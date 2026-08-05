@@ -5465,15 +5465,17 @@ async function openCollectionModal() {
 async function loadAllUnsettledCash() {
   showLoading('Loading unsettled cash...');
   try {
+    // ✅ Get unsettled cash from settlements table (not transactions)
     const { data, error } = await supabase
-      .from('transactions')
+      .from('settlements')
       .select('*')
-      .eq('payment_method', 'Cash')
-      .eq('settled', false)
-      .order('timestamp', { ascending: false });
+      .eq('collected', false)
+      .order('date', { ascending: false });
     
     if (error) throw error;
+    
     allUnsettledCash = data || [];
+    console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements`);
     updateStoreCashSummary();
     updateTotalOutstanding();
     filterCollectionTable();
@@ -5488,7 +5490,9 @@ async function loadAllUnsettledCash() {
 function updateStoreCashSummary() {
   const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
   allUnsettledCash.forEach(rec => {
-    if (storeTotals.hasOwnProperty(rec.store)) storeTotals[rec.store] += rec.total;
+    if (storeTotals.hasOwnProperty(rec.store)) {
+      storeTotals[rec.store] += rec.cash_actual || 0;
+    }
   });
   for (const [store, total] of Object.entries(storeTotals)) {
     const card = document.querySelector(`.store-cash-card[data-store="${store}"]`);
@@ -5519,12 +5523,15 @@ function renderCollectionTable(records) {
   } else {
     let html = '';
     records.forEach(rec => {
-      const date = new Date(rec.timestamp).toLocaleDateString();
+      const date = new Date(rec.date).toLocaleDateString();
+      const employeeName = rec.employee_name || 'Unknown';
+      // ✅ Use cash_actual from settlement
+      const amount = rec.cash_actual || 0;
       html += `<tr data-id="${rec.id}">
         <td><input type="checkbox" class="collection-checkbox" value="${rec.id}"></td>
         <td>${date}</td>
-        <td>${getEmployeeName(rec.employee_id)}</td>
-        <td style="text-align: right;">RM ${rec.total.toFixed(2)}</td>
+        <td>${escapeHtml(employeeName)}</td>
+        <td style="text-align: right;">RM ${amount.toFixed(2)}</td>
       </tr>`;
     });
     tbody.innerHTML = html;
@@ -5567,20 +5574,28 @@ async function loadCollectionHistory(fromDate = null, toDate = null) {
 
   try {
     let query = supabase
-      .from('cash_collections')
+      .from('settlements')
       .select('*')
+      .eq('collected', true)
       .order('collected_at', { ascending: false });
     
-    if (fromDate) query = query.gte('collected_at', fromDate);
-    if (toDate) query = query.lte('collected_at', toDate);
+    if (fromDate) {
+      const from = new Date(fromDate + 'T00:00:00+08:00');
+      query = query.gte('collected_at', from.toISOString());
+    }
+    if (toDate) {
+      const to = new Date(toDate + 'T23:59:59+08:00');
+      query = query.lte('collected_at', to.toISOString());
+    }
     
     const { data, error } = await query;
     if (error) throw error;
     
     if (data && data.length > 0) {
+      // Group by collector
       const collectorTotals = {};
       data.forEach(rec => {
-        const name = rec.collector_name || 'Unknown';
+        const name = rec.collected_by || 'Unknown';
         const amount = parseFloat(rec.cash_actual) || 0;
         collectorTotals[name] = (collectorTotals[name] || 0) + amount;
       });
@@ -5594,18 +5609,21 @@ async function loadCollectionHistory(fromDate = null, toDate = null) {
 
       let detailsHtml = '<div style="max-height: 300px; overflow-y: auto;">';
       for (const rec of data) {
-        const collectionDate = rec.collected_at;
+        const collectionDate = rec.collected_at || rec.timestamp;
         const formattedDate = new Date(collectionDate).toLocaleString();
-        const collector = rec.collector_name || 'Unknown';
+        const collector = rec.collected_by || 'Unknown';
         const amount = parseFloat(rec.cash_actual) || 0;
         const storeName = rec.store ? rec.store.charAt(0).toUpperCase() + rec.store.slice(1).replace('_', ' ') : 'Unknown Store';
+        const settlementDate = new Date(rec.date).toLocaleDateString();
         
         detailsHtml += `
           <div class="collection-history-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e2e8f0;">
             <div style="flex: 3;">
               <div><strong>🏪 ${escapeHtml(storeName)}</strong></div>
-              <div><span class="collector-name">👤 ${escapeHtml(collector)}</span></div>
-              <div style="font-size: 0.75rem; color: #64748b;">${formattedDate}</div>
+              <div><span class="collector-name">👤 Collected by: ${escapeHtml(collector)}</span></div>
+              <div style="font-size: 0.75rem; color: #64748b;">
+                Settlement Date: ${settlementDate} | Collected: ${formattedDate}
+              </div>
             </div>
             <div class="collector-total" style="font-weight: 700; color: #2c7a4b;">RM ${amount.toFixed(2)}</div>
           </div>
@@ -9494,26 +9512,32 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
     updateCollectionButtonState();
   });
   document.getElementById('collectSelectedBtn').addEventListener('click', async () => {
-    const selectedIds = Array.from(document.querySelectorAll('.collection-checkbox:checked')).map(cb => cb.value);
-    if (selectedIds.length === 0) return;
-    showLoading('Marking as collected...');
-    try {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ collected: true, collected_by: currentEmployee.id, collected_by_name: currentEmployee.name, collected_at: new Date().toISOString() })
-        .in('id', selectedIds);
-      
-      if (error) throw error;
-      
-      await showAlertModal('Success', `${selectedIds.length} cash record(s) marked as collected.`);
-      await loadAllUnsettledCash();
-    } catch (err) {
-      console.error(err);
-      await showAlertModal('Error', 'Failed to mark as collected: ' + err.message);
-    } finally {
-      hideLoading();
-    }
-  });
+  const selectedIds = Array.from(document.querySelectorAll('.collection-checkbox:checked')).map(cb => cb.value);
+  if (selectedIds.length === 0) return;
+  
+  showLoading('Marking as collected...');
+  try {
+    // ✅ Update the settlements table
+    const { error } = await supabase
+      .from('settlements')
+      .update({ 
+        collected: true, 
+        collected_by: currentEmployee?.name || 'Unknown',
+        collected_at: new Date().toISOString()
+      })
+      .in('id', selectedIds);
+    
+    if (error) throw error;
+    
+    await showAlertModal('Success', `${selectedIds.length} settlement(s) marked as collected.`);
+    await loadAllUnsettledCash();
+  } catch (err) {
+    console.error(err);
+    await showAlertModal('Error', 'Failed to mark as collected: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+});
 
   // Collection history filters
   document.getElementById('historyDateRangeSelect').addEventListener('change', () => {
