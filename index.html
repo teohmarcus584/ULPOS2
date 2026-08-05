@@ -5093,7 +5093,6 @@ async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
   console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
   
-  // ✅ IMPORTANT: Get today's date in the same format as your transactions
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
   console.log('Report from fetchSalesReport:', report);
@@ -5104,11 +5103,13 @@ async function refreshSettlementTotals(store, silent = false) {
     const qr = report.otherTotal || 0;
     const alipay = report.alipayTotal || 0;
     const refund = report.refundTotal || 0;
+    // ✅ Use netTotal from report
+    const netTotal = report.netTotal || (cash + card + qr + alipay + refund);
 
-    currentSettlementTotals = { cash, card, qr, alipay, refund };
+    currentSettlementTotals = { cash, card, qr, alipay, refund, netTotal };
 
     if (!silent) {
-      console.log(`💰 Updating UI with totals - Cash: ${cash}, Card: ${card}, QR: ${qr}, Alipay: ${alipay}`);
+      console.log(`💰 Updating UI with totals - Cash: ${cash}, Card: ${card}, QR: ${qr}, Alipay: ${alipay}, Net: ${netTotal}`);
       
       const sysCash = document.getElementById('sysCash');
       if (sysCash) sysCash.innerText = `RM ${cash.toFixed(2)}`;
@@ -5121,11 +5122,10 @@ async function refreshSettlementTotals(store, silent = false) {
       const sysRefund = document.getElementById('sysRefund');
       if (sysRefund) sysRefund.innerText = `RM ${Math.abs(refund).toFixed(2)}`;
 
-      const netTotal = cash + card + qr + alipay;
+      // ✅ Use netTotal from report
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
 
-      // Enable settlement fields
       setSettlementFieldsEnabled(true);
       
       const settlementError = document.getElementById('settlementError');
@@ -5139,14 +5139,13 @@ async function refreshSettlementTotals(store, silent = false) {
       const recordBtn = document.getElementById('recordSettlementBtn');
       if (recordBtn) recordBtn.style.display = 'none';
       
-      // Clear any error fields
       const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
       errorFields.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.remove('error-field');
       });
       
-      // Pre-fill actual fields with system totals
+      // ✅ Pre-fill with net totals
       document.getElementById('actualCash').value = cash.toFixed(2);
       document.getElementById('actualCard').value = card.toFixed(2);
       document.getElementById('actualQR').value = qr.toFixed(2);
@@ -7322,7 +7321,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
     
-    // ✅ Fix: Convert local date to UTC range
     if (from) {
       const startDate = new Date(from + 'T00:00:00+08:00');
       query = query.gte('timestamp', startDate.toISOString());
@@ -7340,7 +7338,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     
     console.log(`📊 Found ${data?.length || 0} transactions`);
     
-    // If no transactions, return zeros
     if (!data || data.length === 0) {
       console.log('ℹ️ No transactions found in date range');
       const emptyResult = {
@@ -7352,7 +7349,8 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
         refundTotal: 0,
         refundedTransactionCount: 0,
         transactionCount: 0,
-        totalItems: 0
+        totalItems: 0,
+        netTotal: 0  // ✅ ADD THIS
       };
       if (!silent) {
         document.getElementById('adminReportTotalSales').innerText = `RM 0.00`;
@@ -7364,62 +7362,109 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
         document.getElementById('adminReportRefundedBills').innerText = `0`;
         document.getElementById('adminReportTransactionCount').innerText = `0`;
         document.getElementById('adminReportTotalItems').innerText = `0`;
+        // ✅ Update net total
+        document.getElementById('sysNetTotal').innerText = `RM 0.00`;
       }
       return emptyResult;
     }
     
-    // Calculate totals
-    const totals = {
-      totalSales: 0,
-      cashTotal: 0,
-      cardTotal: 0,
-      otherTotal: 0,
-      alipayTotal: 0,
-      refundTotal: 0,
-      refundedTransactionCount: 0,
-      transactionCount: data.length,
-      totalItems: 0
-    };
+    // ✅ Track refunded transactions
+    const refundedTransactionIds = new Set();
+    let totalSales = 0;
+    let cashTotal = 0;
+    let cardTotal = 0;
+    let otherTotal = 0;
+    let alipayTotal = 0;
+    let refundTotal = 0;
+    let refundedTransactionCount = 0;
+    let totalItems = 0;
     
+    // ✅ First pass: Find all refund transactions
+    for (const tx of data) {
+      const total = parseFloat(tx.total) || 0;
+      if (total < 0) {
+        // This is a refund transaction
+        if (tx.refund_of) {
+          refundedTransactionIds.add(tx.refund_of);
+        }
+        refundTotal += total;
+      }
+    }
+    
+    // ✅ Second pass: Calculate totals
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
       
+      // ✅ Skip refunded transactions (they are already counted in refundTotal)
+      if (tx.transaction_id && refundedTransactionIds.has(tx.transaction_id)) {
+        console.log(`⏭️ Skipping refunded transaction: ${tx.transaction_id}`);
+        continue;
+      }
+      
+      // ✅ Skip refund transactions (negative totals)
       if (total < 0) {
-        totals.refundTotal += total;
+        // Already counted in refundTotal
+        continue;
+      }
+      
+      // ✅ Only count positive transactions that are NOT refunded
+      totalSales += total;
+      
+      const payment = tx.payment_method;
+      if (payment === 'Cash' || payment === 'cash') {
+        cashTotal += total;
+      } else if (payment === 'Card' || payment === 'card') {
+        cardTotal += total;
+      } else if (payment === 'QR Pay' || payment === 'qr' || payment === 'QR') {
+        otherTotal += total;
+      } else if (payment === 'Alipay' || payment === 'alipay') {
+        alipayTotal += total;
       } else {
-        totals.totalSales += total;
-        
-        const payment = tx.payment_method;
-        if (payment === 'Cash' || payment === 'cash') {
-          totals.cashTotal += total;
-        } else if (payment === 'Card' || payment === 'card') {
-          totals.cardTotal += total;
-        } else if (payment === 'QR Pay' || payment === 'qr' || payment === 'QR') {
-          totals.otherTotal += total;
-        } else if (payment === 'Alipay' || payment === 'alipay') {
-          totals.alipayTotal += total;
-        } else {
-          totals.otherTotal += total;
-        }
+        otherTotal += total;
       }
       
       if (tx.items && Array.isArray(tx.items)) {
         for (const item of tx.items) {
-          totals.totalItems += parseInt(item.quantity) || 0;
+          totalItems += parseInt(item.quantity) || 0;
         }
       }
     }
     
+    // ✅ Count refunded transactions
+    refundedTransactionCount = refundedTransactionIds.size;
+    
+    // ✅ Calculate net total (sales - refunds)
+    const netTotal = totalSales + refundTotal;
+    
+    const totals = {
+      totalSales: totalSales,
+      cashTotal: cashTotal,
+      cardTotal: cardTotal,
+      otherTotal: otherTotal,
+      alipayTotal: alipayTotal,
+      refundTotal: refundTotal,
+      refundedTransactionCount: refundedTransactionCount,
+      transactionCount: data.length,
+      totalItems: totalItems,
+      netTotal: netTotal  // ✅ ADD THIS
+    };
+    
+    console.log('📊 Totals calculated:', totals);
+    
     if (!silent) {
-      document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
-      document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
-      document.getElementById('adminReportCardTotal').innerText = `RM ${totals.cardTotal.toFixed(2)}`;
-      document.getElementById('adminReportQRTotal').innerText = `RM ${totals.otherTotal.toFixed(2)}`;
-      document.getElementById('adminReportAlipayTotal').innerText = `RM ${totals.alipayTotal.toFixed(2)}`;
-      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(totals.refundTotal).toFixed(2)}`;
-      document.getElementById('adminReportRefundedBills').innerText = totals.refundedTransactionCount || 0;
-      document.getElementById('adminReportTransactionCount').innerText = totals.transactionCount || 0;
-      document.getElementById('adminReportTotalItems').innerText = totals.totalItems || 0;
+      document.getElementById('adminReportTotalSales').innerText = `RM ${totalSales.toFixed(2)}`;
+      document.getElementById('adminReportCashTotal').innerText = `RM ${cashTotal.toFixed(2)}`;
+      document.getElementById('adminReportCardTotal').innerText = `RM ${cardTotal.toFixed(2)}`;
+      document.getElementById('adminReportQRTotal').innerText = `RM ${otherTotal.toFixed(2)}`;
+      document.getElementById('adminReportAlipayTotal').innerText = `RM ${alipayTotal.toFixed(2)}`;
+      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(refundTotal).toFixed(2)}`;
+      document.getElementById('adminReportRefundedBills').innerText = refundedTransactionCount || 0;
+      document.getElementById('adminReportTransactionCount').innerText = data.length || 0;
+      document.getElementById('adminReportTotalItems').innerText = totalItems || 0;
+      
+      // ✅ Update settlement modal with net total
+      const sysNetTotal = document.getElementById('sysNetTotal');
+      if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
     }
     
     return totals;
