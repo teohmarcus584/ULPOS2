@@ -5780,13 +5780,28 @@ async function fetchAndCacheReceipts() {
     }
     cachedReceipts = null;
   }
-
+async function fetchAndCacheReceipts() { 
+  try {
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('timestamp', { ascending: false });  // ✅ No limit!
+    cachedReceipts = data || [];
+    if (document.getElementById('receiptsModal')?.style.display === 'flex') {
+      renderReceiptsList(cachedReceipts);
+    }
+    return;
+  } catch(e) { 
+    console.error('fetchAndCacheReceipts error:', e);
+    return; 
+  }
+}
 async function fetchReceipts(store, employeeId, from, to, search) {
   try {
     let query = supabase
       .from('transactions')
       .select('*')
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false });  // ✅ No limit
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
