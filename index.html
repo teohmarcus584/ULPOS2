@@ -2474,14 +2474,17 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 
 // ==================== CONFIGURATION ====================
 // ==================== SUPABASE CONFIG ====================
+// ==================== SUPABASE CONFIG ====================
 const SUPABASE_URL = "https://zhtfjvqmxbzeuukcinky.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 
-// ✅ Make it global using 'var' or assign to window
+// ✅ This is the correct way to create the client
 var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Or if you prefer using window:
-// window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Log to verify
+console.log('✅ Supabase client created');
+console.log('🔗 URL:', SUPABASE_URL);
+console.log('🔑 Key starts with:', SUPABASE_ANON_KEY.substring(0, 20));
 const APPS_SCRIPT_URL = "";  // Empty string since we're not using it anymore
 
 
@@ -5739,91 +5742,25 @@ async function fetchAndCacheReceipts() {
     const receiptsModal = document.getElementById('receiptsModal');
     const isModalOpen = receiptsModal && receiptsModal.style.display === 'flex';
     
-    let store, employeeId, range, search, from, to;
+    let store = isModalOpen ? document.getElementById('receiptsStoreSelect')?.value || 'all' : currentStore;
+    let employeeId = isModalOpen ? document.getElementById('receiptsEmployeeSelect')?.value || 'all' : 'all';
+    let search = isModalOpen ? document.getElementById('receiptsSearch')?.value || '' : '';
     
+    // ✅ Use Supabase
+    let query = supabase
+      .from('transactions')
+      .select('*')
+      .order('timestamp', { ascending: false });
+    
+    if (store && store !== 'all') query = query.eq('store', store);
+    if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    cachedReceipts = data || [];
     if (isModalOpen) {
-      // Use current UI selections
-      if (currentEmployee?.isAdmin) {
-        store = document.getElementById('receiptsStoreSelect')?.value || 'all';
-        employeeId = document.getElementById('receiptsEmployeeSelect')?.value || 'all';
-      } else {
-        store = currentStore;
-        employeeId = 'all';
-      }
-      range = document.getElementById('receiptsDateRangeSelect')?.value || 'today';
-      search = document.getElementById('receiptsSearch')?.value || '';
-      
-      // Compute local dates (same as updateReceipts)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (range === 'today') {
-        from = getLocalDateString(today);
-        to = from;
-      } else if (range === 'week') {
-        const start = new Date(today);
-        const dayOfWeek = today.getDay();
-        const diffToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-        start.setDate(today.getDate() - diffToMonday);
-        from = getLocalDateString(start);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        to = getLocalDateString(end);
-      } else if (range === 'month') {
-        const start = new Date(today.getFullYear(), today.getMonth(), 1);
-        from = getLocalDateString(start);
-        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        to = getLocalDateString(end);
-      } else if (range === 'year') {
-        const start = new Date(today.getFullYear(), 0, 1);
-        from = getLocalDateString(start);
-        const end = new Date(today.getFullYear(), 11, 31);
-        to = getLocalDateString(end);
-      } else if (range === 'custom') {
-        from = document.getElementById('receiptsFromDate')?.value;
-        to = document.getElementById('receiptsToDate')?.value;
-        if (!from || !to) return;
-      }
-    } else {
-      // Modal closed – default to today's local date (keep cache fresh)
-      if (currentEmployee?.isAdmin) {
-        store = 'all';
-        employeeId = 'all';
-      } else {
-        store = currentStore;
-        employeeId = 'all';
-      }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      from = getLocalDateString(today);
-      to = from;
-      search = '';
-    }
-    
-    let url = `${APPS_SCRIPT_URL}?action=getReceipts&store=${store}&employeeId=${employeeId}`;
-    if (from) url += `&from=${encodeURIComponent(from)}`;
-    if (to) url += `&to=${encodeURIComponent(to)}`;
-    if (search) url += `&search=${encodeURIComponent(search)}`;
-    
-    const response = await fetch(url);
-    const result = await response.json();
-    if (result.success) {
-      let receipts = result.receipts;
-      
-      // ✅ Apply local‑date filtering (ensures correct local day boundaries)
-      if (from || to) {
-        receipts = receipts.filter(rec => {
-          const receiptDate = new Date(rec.timestamp);
-          const localDateStr = getLocalDateString(receiptDate);
-          if (from && localDateStr < from) return false;
-          if (to && localDateStr > to) return false;
-          return true;
-        });
-      }
-      
-      cachedReceipts = receipts;
-      if (isModalOpen) {
-        renderReceiptsList(cachedReceipts);
-      }
+      renderReceiptsList(cachedReceipts);
     }
   } catch (err) {
     console.error('Background receipt fetch failed:', err);
@@ -8086,37 +8023,66 @@ async function refreshReportInBackground(store, employeeId, from, to, unsettledO
 async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, silent = false) {
   if (!silent) showLoading('Loading report...');
   try {
-    let url = `${APPS_SCRIPT_URL}?action=getSalesReport&store=${store}&employeeId=${employeeId}`;
-    if (from) url += `&from=${encodeURIComponent(from)}`;
-    if (to) url += `&to=${encodeURIComponent(to)}`;
-    if (unsettledOnly) url += `&unsettledOnly=true`;
-    const response = await fetch(url);
-    const result = await response.json();
-    if (result.success) {
-      if (!silent) {
-        const totalSalesEl = document.getElementById('adminReportTotalSales');
-        if (totalSalesEl) totalSalesEl.innerText = `RM ${(result.totalSales || 0).toFixed(2)}`;
-        const cashTotalEl = document.getElementById('adminReportCashTotal');
-        if (cashTotalEl) cashTotalEl.innerText = `RM ${(result.cashTotal || 0).toFixed(2)}`;
-        const cardTotalEl = document.getElementById('adminReportCardTotal');
-        if (cardTotalEl) cardTotalEl.innerText = `RM ${(result.cardTotal || 0).toFixed(2)}`;
-        const qrTotalEl = document.getElementById('adminReportQRTotal');
-        if (qrTotalEl) qrTotalEl.innerText = `RM ${(result.otherTotal || 0).toFixed(2)}`;
-        const alipayTotalEl = document.getElementById('adminReportAlipayTotal');
-        if (alipayTotalEl) alipayTotalEl.innerText = `RM ${(result.alipayTotal || 0).toFixed(2)}`;
-        const refundTotalEl = document.getElementById('adminReportRefundTotal');
-        if (refundTotalEl) refundTotalEl.innerText = `RM ${Math.abs(result.refundTotal || 0).toFixed(2)}`;
-        const refundedBillsEl = document.getElementById('adminReportRefundedBills');
-        if (refundedBillsEl) refundedBillsEl.innerText = result.refundedTransactionCount || 0;
-        const transactionCountEl = document.getElementById('adminReportTransactionCount');
-        if (transactionCountEl) transactionCountEl.innerText = result.transactionCount || 0;
-        const totalItemsEl = document.getElementById('adminReportTotalItems');
-        if (totalItemsEl) totalItemsEl.innerText = result.totalItems || 0;
+    // ✅ Use Supabase instead of Google Sheets
+    let query = supabase
+      .from('transactions')
+      .select('*');
+    
+    if (store && store !== 'all') query = query.eq('store', store);
+    if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
+    if (from) query = query.gte('timestamp', from);
+    if (to) query = query.lte('timestamp', to);
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    // Aggregate totals
+    const totals = {
+      totalSales: 0,
+      cashTotal: 0,
+      cardTotal: 0,
+      otherTotal: 0,
+      alipayTotal: 0,
+      refundTotal: 0,
+      refundedTransactionCount: 0,
+      transactionCount: data.length,
+      totalItems: 0
+    };
+    
+    data.forEach(tx => {
+      const total = parseFloat(tx.total) || 0;
+      if (total < 0) {
+        totals.refundTotal += total;
+        totals.refundedTransactionCount++;
+      } else {
+        totals.totalSales += total;
+        switch (tx.payment_method) {
+          case 'Cash': totals.cashTotal += total; break;
+          case 'Card': totals.cardTotal += total; break;
+          case 'QR Pay': totals.otherTotal += total; break;
+          case 'Alipay': totals.alipayTotal += total; break;
+        }
       }
-      return result;
-    } else {
-      throw new Error(result.error || 'Report data error');
+      if (tx.items) {
+        tx.items.forEach(item => {
+          totals.totalItems += parseInt(item.quantity) || 0;
+        });
+      }
+    });
+    
+    if (!silent) {
+      document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
+      document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
+      document.getElementById('adminReportCardTotal').innerText = `RM ${totals.cardTotal.toFixed(2)}`;
+      document.getElementById('adminReportQRTotal').innerText = `RM ${totals.otherTotal.toFixed(2)}`;
+      document.getElementById('adminReportAlipayTotal').innerText = `RM ${totals.alipayTotal.toFixed(2)}`;
+      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(totals.refundTotal).toFixed(2)}`;
+      document.getElementById('adminReportRefundedBills').innerText = totals.refundedTransactionCount || 0;
+      document.getElementById('adminReportTransactionCount').innerText = totals.transactionCount || 0;
+      document.getElementById('adminReportTotalItems').innerText = totals.totalItems || 0;
     }
+    
+    return totals;
   } catch (err) {
     console.error('fetchSalesReport error:', err);
     if (!silent) await showAlertModal('Error', 'Failed to load report: ' + err.message);
@@ -8126,16 +8092,37 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
   }
 }
    async function fetchEmployeeSalesData(store, from, to) {
-    try {
-      let url = `${APPS_SCRIPT_URL}?action=getEmployeeSalesData&store=${store}`;
-      if (from) url += `&from=${encodeURIComponent(from)}`;
-      if (to) url += `&to=${encodeURIComponent(to)}`;
-      const response = await fetch(url);
-      const result = await response.json();
-      if (result.success) return { labels: result.labels || [], data: result.data || [], transactionCounts: result.transactionCounts || [] };
-      return null;
-    } catch(err) { console.error(err); return null; }
+  try {
+    let query = supabase
+      .from('transactions')
+      .select('employee_name, total, payment_method, items');
+    
+    if (store && store !== 'all') query = query.eq('store', store);
+    if (from) query = query.gte('timestamp', from);
+    if (to) query = query.lte('timestamp', to);
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    // Aggregate by employee
+    const employeeMap = {};
+    data.forEach(tx => {
+      const name = tx.employee_name || 'Unknown';
+      const total = parseFloat(tx.total) || 0;
+      if (total > 0) {
+        employeeMap[name] = (employeeMap[name] || 0) + total;
+      }
+    });
+    
+    const labels = Object.keys(employeeMap);
+    const salesData = Object.values(employeeMap);
+    
+    return { labels, data: salesData };
+  } catch(err) { 
+    console.error('fetchEmployeeSalesData error:', err); 
+    return null; 
   }
+}
 
 async function fetchProductSalesReport(store, employeeId, from, to) {
   try {
