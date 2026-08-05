@@ -4697,11 +4697,18 @@ async function processRefund(transactionId, store) {
       return;
     }
 
-    const refundId = `REF-${transactionId}`;
+    // Check if already refunded
+    if (transaction.refunded === true) {
+      await showAlertModal('Error', 'This transaction has already been refunded.');
+      hideLoading();
+      return;
+    }
+
+    const refundId = `REF-${transactionId}-${Date.now()}`;
     const refundItems = transaction.items.map(item => ({
       ...item,
-      quantity: -item.quantity,
-      total: -item.total
+      quantity: -Math.abs(item.quantity || 0),
+      total: -Math.abs(item.total || 0)
     }));
 
     const refundData = {
@@ -4709,66 +4716,90 @@ async function processRefund(transactionId, store) {
       store: store,
       employee_id: currentEmployee.id,
       employee_name: currentEmployee.name,
-      total: -transaction.total,
-      payment_method: transaction.payment_method,
+      total: -Math.abs(transaction.total || 0),
+      payment_method: transaction.payment_method || 'Cash',
       items: refundItems,
       timestamp: new Date().toISOString(),
-      refunded_from: transactionId,
-      discount: -transaction.discount || 0,
-      buy2_free1_discount: -transaction.buy2_free1_discount || 0,
-      buy3_free1_discount: -transaction.buy3_free1_discount || 0,
-      custom_discount: -transaction.custom_discount || 0,
-      staff_discount: -transaction.staff_discount || 0
+      refund_of: transactionId,  // ✅ Use refund_of instead of refunded_from
+      discount: -(transaction.discount || 0),
+      buy2_free1_discount: -(transaction.buy2_free1_discount || 0),
+      buy3_free1_discount: -(transaction.buy3_free1_discount || 0),
+      custom_discount: -(transaction.custom_discount || 0),
+      staff_discount: -(transaction.staff_discount || 0),
+      settled: false,
+      refunded: false
     };
 
     const { error } = await supabase
       .from('transactions')
       .insert([refundData]);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Insert refund error:', error);
+      await showAlertModal('Error', 'Failed to create refund: ' + error.message);
+      hideLoading();
+      return;
+    }
 
     // Mark original as refunded
-    await supabase
+    const { error: updateError } = await supabase
       .from('transactions')
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
+    
+    if (updateError) {
+      console.error('Update refund status error:', updateError);
+    }
 
     // Restore stock
     for (const item of transaction.items) {
-      const { data: product, error: pError } = await supabase
-        .from('products')
-        .select('stock')
-        .eq('id', item.id)
-        .single();
-      
-      if (product && !pError) {
-        const newStock = product.stock + item.quantity;
-        await supabase
+      if (item.quantity > 0) {
+        const { data: product, error: pError } = await supabase
           .from('products')
-          .update({ stock: newStock })
-          .eq('id', item.id);
+          .select('stock')
+          .eq('id', item.id)
+          .single();
         
-        const localProduct = products.find(p => p.id == item.id);
-        if (localProduct) {
-          localProduct.stock = newStock;
+        if (product && !pError) {
+          const newStock = (product.stock || 0) + item.quantity;
+          await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', item.id);
+          
+          const localProduct = products.find(p => p.id == item.id);
+          if (localProduct) {
+            localProduct.stock = newStock;
+          }
         }
       }
     }
 
-    await showAlertModal('Refund Successful', `Refund ID: ${refundId}\nStock restored.`);
+    await showAlertModal('Refund Successful', 
+      `Refund ID: ${refundId}\nStock restored for ${transaction.items.length} item(s).`
+    );
 
+    // Print refund receipt if printer is connected
     if (window.printerAPI?.isConnected) {
-      const printed = await window.printerAPI.printReceipt(refundData);
-      if (!printed) {
-        console.warn('Refund receipt print failed');
+      try {
+        const refundReceipt = {
+          ...refundData,
+          employee_name: currentEmployee.name,
+          store: store
+        };
+        await window.printerAPI.printReceipt(refundReceipt);
+      } catch (printErr) {
+        console.warn('Print refund receipt failed:', printErr);
       }
     }
 
+    // Update local data
     updateReceipts();
     localStorage.removeItem(`products_${currentStore}`);
     await fetchProductsFromSheet();
     invalidateAllReportCaches();
 
+    // Update cached receipts
     if (cachedReceipts) {
       const originalReceipt = cachedReceipts.find(r => r.transaction_id === transactionId);
       if (originalReceipt) {
@@ -4785,8 +4816,9 @@ async function processRefund(transactionId, store) {
     if (reportModal && reportModal.style.display === 'flex') {
       await updateAdminReport(true);
     }
+    
   } catch (err) {
-    console.error(err);
+    console.error('Refund error:', err);
     await showAlertModal('Refund Failed', err.message || 'Connection error while processing refund.');
   } finally {
     hideLoading();
