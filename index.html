@@ -3946,7 +3946,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
 
 async function saveTransactionToSheet(transaction) {
   try {
-    // Map the transaction data to match your exact table columns
+    // 1. Save to transactions table
     const { error } = await supabase
       .from('transactions')
       .insert([{
@@ -3978,13 +3978,94 @@ async function saveTransactionToSheet(transaction) {
       console.error('Save transaction error:', error);
       throw error;
     }
+    
+    // 2. ✅ IRS Reporting for Card and Alipay
+    const paymentMethod = String(transaction.payment_method).toLowerCase();
+    if (paymentMethod === 'card' || paymentMethod === 'alipay') {
+      console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
+      
+      // Get next invoice number
+      const invoiceNo = await getNextIRSInvoiceNumber();
+      
+      // Save to IRS reporting table
+      const { error: irsError } = await supabase
+        .from('irs_reporting')
+        .insert([{
+          invoice_no: invoiceNo,
+          transaction_id: transaction.transaction_id,
+          timestamp: transaction.timestamp,
+          items: JSON.stringify(transaction.items),
+          total: transaction.total,
+          store: transaction.store,
+          employee_id: transaction.employee_id,
+          employee_name: transaction.employee_name || '',
+          payment_method: transaction.payment_method,
+          created_at: new Date().toISOString()
+        }]);
+      
+      if (irsError) {
+        console.error('❌ IRS reporting error:', irsError);
+        // Don't fail the transaction if IRS fails, just log it
+      } else {
+        console.log(`✅ IRS report saved: ${invoiceNo}`);
+      }
+    }
+    
     return true;
   } catch (err) {
     console.error('saveTransactionToSheet error:', err);
     return false;
   }
 }
-
+// In processRefund function, add this after creating the refund:
+if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
+  const invoiceNo = await getNextIRSInvoiceNumber();
+  const { error: irsError } = await supabase
+    .from('irs_reporting')
+    .insert([{
+      invoice_no: `REF-${invoiceNo}`,
+      transaction_id: refundId,
+      timestamp: new Date().toISOString(),
+      items: JSON.stringify(refundItems),
+      total: refundTotal,
+      store: store,
+      employee_id: currentEmployee.id,
+      employee_name: currentEmployee.name,
+      payment_method: transaction.payment_method,
+      created_at: new Date().toISOString()
+    }]);
+  
+  if (irsError) {
+    console.error('❌ IRS refund report error:', irsError);
+  }
+}
+async function getNextIRSInvoiceNumber() {
+  try {
+    const { data, error } = await supabase
+      .from('irs_reporting')
+      .select('invoice_no')
+      .order('invoice_no', { ascending: false })
+      .limit(1);
+    
+    if (error) throw error;
+    
+    let nextNum = 1;
+    if (data && data.length > 0) {
+      const lastInvoice = data[0].invoice_no;
+      const match = lastInvoice.match(/INV-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1]) + 1;
+      }
+    }
+    
+    return `INV-${String(nextNum).padStart(4, '0')}`;
+  } catch (err) {
+    console.error('getNextIRSInvoiceNumber error:', err);
+    // Fallback
+    const timestamp = Date.now();
+    return `INV-${timestamp}`;
+  }
+}
 async function getNextTransactionNumber(store) {
   try {
     const prefix = store.substring(0, 3).toUpperCase();
