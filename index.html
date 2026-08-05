@@ -7321,8 +7321,16 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
-    if (from) query = query.gte('timestamp', from);
-    if (to) query = query.lte('timestamp', to);
+    
+    // ✅ Fix: Convert local date to UTC range
+    if (from) {
+      const startDate = new Date(from + 'T00:00:00+08:00');
+      query = query.gte('timestamp', startDate.toISOString());
+    }
+    if (to) {
+      const endDate = new Date(to + 'T23:59:59+08:00');
+      query = query.lte('timestamp', endDate.toISOString());
+    }
     
     const { data, error } = await query;
     if (error) {
@@ -7381,7 +7389,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       } else {
         totals.totalSales += total;
         
-        // Count payment methods
         const payment = tx.payment_method;
         if (payment === 'Cash' || payment === 'cash') {
           totals.cashTotal += total;
@@ -7392,11 +7399,10 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
         } else if (payment === 'Alipay' || payment === 'alipay') {
           totals.alipayTotal += total;
         } else {
-          totals.otherTotal += total; // fallback
+          totals.otherTotal += total;
         }
       }
       
-      // Count items
       if (tx.items && Array.isArray(tx.items)) {
         for (const item of tx.items) {
           totals.totalItems += parseInt(item.quantity) || 0;
@@ -7404,14 +7410,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       }
     }
     
-    // Count refunded transactions
-    if (data.some(tx => tx.refunded === true)) {
-      totals.refundedTransactionCount = data.filter(tx => tx.refunded === true).length;
-    }
-    
-    console.log('📊 Totals calculated:', totals);
-    
-    // Update UI
     if (!silent) {
       document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
       document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
