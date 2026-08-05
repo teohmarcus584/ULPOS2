@@ -2989,7 +2989,6 @@ async function autoSelectStoreByLocation() {
 
 async function fetchProductsFromSheet(force = false) {
   try {
-    // Get the current store
     const store = currentStore;
     const stockColumn = `stock_${store}`;
     
@@ -3000,14 +2999,12 @@ async function fetchProductsFromSheet(force = false) {
     
     if (error) throw error;
     
-    // Map the data to the format expected by the POS
     products = data.map(p => ({
       id: p.id,
       name: p.name,
       price: parseFloat(p.price),
-      stock: parseInt(p[stockColumn]) || 0,  // Use the store-specific stock column
+      stock: parseInt(p[stockColumn]) || 0,
       category: p.category || "Uncategorized",
-      // Keep the store-specific stock values for updating
       stock_queens: parseInt(p.stock_queens) || 0,
       stock_sunshine: parseInt(p.stock_sunshine) || 0,
       stock_gurney_paragon: parseInt(p.stock_gurney_paragon) || 0
@@ -8543,13 +8540,25 @@ async function preloadProductsForStore(store) {
       }
     }
     
-    const { data: products, error: productError } = await supabase
+    // ✅ FIX: Get all products and filter by store's stock column
+    const { data: allProducts, error: productError } = await supabase
       .from('products')
       .select('*')
-      .eq('store', store)
       .order('name');
     
     if (productError) throw productError;
+    
+    // Filter products that have stock for this store
+    const stockColumn = `stock_${store}`;
+    const products = allProducts
+      .filter(p => p[stockColumn] !== undefined && p[stockColumn] !== null)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        price: parseFloat(p.price),
+        stock: parseInt(p[stockColumn]) || 0,
+        category: p.category || "Uncategorized"
+      }));
     
     let employees = cachedEmployees;
     if (employees.length === 0) {
@@ -8661,6 +8670,7 @@ async function backgroundSync() {
     const cacheKey = `products_${store}`;
     const hashKey = `products_hash_${store}`;
     const cached = localStorage.getItem(cacheKey);
+    
     if (!cached) {
       const wasInStockTakeMode = stockTakeMode;
       await fetchProductsFromSheet(false);
@@ -8670,16 +8680,22 @@ async function backgroundSync() {
       }
       return;
     }
+    
     const { hash: cachedHash } = JSON.parse(cached);
     
+    // ✅ FIX: Get all products and calculate hash based on store-specific stock
     const { data, error } = await supabase
       .from('products')
-      .select('*')
-      .eq('store', store);
+      .select('*');
     
     if (error) throw error;
     
-    const newHash = JSON.stringify(data.map(p => ({ id: p.id, stock: p.stock })));
+    const stockColumn = `stock_${store}`;
+    const newHash = JSON.stringify(data.map(p => ({ 
+      id: p.id, 
+      stock: p[stockColumn] 
+    })));
+    
     if (newHash !== cachedHash) {
       console.log("Hash mismatch, updating products...");
       const wasInStockTakeMode = stockTakeMode;
