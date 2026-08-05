@@ -2478,10 +2478,10 @@ const SUPABASE_URL = "https://zhtfjvqmxbzeuukcinky.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 
 // ✅ Make it global using 'var' or assign to window
-var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Or if you prefer using window:
-// window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const APPS_SCRIPT_URL = "";  // Empty string since we're not using it anymore
 
 
@@ -3533,7 +3533,7 @@ async function loadAndCacheEmployees(force = false) {
     return cachedEmployees;
   }
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('employees')
       .select('*')
       .order('name');
@@ -4248,7 +4248,7 @@ async function addNewProduct() {
       }
     }
     
-    const { data: products, error: productError } = await supabaseClient
+    const { data: products, error: productError } = await supabase
       .from('products')
       .select('*')
       .eq('store', store)
@@ -11077,7 +11077,7 @@ document.getElementById('lowStockToggleBtn')?.addEventListener('click', () => {
 
   async function fetchEmployees() {
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
       .from('employees')
       .select('*')
       .order('name');
