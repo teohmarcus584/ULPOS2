@@ -2477,11 +2477,7 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 const SUPABASE_URL = "https://zhtfjvqmxbzeuukcinky.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 
-// ✅ Check if supabase already exists before declaring
-// ✅ Create client with a different name
-const supabaseClient = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// Or use let instead of const
-// let supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 
 
