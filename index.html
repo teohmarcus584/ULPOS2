@@ -4016,28 +4016,7 @@ async function saveTransactionToSheet(transaction) {
     return false;
   }
 }
-// In processRefund function, add this after creating the refund:
-if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
-  const invoiceNo = await getNextIRSInvoiceNumber();
-  const { error: irsError } = await supabase
-    .from('irs_reporting')
-    .insert([{
-      invoice_no: `REF-${invoiceNo}`,
-      transaction_id: refundId,
-      timestamp: new Date().toISOString(),
-      items: JSON.stringify(refundItems),
-      total: refundTotal,
-      store: store,
-      employee_id: currentEmployee.id,
-      employee_name: currentEmployee.name,
-      payment_method: transaction.payment_method,
-      created_at: new Date().toISOString()
-    }]);
-  
-  if (irsError) {
-    console.error('❌ IRS refund report error:', irsError);
-  }
-}
+
 async function getNextIRSInvoiceNumber() {
   try {
     const { data, error } = await supabase
@@ -4912,7 +4891,7 @@ async function processRefund(transactionId, store) {
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
 
-    // ✅ IRS Reporting for refunds (Card and Alipay)
+    // ✅ IRS Reporting for refunds (Card and Alipay) - INSIDE the function
     if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
       console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
       
