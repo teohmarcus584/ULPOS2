@@ -3979,7 +3979,7 @@ async function saveTransactionToSheet(transaction) {
       throw error;
     }
     
-    // 2. ✅ IRS Reporting for Card and Alipay
+    // 2. ✅ IRS Reporting for Card and Alipay (matching Google Sheet structure)
     const paymentMethod = String(transaction.payment_method).toLowerCase();
     if (paymentMethod === 'card' || paymentMethod === 'alipay') {
       console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
@@ -3987,7 +3987,7 @@ async function saveTransactionToSheet(transaction) {
       // Get next invoice number
       const invoiceNo = await getNextIRSInvoiceNumber();
       
-      // Save to IRS reporting table
+      // Save to IRS reporting table (matching Google Sheet columns)
       const { error: irsError } = await supabase
         .from('irs_reporting')
         .insert([{
@@ -3998,8 +3998,7 @@ async function saveTransactionToSheet(transaction) {
           total: transaction.total,
           store: transaction.store,
           employee_id: transaction.employee_id,
-          employee_name: transaction.employee_name || '',
-          payment_method: transaction.payment_method,
+          employee_name: transaction.employee_name || currentEmployee?.name || '',
           created_at: new Date().toISOString()
         }]);
       
@@ -4058,10 +4057,12 @@ async function getNextIRSInvoiceNumber() {
       }
     }
     
-    return `INV-${String(nextNum).padStart(4, '0')}`;
+    const newInvoice = `INV-${String(nextNum).padStart(4, '0')}`;
+    console.log(`📋 New IRS invoice number: ${newInvoice}`);
+    return newInvoice;
   } catch (err) {
     console.error('getNextIRSInvoiceNumber error:', err);
-    // Fallback
+    // Fallback: use timestamp
     const timestamp = Date.now();
     return `INV-${timestamp}`;
   }
@@ -4860,7 +4861,6 @@ async function processRefund(transactionId, store) {
       return;
     }
 
-    // Check if already refunded
     if (transaction.refunded === true) {
       await showAlertModal('Error', 'This transaction has already been refunded.');
       hideLoading();
@@ -4873,17 +4873,18 @@ async function processRefund(transactionId, store) {
       quantity: -Math.abs(item.quantity || 0),
       total: -Math.abs(item.total || 0)
     }));
+    const refundTotal = -Math.abs(transaction.total || 0);
 
     const refundData = {
       transaction_id: refundId,
       store: store,
       employee_id: currentEmployee.id,
       employee_name: currentEmployee.name,
-      total: -Math.abs(transaction.total || 0),
+      total: refundTotal,
       payment_method: transaction.payment_method || 'Cash',
       items: refundItems,
       timestamp: new Date().toISOString(),
-      refund_of: transactionId,  // ✅ Use refund_of instead of refunded_from
+      refund_of: transactionId,
       discount: -(transaction.discount || 0),
       buy2_free1_discount: -(transaction.buy2_free1_discount || 0),
       buy3_free1_discount: -(transaction.buy3_free1_discount || 0),
@@ -4893,6 +4894,7 @@ async function processRefund(transactionId, store) {
       refunded: false
     };
 
+    // Save refund to transactions
     const { error } = await supabase
       .from('transactions')
       .insert([refundData]);
@@ -4905,13 +4907,35 @@ async function processRefund(transactionId, store) {
     }
 
     // Mark original as refunded
-    const { error: updateError } = await supabase
+    await supabase
       .from('transactions')
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
-    
-    if (updateError) {
-      console.error('Update refund status error:', updateError);
+
+    // ✅ IRS Reporting for refunds (Card and Alipay)
+    if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
+      console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
+      
+      const invoiceNo = await getNextIRSInvoiceNumber();
+      const { error: irsError } = await supabase
+        .from('irs_reporting')
+        .insert([{
+          invoice_no: `REF-${invoiceNo}`,
+          transaction_id: refundId,
+          timestamp: new Date().toISOString(),
+          items: JSON.stringify(refundItems),
+          total: refundTotal,
+          store: store,
+          employee_id: currentEmployee.id,
+          employee_name: currentEmployee.name,
+          created_at: new Date().toISOString()
+        }]);
+      
+      if (irsError) {
+        console.error('❌ IRS refund report error:', irsError);
+      } else {
+        console.log(`✅ IRS refund report saved: REF-${invoiceNo}`);
+      }
     }
 
     // Restore stock
@@ -4962,7 +4986,6 @@ async function processRefund(transactionId, store) {
     await fetchProductsFromSheet();
     invalidateAllReportCaches();
 
-    // Update cached receipts
     if (cachedReceipts) {
       const originalReceipt = cachedReceipts.find(r => r.transaction_id === transactionId);
       if (originalReceipt) {
@@ -4987,7 +5010,33 @@ async function processRefund(transactionId, store) {
     hideLoading();
   }
 }
-
+async function viewIRSReports(store = null, fromDate = null, toDate = null) {
+  try {
+    let query = supabase
+      .from('irs_reporting')
+      .select('*')
+      .order('timestamp', { ascending: false });
+    
+    if (store && store !== 'all') query = query.eq('store', store);
+    if (fromDate) {
+      const from = new Date(fromDate + 'T00:00:00+08:00');
+      query = query.gte('timestamp', from.toISOString());
+    }
+    if (toDate) {
+      const to = new Date(toDate + 'T23:59:59+08:00');
+      query = query.lte('timestamp', to.toISOString());
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    console.log(`📋 IRS Reports (${data?.length || 0}):`, data);
+    return data;
+  } catch (err) {
+    console.error('viewIRSReports error:', err);
+    return [];
+  }
+}
 async function reprintReceipt(receipt) {
   if (!isPrinterConnected) {
     const connectNow = await showConfirmModal(
