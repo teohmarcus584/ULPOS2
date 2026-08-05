@@ -4428,17 +4428,13 @@ async function fetchAndCacheReceipts() {
       .select('*')
       .order('timestamp', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ fetchAndCacheReceipts error:', error);
+      cachedReceipts = [];
+      return;
+    }
     
-    // Ensure employee_name is set from employee_id if missing
-    cachedReceipts = (data || []).map(rec => {
-      if (!rec.employee_name && rec.employee_id) {
-        const emp = cachedEmployees.find(e => String(e.id) === String(rec.employee_id));
-        if (emp) rec.employee_name = emp.name;
-      }
-      return rec;
-    });
-    
+    cachedReceipts = data || [];
     console.log(`✅ Loaded ${cachedReceipts.length} receipts`);
     
     const modal = document.getElementById('receiptsModal');
@@ -4469,20 +4465,26 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     }
     
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('❌ fetchReceipts error:', error);
+      cachedReceipts = [];
+      renderReceiptsList(cachedReceipts);
+      return;
+    }
     
-    // Ensure employee_name is set
-    cachedReceipts = (data || []).map(rec => {
-      if (!rec.employee_name && rec.employee_id) {
-        const emp = cachedEmployees.find(e => String(e.id) === String(rec.employee_id));
-        if (emp) rec.employee_name = emp.name;
-      }
-      return rec;
-    });
+    console.log(`✅ Fetched ${data?.length || 0} receipts`);
     
+    cachedReceipts = data || [];
     renderReceiptsList(cachedReceipts);
+    
+    // Hide loading message
+    const msg = document.getElementById('receiptsLoadingMsg');
+    if (msg) msg.style.display = 'none';
+    
   } catch (err) {
     console.error('fetchReceipts error:', err);
+    cachedReceipts = [];
+    renderReceiptsList(cachedReceipts);
     await showAlertModal('Error', 'Failed to load receipts.');
   }
 }
@@ -4532,7 +4534,7 @@ function renderReceiptsList(receipts) {
     for (const rec of dayReceipts) {
       const date = new Date(rec.timestamp).toLocaleString();
       
-      // Get employee name from cache if missing
+      // ✅ FIX: Get employee name from cache or use employee_id
       let employeeName = rec.employee_name;
       if (!employeeName && rec.employee_id) {
         const emp = cachedEmployees.find(e => String(e.id) === String(rec.employee_id));
@@ -4547,30 +4549,38 @@ function renderReceiptsList(receipts) {
         : `<span class="receipt-id">${rec.transaction_id}</span>`;
 
       let itemsHtml = '<div class="receipt-items-list">';
-      for (const item of rec.items || []) {
-        const price = parseFloat(item.price) || 0;
-        const quantity = parseInt(item.quantity) || 0;
-        const freeQuantity = parseInt(item.free_quantity) || 0;
-        const paidQty = quantity - freeQuantity;
+      
+      // ✅ FIX: Check if items exists and is an array
+      const items = Array.isArray(rec.items) ? rec.items : [];
+      
+      if (items.length === 0) {
+        itemsHtml += '<div style="color:#94a3b8; font-size:0.85rem;">No items in this receipt</div>';
+      } else {
+        for (const item of items) {
+          const price = parseFloat(item.price) || 0;
+          const quantity = parseInt(item.quantity) || 0;
+          const freeQuantity = parseInt(item.free_quantity) || 0;
+          const paidQty = quantity - freeQuantity;
 
-        if (freeQuantity > 0) {
-          itemsHtml += `
-            <div class="receipt-item-row" style="color:#10b981; font-style:italic;">
-              <span class="receipt-item-name">🎁 ${escapeHtml(item.name || 'Unknown')} (Free)</span>
-              <span class="receipt-item-detail">RM 0.00</span>
-            </div>
-          `;
-        }
+          if (freeQuantity > 0) {
+            itemsHtml += `
+              <div class="receipt-item-row" style="color:#10b981; font-style:italic;">
+                <span class="receipt-item-name">🎁 ${escapeHtml(item.name || 'Unknown')} (Free)</span>
+                <span class="receipt-item-detail">RM 0.00</span>
+              </div>
+            `;
+          }
 
-        if (paidQty > 0) {
-          const itemTotal = paidQty * price;
-          itemsHtml += `
-            <div class="receipt-item-row">
-              <span class="receipt-item-name">${escapeHtml(item.name || 'Unknown')}</span>
-              <span class="receipt-item-detail">${paidQty} x RM ${price.toFixed(2)}</span>
-              <span class="receipt-item-detail">RM ${itemTotal.toFixed(2)}</span>
-            </div>
-          `;
+          if (paidQty > 0) {
+            const itemTotal = paidQty * price;
+            itemsHtml += `
+              <div class="receipt-item-row">
+                <span class="receipt-item-name">${escapeHtml(item.name || 'Unknown')}</span>
+                <span class="receipt-item-detail">${paidQty} x RM ${price.toFixed(2)}</span>
+                <span class="receipt-item-detail">RM ${itemTotal.toFixed(2)}</span>
+              </div>
+            `;
+          }
         }
       }
       itemsHtml += '</div>';
