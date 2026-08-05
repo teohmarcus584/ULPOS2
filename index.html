@@ -5076,19 +5076,23 @@ async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
   console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
   
+  // ✅ IMPORTANT: Get today's date in the same format as your transactions
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
+  console.log('Report from fetchSalesReport:', report);
+  
   if (report) {
-    const cash = report.cashTotal !== undefined ? report.cashTotal : 0;
-    const card = report.cardTotal !== undefined ? report.cardTotal : 0;
-    const qr = report.otherTotal !== undefined ? report.otherTotal : 0;
-    const alipay = report.alipayTotal !== undefined ? report.alipayTotal : 0;
-    const refund = report.refundTotal !== undefined ? report.refundTotal : 0;
+    const cash = report.cashTotal || 0;
+    const card = report.cardTotal || 0;
+    const qr = report.otherTotal || 0;
+    const alipay = report.alipayTotal || 0;
+    const refund = report.refundTotal || 0;
 
     currentSettlementTotals = { cash, card, qr, alipay, refund };
 
     if (!silent) {
-      // Update UI elements
+      console.log(`💰 Updating UI with totals - Cash: ${cash}, Card: ${card}, QR: ${qr}, Alipay: ${alipay}`);
+      
       const sysCash = document.getElementById('sysCash');
       if (sysCash) sysCash.innerText = `RM ${cash.toFixed(2)}`;
       const sysCard = document.getElementById('sysCard');
@@ -5107,37 +5111,32 @@ async function refreshSettlementTotals(store, silent = false) {
       // Enable settlement fields
       setSettlementFieldsEnabled(true);
       
-      // Clear any previous error
       const settlementError = document.getElementById('settlementError');
       if (settlementError) settlementError.style.display = 'none';
       
-      // Check if settlement already exists for today
-      const alreadySettled = await checkSettlementStatus(store, todayStr);
-      if (alreadySettled) {
-        console.log('Settlement already recorded for today');
-        if (settlementError) {
-          settlementError.innerHTML = '⚠️ Settlement already recorded for today.';
-          settlementError.style.display = 'block';
-          settlementError.style.color = '#f59e0b';
-        }
-        // Disable settlement fields if already settled
-        setSettlementFieldsEnabled(false);
-        const checkBtn = document.getElementById('checkSettlementBtn');
-        if (checkBtn) checkBtn.style.display = 'none';
-        const recordBtn = document.getElementById('recordSettlementBtn');
-        if (recordBtn) recordBtn.style.display = 'none';
-      } else {
-        // Enable check button
-        const checkBtn = document.getElementById('checkSettlementBtn');
-        if (checkBtn) {
-          checkBtn.style.display = 'block';
-          checkBtn.disabled = false;
-        }
-        const recordBtn = document.getElementById('recordSettlementBtn');
-        if (recordBtn) recordBtn.style.display = 'none';
+      const checkBtn = document.getElementById('checkSettlementBtn');
+      if (checkBtn) {
+        checkBtn.style.display = 'block';
+        checkBtn.disabled = false;
       }
+      const recordBtn = document.getElementById('recordSettlementBtn');
+      if (recordBtn) recordBtn.style.display = 'none';
+      
+      // Clear any error fields
+      const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
+      errorFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('error-field');
+      });
+      
+      // Pre-fill actual fields with system totals
+      document.getElementById('actualCash').value = cash.toFixed(2);
+      document.getElementById('actualCard').value = card.toFixed(2);
+      document.getElementById('actualQR').value = qr.toFixed(2);
+      document.getElementById('actualAlipay').value = alipay.toFixed(2);
     }
   } else {
+    console.error('❌ Report is null, settlement totals not updated');
     if (!silent) {
       await showAlertModal('Error', 'Failed to load settlement data. Please check network and try again.');
     }
@@ -7297,6 +7296,8 @@ async function refreshReportInBackground(store, employeeId, from, to, unsettledO
 async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, silent = false) {
   if (!silent) showLoading('Loading report...');
   try {
+    console.log(`📊 Fetching sales report for store: ${store}, from: ${from}, to: ${to}`);
+    
     let query = supabase
       .from('transactions')
       .select('*');
@@ -7307,8 +7308,42 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     if (to) query = query.lte('timestamp', to);
     
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('❌ fetchSalesReport error:', error);
+      throw error;
+    }
     
+    console.log(`📊 Found ${data?.length || 0} transactions`);
+    
+    // If no transactions, return zeros
+    if (!data || data.length === 0) {
+      console.log('ℹ️ No transactions found in date range');
+      const emptyResult = {
+        totalSales: 0,
+        cashTotal: 0,
+        cardTotal: 0,
+        otherTotal: 0,
+        alipayTotal: 0,
+        refundTotal: 0,
+        refundedTransactionCount: 0,
+        transactionCount: 0,
+        totalItems: 0
+      };
+      if (!silent) {
+        document.getElementById('adminReportTotalSales').innerText = `RM 0.00`;
+        document.getElementById('adminReportCashTotal').innerText = `RM 0.00`;
+        document.getElementById('adminReportCardTotal').innerText = `RM 0.00`;
+        document.getElementById('adminReportQRTotal').innerText = `RM 0.00`;
+        document.getElementById('adminReportAlipayTotal').innerText = `RM 0.00`;
+        document.getElementById('adminReportRefundTotal').innerText = `RM 0.00`;
+        document.getElementById('adminReportRefundedBills').innerText = `0`;
+        document.getElementById('adminReportTransactionCount').innerText = `0`;
+        document.getElementById('adminReportTotalItems').innerText = `0`;
+      }
+      return emptyResult;
+    }
+    
+    // Calculate totals
     const totals = {
       totalSales: 0,
       cashTotal: 0,
@@ -7321,27 +7356,45 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       totalItems: 0
     };
     
-    data.forEach(tx => {
+    for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
+      
       if (total < 0) {
         totals.refundTotal += total;
-        totals.refundedTransactionCount++;
       } else {
         totals.totalSales += total;
-        switch (tx.payment_method) {
-          case 'Cash': totals.cashTotal += total; break;
-          case 'Card': totals.cardTotal += total; break;
-          case 'QR Pay': totals.otherTotal += total; break;
-          case 'Alipay': totals.alipayTotal += total; break;
+        
+        // Count payment methods
+        const payment = tx.payment_method;
+        if (payment === 'Cash' || payment === 'cash') {
+          totals.cashTotal += total;
+        } else if (payment === 'Card' || payment === 'card') {
+          totals.cardTotal += total;
+        } else if (payment === 'QR Pay' || payment === 'qr' || payment === 'QR') {
+          totals.otherTotal += total;
+        } else if (payment === 'Alipay' || payment === 'alipay') {
+          totals.alipayTotal += total;
+        } else {
+          totals.otherTotal += total; // fallback
         }
       }
-      if (tx.items) {
-        tx.items.forEach(item => {
+      
+      // Count items
+      if (tx.items && Array.isArray(tx.items)) {
+        for (const item of tx.items) {
           totals.totalItems += parseInt(item.quantity) || 0;
-        });
+        }
       }
-    });
+    }
     
+    // Count refunded transactions
+    if (data.some(tx => tx.refunded === true)) {
+      totals.refundedTransactionCount = data.filter(tx => tx.refunded === true).length;
+    }
+    
+    console.log('📊 Totals calculated:', totals);
+    
+    // Update UI
     if (!silent) {
       document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
       document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
@@ -7355,8 +7408,9 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     }
     
     return totals;
+    
   } catch (err) {
-    console.error('fetchSalesReport error:', err);
+    console.error('❌ fetchSalesReport error:', err);
     if (!silent) await showAlertModal('Error', 'Failed to load report: ' + err.message);
     return null;
   } finally {
