@@ -5782,26 +5782,41 @@ async function fetchAndCacheReceipts() {
   }
 async function fetchAndCacheReceipts() { 
   try {
-    const { data } = await supabase
+    console.log('📜 Fetching all receipts...');
+    
+    // ✅ Remove .limit(50) - get ALL receipts
+    const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('timestamp', { ascending: false });  // ✅ No limit!
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('❌ Error fetching receipts:', error);
+      cachedReceipts = [];
+      return;
+    }
+    
     cachedReceipts = data || [];
-    if (document.getElementById('receiptsModal')?.style.display === 'flex') {
+    console.log(`✅ Loaded ${cachedReceipts.length} receipts`);
+    
+    // If receipts modal is open, refresh it
+    const modal = document.getElementById('receiptsModal');
+    if (modal && modal.style.display === 'flex') {
       renderReceiptsList(cachedReceipts);
     }
-    return;
   } catch(e) { 
     console.error('fetchAndCacheReceipts error:', e);
-    return; 
+    cachedReceipts = [];
   }
 }
 async function fetchReceipts(store, employeeId, from, to, search) {
   try {
+    console.log('📜 Fetching receipts with filters...');
+    
     let query = supabase
       .from('transactions')
       .select('*')
-      .order('timestamp', { ascending: false });  // ✅ No limit
+      .order('timestamp', { ascending: false });  // ✅ NO limit
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
@@ -5817,7 +5832,7 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     cachedReceipts = data || [];
     renderReceiptsList(cachedReceipts);
   } catch (err) {
-    console.error(err);
+    console.error('fetchReceipts error:', err);
     await showAlertModal('Error', 'Failed to load receipts.');
   }
 }
@@ -9611,7 +9626,7 @@ function renderProductGrid() {
     renderStockTakeProductGrid();
     return;
   }
-  if (selectedCategory === 'all' && !inventoryMode) {
+  if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
     const categories = [...new Set(products.map(p => p.category))];
     let filteredCategories = categories;
 
