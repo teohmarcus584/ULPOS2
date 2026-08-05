@@ -2477,8 +2477,12 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 const SUPABASE_URL = "https://zhtfjvqmxbzeuukcinky.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ✅ Make it global using 'var' or assign to window
+var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Or if you prefer using window:
+// window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const APPS_SCRIPT_URL = "";  // Empty string since we're not using it anymore
 
 
 // Haversine distance in km
@@ -3529,12 +3533,15 @@ async function loadAndCacheEmployees(force = false) {
     return cachedEmployees;
   }
   try {
-    const url = `${APPS_SCRIPT_URL}?action=getEmployees`;
-    const response = await fetch(url);
-    const result = await response.json();
-    if (result.success) {
-      cachedEmployees = result.employees.map(emp => {
-        // Override admin flag for known admin PINs/names
+    const { data, error } = await supabaseClient
+      .from('employees')
+      .select('*')
+      .order('name');
+    
+    if (error) throw error;
+    
+    if (data) {
+      cachedEmployees = data.map(emp => {
         if (emp.pin === "1234" || (emp.name && emp.name.toLowerCase().includes("admin"))) {
           emp.isAdmin = true;
         }
@@ -4220,58 +4227,68 @@ async function addNewProduct() {
   }
 
   async function preloadProductsForStore(store) {
-    try {
-      const cacheKey = `products_${store}`;
-      const now = Date.now();
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        const { timestamp, products: cachedProducts } = JSON.parse(cached);
-      if (now - timestamp < 60 * 1000) {   // 1 second
-          const empResponse = await fetch(`${APPS_SCRIPT_URL}?action=getEmployees`);
-          const empResult = await empResponse.json();
-          if (empResult.success) {
-            preloadedDataMap[store] = {
-              products: cachedProducts,
-              employees: empResult.employees
-            };
-          } else {
-            preloadedDataMap[store] = { products: cachedProducts, employees: [] };
-          }
-          return;
+  try {
+    const cacheKey = `products_${store}`;
+    const now = Date.now();
+    const cached = localStorage.getItem(cacheKey);
+    
+    if (cached) {
+      const { timestamp, products: cachedProducts } = JSON.parse(cached);
+      if (now - timestamp < 60 * 1000) {
+        let employees = cachedEmployees;
+        if (employees.length === 0) {
+          const empData = await loadAndCacheEmployees();
+          employees = empData || [];
         }
+        preloadedDataMap[store] = {
+          products: cachedProducts,
+          employees: employees
+        };
+        return;
       }
-      const url = `${APPS_SCRIPT_URL}?action=getInitialData&store=${store}&_=${now}`;
-      const response = await fetch(url);
-      const result = await response.json();
-      if (result.success) {
-  // Sort products alphabetically by name
-  const sortedProducts = result.products.sort((a, b) => a.name.localeCompare(b.name));
-  preloadedDataMap[store] = {
-    products: sortedProducts,
-    employees: result.employees
-  };
-  localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, products: sortedProducts }));
-}
-    } catch (err) {
-      console.error(`Preload failed for ${store}:`, err);
     }
+    
+    const { data: products, error: productError } = await supabaseClient
+      .from('products')
+      .select('*')
+      .eq('store', store)
+      .order('name');
+    
+    if (productError) throw productError;
+    
+    let employees = cachedEmployees;
+    if (employees.length === 0) {
+      const empData = await loadAndCacheEmployees();
+      employees = empData || [];
+    }
+    
+    if (products) {
+      const sortedProducts = products.sort((a, b) => a.name.localeCompare(b.name));
+      preloadedDataMap[store] = {
+        products: sortedProducts,
+        employees: employees
+      };
+      localStorage.setItem(cacheKey, JSON.stringify({ 
+        timestamp: now, 
+        products: sortedProducts 
+      }));
+    }
+  } catch (err) {
+    console.error(`Preload failed for ${store}:`, err);
   }
+}
 
   // ==================== INITIAL DATA LOAD ====================
- async function loadInitialData() {
+async function loadInitialData() {
   try {
-    // Directly fetch products from the sheet (uses caching internally)
     const success = await fetchProductsFromSheet();
     if (!success) throw new Error('Failed to load products');
-
-    // Now load employees
-    const url = `${APPS_SCRIPT_URL}?action=getEmployees`;
-    const response = await fetch(url);
-    const result = await response.json();
-    if (result.success) {
+    
+    const employees = await loadAndCacheEmployees();
+    if (employees && employees.length) {
       employeeNameMap = {};
       soldBySelectCart.innerHTML = '';
-      result.employees.forEach(emp => {
+      employees.forEach(emp => {
         employeeNameMap[emp.id] = emp.name;
         const option = document.createElement('option');
         option.value = emp.id;
@@ -4283,25 +4300,10 @@ async function addNewProduct() {
     return true;
   } catch (err) {
     console.error(err);
-    await showAlertModal('Error', 'Failed to load initial data. Check URL & sheet.');
+    await showAlertModal('Error', 'Failed to load initial data.');
     return false;
   }
 }
-
-    
-
-  // ==================== FETCH PRODUCTS (with caching and hash) ====================
-  // Simple hash function for change detection
-  function computeProductsHash(productsArray) {
-    let str = JSON.stringify(productsArray.map(p => ({ id: p.id, name: p.name, price: p.price, stock: p.stock, category: p.category })));
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash |= 0;
-    }
-    return hash.toString();
-  }
 
 async function fetchProductsFromSheet(force = false) {
   try {
@@ -11075,7 +11077,7 @@ document.getElementById('lowStockToggleBtn')?.addEventListener('click', () => {
 
   async function fetchEmployees() {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('employees')
       .select('*')
       .order('name');
@@ -11087,7 +11089,6 @@ document.getElementById('lowStockToggleBtn')?.addEventListener('click', () => {
     return [];
   }
 }
-
   function populateStoreSelects() {
     const stores = Array.from(storeSelect.options).map(opt => ({ value: opt.value, text: opt.text }));
     const receiptsStore = document.getElementById('receiptsStoreSelect');
