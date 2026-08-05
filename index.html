@@ -8800,7 +8800,85 @@ function stopReceiptPolling() {
   }
   cachedReceipts = null;
 }
+// ==================== RECORD SETTLEMENT ====================
 
+async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSystem, qrSystem, alipaySystem, refundSystem, cashActual, cardActual, qrActual, alipayActual) {
+  try {
+    console.log('📝 Recording settlement for:', { store, date });
+    
+    // Check if settlement already exists for this store and date
+    const { data: existing, error: checkError } = await supabase
+      .from('settlements')
+      .select('*')
+      .eq('store', store)
+      .eq('date', date)
+      .maybeSingle();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Check error:', checkError);
+      return { success: false, error: checkError.message };
+    }
+    
+    if (existing) {
+      console.log('⚠️ Settlement already exists for this date');
+      return { 
+        success: true, 
+        duplicated: true, 
+        message: `Settlement already recorded for ${store} on ${date}` 
+      };
+    }
+    
+    // Insert the settlement record
+    const { data, error } = await supabase
+      .from('settlements')
+      .insert([{
+        timestamp: new Date().toISOString(),
+        employee_id: currentEmployee?.id || 'EMP001',
+        employee_name: currentEmployee?.name || 'Unknown',
+        store: store,
+        petty_cash_float: parseFloat(pettyCashFloat) || 0,
+        date: date,
+        cash_system: parseFloat(cashSystem) || 0,
+        card_system: parseFloat(cardSystem) || 0,
+        qr_system: parseFloat(qrSystem) || 0,
+        alipay_system: parseFloat(alipaySystem) || 0,
+        refund_system: parseFloat(refundSystem) || 0,
+        cash_actual: parseFloat(cashActual) || 0,
+        card_actual: parseFloat(cardActual) || 0,
+        qr_actual: parseFloat(qrActual) || 0,
+        alipay_actual: parseFloat(alipayActual) || 0,
+        status: 'recorded',
+        collected: false,
+        collected_by: '',
+        collected_at: null
+      }]);
+    
+    if (error) {
+      console.error('❌ Settlement insert error:', error);
+      return { success: false, error: error.message };
+    }
+    
+    console.log('✅ Settlement recorded successfully:', data);
+    
+    // Mark all unsettled cash transactions as settled for this store
+    const { error: updateError } = await supabase
+      .from('transactions')
+      .update({ settled: true })
+      .eq('store', store)
+      .eq('payment_method', 'Cash')
+      .eq('settled', false);
+    
+    if (updateError) {
+      console.warn('⚠️ Error updating unsettled transactions:', updateError);
+    }
+    
+    return { success: true, data: data };
+    
+  } catch (err) {
+    console.error('❌ recordSettlement error:', err);
+    return { success: false, error: err.message };
+  }
+}
 // ==================== PENDING SALES ====================
 
 let pendingSales = [];
@@ -9144,198 +9222,138 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Check Settlement button
-  document.getElementById('checkSettlementBtn').addEventListener('click', async () => {
-    const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
-    errorFields.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('error-field');
-    });
-
-    const actualCash = parseFloat(document.getElementById('actualCash').value);
-    const actualCard = parseFloat(document.getElementById('actualCard').value);
-    const actualQR = parseFloat(document.getElementById('actualQR').value);
-    const actualAlipay = parseFloat(document.getElementById('actualAlipay').value);
-
-    if (isNaN(actualCash) || isNaN(actualCard) || isNaN(actualQR) || isNaN(actualAlipay)) {
-      document.getElementById('settlementError').innerHTML = '❌ Please fill in all actual settlement amounts.';
-      document.getElementById('settlementError').style.display = 'block';
-      return;
-    }
-
-    const sysCash = parseFloat(document.getElementById('sysCash').innerText.replace('RM ', '')) || 0;
-    const sysCard = parseFloat(document.getElementById('sysCard').innerText.replace('RM ', '')) || 0;
-    const sysQR = parseFloat(document.getElementById('sysQR').innerText.replace('RM ', '')) || 0;
-    const sysAlipay = parseFloat(document.getElementById('sysAlipay').innerText.replace('RM ', '')) || 0;
-
-    let errors = [];
-    let wrongFields = [];
-
-    if (currentEmployee.isAdmin) {
-      if (Math.abs(actualCash - sysCash) > 0.01) {
-        errors.push(`Cash: system RM ${sysCash.toFixed(2)} vs actual RM ${actualCash.toFixed(2)}`);
-        wrongFields.push('actualCash');
-      }
-      if (Math.abs(actualCard - sysCard) > 0.01) {
-        errors.push(`Card: system RM ${sysCard.toFixed(2)} vs actual RM ${actualCard.toFixed(2)}`);
-        wrongFields.push('actualCard');
-      }
-      if (Math.abs(actualQR - sysQR) > 0.01) {
-        errors.push(`QR Pay: system RM ${sysQR.toFixed(2)} vs actual RM ${actualQR.toFixed(2)}`);
-        wrongFields.push('actualQR');
-      }
-      if (Math.abs(actualAlipay - sysAlipay) > 0.01) {
-        errors.push(`Alipay: system RM ${sysAlipay.toFixed(2)} vs actual RM ${actualAlipay.toFixed(2)}`);
-        wrongFields.push('actualAlipay');
-      }
-    } else {
-      if (Math.abs(actualCash - sysCash) > 0.01) {
-        errors.push('Cash: WRONG, COUNT AGAIN');
-        wrongFields.push('actualCash');
-      }
-      if (Math.abs(actualCard - sysCard) > 0.01) {
-        errors.push('Card: WRONG, COUNT AGAIN');
-        wrongFields.push('actualCard');
-      }
-      if (Math.abs(actualQR - sysQR) > 0.01) {
-        errors.push('QR Pay: WRONG, COUNT AGAIN');
-        wrongFields.push('actualQR');
-      }
-      if (Math.abs(actualAlipay - sysAlipay) > 0.01) {
-        errors.push('Alipay: WRONG, COUNT AGAIN');
-        wrongFields.push('actualAlipay');
-      }
-    }
-
-    wrongFields.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('error-field');
-    });
-
-    if (errors.length > 0) {
-      document.getElementById('settlementError').innerHTML = errors.join('<br>');
-      document.getElementById('settlementError').style.display = 'block';
-      document.getElementById('recordSettlementBtn').style.display = 'none';
-      document.getElementById('checkSettlementBtn').style.display = 'block';
-      return;
-    }
-
-    setSettlementFieldsEnabled(false);
-    document.getElementById('settlementError').style.display = 'none';
-    document.getElementById('checkSettlementBtn').style.display = 'none';
-    document.getElementById('recordSettlementBtn').style.display = 'block';
+document.getElementById('checkSettlementBtn').addEventListener('click', async () => {
+  const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
+  errorFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('error-field');
   });
 
+  const actualCash = parseFloat(document.getElementById('actualCash').value);
+  const actualCard = parseFloat(document.getElementById('actualCard').value);
+  const actualQR = parseFloat(document.getElementById('actualQR').value);
+  const actualAlipay = parseFloat(document.getElementById('actualAlipay').value);
+
+  if (isNaN(actualCash) || isNaN(actualCard) || isNaN(actualQR) || isNaN(actualAlipay)) {
+    document.getElementById('settlementError').innerHTML = '❌ Please fill in all actual settlement amounts.';
+    document.getElementById('settlementError').style.display = 'block';
+    return;
+  }
+
+  const sysCash = parseFloat(document.getElementById('sysCash').innerText.replace('RM ', '')) || 0;
+  const sysCard = parseFloat(document.getElementById('sysCard').innerText.replace('RM ', '')) || 0;
+  const sysQR = parseFloat(document.getElementById('sysQR').innerText.replace('RM ', '')) || 0;
+  const sysAlipay = parseFloat(document.getElementById('sysAlipay').innerText.replace('RM ', '')) || 0;
+  const sysRefund = parseFloat(document.getElementById('sysRefund').innerText.replace('RM ', '')) || 0;
+
+  let errors = [];
+  let wrongFields = [];
+
+  if (Math.abs(actualCash - sysCash) > 0.01) {
+    errors.push(`Cash: system RM ${sysCash.toFixed(2)} vs actual RM ${actualCash.toFixed(2)}`);
+    wrongFields.push('actualCash');
+  }
+  if (Math.abs(actualCard - sysCard) > 0.01) {
+    errors.push(`Card: system RM ${sysCard.toFixed(2)} vs actual RM ${actualCard.toFixed(2)}`);
+    wrongFields.push('actualCard');
+  }
+  if (Math.abs(actualQR - sysQR) > 0.01) {
+    errors.push(`QR Pay: system RM ${sysQR.toFixed(2)} vs actual RM ${actualQR.toFixed(2)}`);
+    wrongFields.push('actualQR');
+  }
+  if (Math.abs(actualAlipay - sysAlipay) > 0.01) {
+    errors.push(`Alipay: system RM ${sysAlipay.toFixed(2)} vs actual RM ${actualAlipay.toFixed(2)}`);
+    wrongFields.push('actualAlipay');
+  }
+
+  wrongFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('error-field');
+  });
+
+  if (errors.length > 0) {
+    document.getElementById('settlementError').innerHTML = errors.join('<br>');
+    document.getElementById('settlementError').style.display = 'block';
+    document.getElementById('recordSettlementBtn').style.display = 'none';
+    document.getElementById('checkSettlementBtn').style.display = 'block';
+    return;
+  }
+
+  // No errors, proceed to record
+  document.getElementById('settlementError').style.display = 'none';
+  document.getElementById('checkSettlementBtn').style.display = 'none';
+  document.getElementById('recordSettlementBtn').style.display = 'block';
+  
+  // ✅ Store the settlement data for recording
+  window._settlementData = {
+    store: document.getElementById('settlementStoreSelect').value,
+    date: getLocalDateString(new Date()),
+    pettyCashFloat: parseFloat(document.getElementById('pettyCashFloat').value) || 0,
+    cashSystem: sysCash,
+    cardSystem: sysCard,
+    qrSystem: sysQR,
+    alipaySystem: sysAlipay,
+    refundSystem: sysRefund,
+    cashActual: actualCash,
+    cardActual: actualCard,
+    qrActual: actualQR,
+    alipayActual: actualAlipay
+  };
+  
+  console.log('✅ Settlement check passed. Ready to record:', window._settlementData);
+});
   // Record Settlement button
-  document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
-    showLoading('Recording settlement...');
+document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
+  if (!window._settlementData) {
+    await showAlertModal('Error', 'No settlement data found. Please check again.');
+    return;
+  }
+  
+  showLoading('Recording settlement...');
+  
+  try {
+    const data = window._settlementData;
     
-    const store = document.getElementById('settlementStoreSelect').value;
-    const pettyCash = parseFloat(document.getElementById('pettyCashFloat').value) || 0;
-    const actualCash = parseFloat(document.getElementById('actualCash').value);
-    const actualCard = parseFloat(document.getElementById('actualCard').value);
-    const actualQR = parseFloat(document.getElementById('actualQR').value);
-    const actualAlipay = parseFloat(document.getElementById('actualAlipay').value);
-
-    const sysCash = parseFloat(document.getElementById('sysCash').innerText.replace('RM ', '')) || 0;
-    const sysCard = parseFloat(document.getElementById('sysCard').innerText.replace('RM ', '')) || 0;
-    const sysQR = parseFloat(document.getElementById('sysQR').innerText.replace('RM ', '')) || 0;
-    const sysAlipay = parseFloat(document.getElementById('sysAlipay').innerText.replace('RM ', '')) || 0;
-    const sysRefund = parseFloat(document.getElementById('sysRefund').innerText.replace('RM ', '')) || 0;
-    const todayStr = getLocalDateString(new Date());
-
-    try {
-      const { data: existing, error: checkError } = await supabase
-        .from('settlements')
-        .select('*')
-        .eq('store', store)
-        .eq('date', todayStr)
-        .maybeSingle();
-      
-      if (checkError) throw checkError;
-      
-      if (existing) {
-        hideLoading();
-        await showAlertModal('Settlement Already Done', 
-          `⚠️ Settlement already recorded for ${store} on ${todayStr}.\n\n` +
-          `If there are unsettled bills, please check with your manager.`);
-        document.getElementById('settlementModal').style.display = 'none';
-        await refreshSettlementTotals(store);
-        return;
+    const result = await recordSettlement(
+      data.store,
+      data.date,
+      data.pettyCashFloat,
+      data.cashSystem,
+      data.cardSystem,
+      data.qrSystem,
+      data.alipaySystem,
+      data.refundSystem,
+      data.cashActual,
+      data.cardActual,
+      data.qrActual,
+      data.alipayActual
+    );
+    
+    if (result.success) {
+      if (result.duplicated) {
+        await showAlertModal('Settlement Already Done', result.message);
+      } else {
+        await showAlertModal('✅ Settlement Recorded', 
+          `Settlement for ${data.store} on ${data.date} has been saved successfully.`
+        );
       }
-
-      const { error } = await supabase
-        .from('settlements')
-        .insert([{
-          store: store,
-          date: todayStr,
-          employee_id: currentEmployee.id,
-          employee_name: currentEmployee.name,
-          petty_cash_float: pettyCash,
-          cash_system: sysCash,
-          card_system: sysCard,
-          qr_system: sysQR,
-          alipay_system: sysAlipay,
-          refund_system: sysRefund,
-          cash_actual: actualCash,
-          card_actual: actualCard,
-          qr_actual: actualQR,
-          alipay_actual: actualAlipay,
-          recorded_at: new Date().toISOString()
-        }]);
       
-      if (error) throw error;
-
-      const { data: unsettled, error: unsettledError } = await supabase
-        .from('transactions')
-        .update({ settled: true })
-        .eq('store', store)
-        .eq('payment_method', 'Cash')
-        .eq('settled', false);
-      
-      if (unsettledError) throw unsettledError;
-
-      let message = `✅ Settlement for ${store} on ${todayStr} has been saved.`;
-      await showAlertModal('Settlement Recorded', message);
-
-      if (!isPrinterConnected) {
-        showLoading('Printer not connected. Opening Bluetooth selection...');
-        try {
-          await connectPrinter();
-          hideLoading();
-        } catch (err) {
-          hideLoading();
-          await showAlertModal('Printer Connection Failed', 
-            '⚠️ Could not connect to printer.\nSettlement recorded but report not printed.');
-          document.getElementById('settlementModal').style.display = 'none';
-          await refreshSettlementTotals(store);
-          return;
-        }
-      }
-
-      const totals = {
-        cashSystem: sysCash,
-        cardSystem: sysCard,
-        qrSystem: sysQR,
-        alipaySystem: sysAlipay,
-        refundSystem: sysRefund,
-        cashActual: actualCash,
-        cardActual: actualCard,
-        qrActual: actualQR,
-        alipayActual: actualAlipay,
-        pettyCash: pettyCash
-      };
-      await printSettlementReport(store, todayStr, totals);
-
+      // Close modal and refresh
       document.getElementById('settlementModal').style.display = 'none';
-      await refreshSettlementTotals(store);
-    } catch (err) {
-      console.error('Settlement error:', err);
-      hideLoading();
-      await showAlertModal('Error', '❌ Failed to record settlement: ' + err.message);
-    } finally {
-      hideLoading();
+      await refreshSettlementTotals(data.store);
+      
+    } else {
+      throw new Error(result.error || 'Unknown error');
     }
-  });
+    
+  } catch (err) {
+    console.error('Settlement error:', err);
+    await showAlertModal('Error', '❌ Failed to record settlement: ' + err.message);
+  } finally {
+    hideLoading();
+    window._settlementData = null;
+  }
+});
 
   // Reprint settlement
   document.getElementById('reprintSettlementBtn').addEventListener('click', () => {
