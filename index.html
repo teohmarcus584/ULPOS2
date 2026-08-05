@@ -7418,7 +7418,7 @@ async function fetchEmployeeSalesData(store, from, to) {
   try {
     let query = supabase
       .from('transactions')
-      .select('employee_name, total');
+      .select('employee_id, total');
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (from) query = query.gte('timestamp', from);
@@ -7427,16 +7427,21 @@ async function fetchEmployeeSalesData(store, from, to) {
     const { data, error } = await query;
     if (error) throw error;
     
+    // Aggregate by employee_id
     const employeeMap = {};
     data.forEach(tx => {
-      const name = tx.employee_name || 'Unknown';
+      const id = tx.employee_id || 'Unknown';
       const total = parseFloat(tx.total) || 0;
       if (total > 0) {
-        employeeMap[name] = (employeeMap[name] || 0) + total;
+        employeeMap[id] = (employeeMap[id] || 0) + total;
       }
     });
     
-    const labels = Object.keys(employeeMap);
+    // Convert IDs to names using cached employees
+    const labels = Object.keys(employeeMap).map(id => {
+      const emp = cachedEmployees.find(e => String(e.id) === String(id));
+      return emp ? emp.name : id;
+    });
     const salesData = Object.values(employeeMap);
     
     return { labels, data: salesData };
@@ -7445,6 +7450,8 @@ async function fetchEmployeeSalesData(store, from, to) {
     return null; 
   }
 }
+
+
 
 function renderProductDetails(productsData) {
   const tbody = document.getElementById('productDetailsBody');
@@ -8048,7 +8055,7 @@ async function fetchEmployeeSalesAggregate(store, from, to) {
   try {
     let query = supabase
       .from('transactions')
-      .select('employee_name, total');
+      .select('employee_id, total');
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (from) query = query.gte('timestamp', from);
@@ -8059,14 +8066,21 @@ async function fetchEmployeeSalesAggregate(store, from, to) {
     
     const employeeMap = {};
     data.forEach(tx => {
-      const name = tx.employee_name || 'Unknown';
+      const id = tx.employee_id || 'Unknown';
       const total = parseFloat(tx.total) || 0;
       if (total > 0) {
-        employeeMap[name] = (employeeMap[name] || 0) + total;
+        employeeMap[id] = (employeeMap[id] || 0) + total;
       }
     });
     
-    return { labels: Object.keys(employeeMap), data: Object.values(employeeMap) };
+    // Convert IDs to names
+    const labels = Object.keys(employeeMap).map(id => {
+      const emp = cachedEmployees.find(e => String(e.id) === String(id));
+      return emp ? emp.name : id;
+    });
+    const salesData = Object.values(employeeMap);
+    
+    return { labels, data: salesData };
   } catch (err) {
     console.error('fetchEmployeeSalesAggregate error:', err);
     return null;
