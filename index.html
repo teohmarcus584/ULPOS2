@@ -3592,26 +3592,40 @@ async function startCheckout() {
     await showAlertModal('Processing', 'A checkout is already in progress. Please wait.');
     return;
   }
+  
   if (cart.length === 0) {
     await showAlertModal('Empty Cart', 'No items to checkout.');
     return;
   }
 
+  // Calculate subtotal
   let subtotal = 0;
   for (let item of cart) {
     const paidQty = item.quantity - item.freeQuantity;
     subtotal += paidQty * item.product.price;
   }
 
+  // Calculate discounts
   let effectiveStaffDiscount = 0;
   if (staffDiscountActive) {
     effectiveStaffDiscount = subtotal * 0.10;
   }
+  
   const totalAmount = subtotal - discountAmount - (buy2Free1Discount + buy3Free1Discount + customDiscount + effectiveStaffDiscount);
+  
+  console.log('💰 Checkout total:', {
+    subtotal,
+    discountAmount,
+    buy2Free1Discount,
+    buy3Free1Discount,
+    customDiscount,
+    staffDiscount: effectiveStaffDiscount,
+    totalAmount
+  });
+  
   pendingTransaction = { totalAmount };
   showPaymentModal(totalAmount);
 }
-
 function showPaymentModal(totalAmount) {
   const modal = document.getElementById('paymentModal');
   const cashOptionsDiv = document.getElementById('cashOptions');
@@ -3915,33 +3929,51 @@ async function completeCheckout(paymentMethod, cashReceived) {
 
 async function saveTransactionToSheet(transaction) {
   try {
+    // Map the transaction data to match your exact table columns
     const { error } = await supabase
       .from('transactions')
       .insert([{
         transaction_id: transaction.transaction_id,
-        store: transaction.store,
-        employee_id: transaction.employee_id,
-        employee_name: transaction.employee_name,
+        timestamp: transaction.timestamp,
+        items: transaction.items,
         total: transaction.total,
         payment_method: transaction.payment_method,
-        cash_received: transaction.cash_received,
+        cash_received: transaction.cash_received || 0,
+        store: transaction.store,
+        employee_id: transaction.employee_id,
+        settled: transaction.settled || false,
+        refunded: transaction.refunded || false,
+        refund_of: transaction.refund_of || '',
+        original_payment_method: transaction.original_payment_method || '',
+        customer_id: transaction.customer_id || '',
+        points_awarded: transaction.points_awarded || 0,
         discount: transaction.discount || 0,
-        items: transaction.items,
-        timestamp: transaction.timestamp,
-        sales_person_name: transaction.sales_person_name,
-        sales_person_id: transaction.sales_person_id
+        buy2_free1_discount: transaction.buy2_free1_discount || 0,
+        buy3_free1_discount: transaction.buy3_free1_discount || 0,
+        custom_discount: transaction.custom_discount || 0,
+        refunded_by: transaction.refunded_by || '',
+        staff_discount: transaction.staff_discount || 0,
+        sales_person_name: transaction.sales_person_name || '',
+        sales_person_id: transaction.sales_person_id || ''
       }]);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Save transaction error:', error);
+      throw error;
+    }
     return true;
   } catch (err) {
-    console.error(err);
+    console.error('saveTransactionToSheet error:', err);
     return false;
   }
 }
 
 async function getNextTransactionNumber(store) {
   try {
+    const prefix = store.substring(0, 3).toUpperCase();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // Get the latest transaction for this store
     const { data, error } = await supabase
       .from('transactions')
       .select('transaction_id')
@@ -3951,19 +3983,26 @@ async function getNextTransactionNumber(store) {
     
     if (error) throw error;
     
-    const prefix = store.substring(0, 3).toUpperCase();
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    
     let nextNum = 1;
     if (data && data.length > 0) {
       const lastId = data[0].transaction_id;
+      // Extract the number from the end of the ID
       const match = lastId.match(/-(\d+)$/);
-      if (match) nextNum = parseInt(match[1]) + 1;
+      if (match) {
+        nextNum = parseInt(match[1]) + 1;
+      } else {
+        // If no number found, try to extract from the prefix
+        const numMatch = lastId.match(new RegExp(`${prefix}(\\d+)`));
+        if (numMatch) {
+          nextNum = parseInt(numMatch[1]) + 1;
+        }
+      }
     }
     
     return `${prefix}-${date}-${String(nextNum).padStart(4, '0')}`;
   } catch (err) {
     console.error('Failed to get transaction number:', err);
+    // Fallback: use timestamp
     const prefix = store.substring(0, 3).toUpperCase();
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
