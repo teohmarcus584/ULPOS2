@@ -3948,11 +3948,11 @@ async function saveTransactionToSheet(transaction) {
   try {
     console.log('💾 Saving transaction:', transaction.transaction_id);
     
-    // 1. Save to transactions table
+    // ✅ Use the transaction_id as-is (don't generate a new one)
     const { error } = await supabase
       .from('transactions')
       .insert([{
-        transaction_id: transaction.transaction_id,
+        transaction_id: transaction.transaction_id,  // Use the one passed in
         timestamp: transaction.timestamp,
         items: transaction.items,
         total: transaction.total,
@@ -3981,48 +3981,35 @@ async function saveTransactionToSheet(transaction) {
       throw error;
     }
     
-    console.log('✅ Transaction saved to transactions table');
+    console.log('✅ Transaction saved:', transaction.transaction_id);
     
-    // 2. ✅ IRS Reporting for Card and Alipay
+    // IRS Reporting for Card and Alipay
     const paymentMethod = String(transaction.payment_method).toLowerCase();
-    console.log(`📋 Checking IRS report for payment method: ${paymentMethod}`);
-    
     if (paymentMethod === 'card' || paymentMethod === 'alipay') {
       console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
       
-      // Get next invoice number
       const invoiceNo = await getNextIRSInvoiceNumber();
-      console.log(`📋 Generated invoice number: ${invoiceNo}`);
       
-      // Save to IRS reporting table
-      const irsData = {
-        invoice_no: invoiceNo,
-        transaction_id: transaction.transaction_id,
-        timestamp: transaction.timestamp,
-        items: JSON.stringify(transaction.items),
-        total: transaction.total,
-        store: transaction.store,
-        employee_id: transaction.employee_id,
-        employee_name: transaction.employee_name || currentEmployee?.name || '',
-        payment_method: transaction.payment_method,
-        created_at: new Date().toISOString()
-      };
-      
-      console.log('📋 IRS data to save:', irsData);
-      
-      const { data: irsResult, error: irsError } = await supabase
+      const { error: irsError } = await supabase
         .from('irs_reporting')
-        .insert([irsData])
-        .select();
+        .insert([{
+          invoice_no: invoiceNo,
+          transaction_id: transaction.transaction_id,
+          timestamp: transaction.timestamp,
+          items: JSON.stringify(transaction.items),
+          total: transaction.total,
+          store: transaction.store,
+          employee_id: transaction.employee_id,
+          employee_name: transaction.employee_name || currentEmployee?.name || '',
+          payment_method: transaction.payment_method,
+          created_at: new Date().toISOString()
+        }]);
       
       if (irsError) {
         console.error('❌ IRS reporting error:', irsError);
-        // Don't fail the transaction if IRS fails, just log it
       } else {
-        console.log(`✅ IRS report saved: ${invoiceNo}`, irsResult);
+        console.log(`✅ IRS report saved: ${invoiceNo}`);
       }
-    } else {
-      console.log(`ℹ️ Skipping IRS report for ${transaction.payment_method} (only Card and Alipay)`);
     }
     
     return true;
@@ -4069,48 +4056,73 @@ async function getNextIRSInvoiceNumber() {
 }
 async function getNextTransactionNumber(store) {
   try {
-    const prefix = store.substring(0, 3).toUpperCase();
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    // Map store to prefix
+    const prefixMap = {
+      queens: 'TXN38',
+      sunshine: 'TXN39',
+      gurney_paragon: 'TXN40'
+    };
     
-    console.log(`🔍 Getting next transaction number for ${store} (${prefix}-${date})`);
+    const prefix = prefixMap[store];
+    if (!prefix) {
+      console.error(`❌ Unknown store: ${store}`);
+      // Fallback
+      const fallbackPrefix = store.substring(0, 3).toUpperCase();
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000);
+      return `${fallbackPrefix}-${timestamp}-${String(random).padStart(4, '0')}`;
+    }
     
-    // Get all transactions for this store with this date prefix
+    console.log(`🔍 Getting next transaction number for ${store} with prefix ${prefix}`);
+    
+    // Get all transactions with this prefix
     const { data, error } = await supabase
       .from('transactions')
       .select('transaction_id')
-      .like('transaction_id', `${prefix}-${date}-%`)
-      .order('transaction_id', { ascending: false });
+      .like('transaction_id', `${prefix}%`)
+      .order('transaction_id', { ascending: false })
+      .limit(1);
     
     if (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('❌ Error fetching transactions:', error);
       throw error;
     }
     
     let nextNum = 1;
     if (data && data.length > 0) {
-      // Extract numbers and find the highest
-      const numbers = data.map(row => {
-        const match = row.transaction_id.match(/-(\d+)$/);
-        return match ? parseInt(match[1]) : 0;
-      });
+      const lastId = data[0].transaction_id;
+      console.log(`📋 Last transaction ID: ${lastId}`);
       
-      const maxNum = Math.max(...numbers);
-      nextNum = maxNum + 1;
-      console.log(`📊 Found ${data.length} existing transactions, highest number: ${maxNum}, next: ${nextNum}`);
+      // Extract the number from TXN38XXXXX format
+      const match = lastId.match(new RegExp(`${prefix}(\\d{6})`));
+      if (match) {
+        nextNum = parseInt(match[1]) + 1;
+        console.log(`📊 Next number: ${nextNum}`);
+      } else {
+        console.warn(`⚠️ Could not extract number from ${lastId}, starting at 1`);
+      }
     } else {
-      console.log(`📊 No existing transactions found for ${prefix}-${date}, starting at 1`);
+      console.log(`📊 No existing transactions found for ${prefix}, starting at 1`);
     }
     
-    const newId = `${prefix}-${date}-${String(nextNum).padStart(4, '0')}`;
+    // Ensure we have 6 digits (pad with zeros)
+    const paddedNum = String(nextNum).padStart(6, '0');
+    const newId = `${prefix}${paddedNum}`;
+    
     console.log(`✅ Generated new transaction ID: ${newId}`);
     return newId;
+    
   } catch (err) {
     console.error('❌ Failed to get transaction number:', err);
     // Fallback: use timestamp
-    const prefix = store.substring(0, 3).toUpperCase();
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    const fallbackId = `${prefix}-${timestamp}-${String(random).padStart(4, '0')}`;
+    const prefixMap = {
+      queens: 'TXN38',
+      sunshine: 'TXN39',
+      gurney_paragon: 'TXN40'
+    };
+    const prefix = prefixMap[store] || store.substring(0, 3).toUpperCase();
+    const timestamp = Date.now().toString().slice(-6);
+    const fallbackId = `${prefix}${timestamp}`;
     console.log(`⚠️ Using fallback ID: ${fallbackId}`);
     return fallbackId;
   }
