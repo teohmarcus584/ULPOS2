@@ -3973,40 +3973,47 @@ async function getNextTransactionNumber(store) {
     const prefix = store.substring(0, 3).toUpperCase();
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     
-    // Get the latest transaction for this store
+    console.log(`🔍 Getting next transaction number for ${store} (${prefix}-${date})`);
+    
+    // Get all transactions for this store with this date prefix
     const { data, error } = await supabase
       .from('transactions')
       .select('transaction_id')
-      .eq('store', store)
-      .order('transaction_id', { ascending: false })
-      .limit(1);
+      .like('transaction_id', `${prefix}-${date}-%`)
+      .order('transaction_id', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching transactions:', error);
+      throw error;
+    }
     
     let nextNum = 1;
     if (data && data.length > 0) {
-      const lastId = data[0].transaction_id;
-      // Extract the number from the end of the ID
-      const match = lastId.match(/-(\d+)$/);
-      if (match) {
-        nextNum = parseInt(match[1]) + 1;
-      } else {
-        // If no number found, try to extract from the prefix
-        const numMatch = lastId.match(new RegExp(`${prefix}(\\d+)`));
-        if (numMatch) {
-          nextNum = parseInt(numMatch[1]) + 1;
-        }
-      }
+      // Extract numbers and find the highest
+      const numbers = data.map(row => {
+        const match = row.transaction_id.match(/-(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      });
+      
+      const maxNum = Math.max(...numbers);
+      nextNum = maxNum + 1;
+      console.log(`📊 Found ${data.length} existing transactions, highest number: ${maxNum}, next: ${nextNum}`);
+    } else {
+      console.log(`📊 No existing transactions found for ${prefix}-${date}, starting at 1`);
     }
     
-    return `${prefix}-${date}-${String(nextNum).padStart(4, '0')}`;
+    const newId = `${prefix}-${date}-${String(nextNum).padStart(4, '0')}`;
+    console.log(`✅ Generated new transaction ID: ${newId}`);
+    return newId;
   } catch (err) {
-    console.error('Failed to get transaction number:', err);
+    console.error('❌ Failed to get transaction number:', err);
     // Fallback: use timestamp
     const prefix = store.substring(0, 3).toUpperCase();
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000);
-    return `${prefix}-${timestamp}-${random}`;
+    const fallbackId = `${prefix}-${timestamp}-${String(random).padStart(4, '0')}`;
+    console.log(`⚠️ Using fallback ID: ${fallbackId}`);
+    return fallbackId;
   }
 }
 
@@ -8807,18 +8814,42 @@ async function syncPendingSales() {
   if (!navigator.onLine) return;
   if (pendingSales.length === 0) return;
 
+  console.log(`🔄 Syncing ${pendingSales.length} pending sales...`);
+  
   const failed = [];
   for (const sale of pendingSales) {
+    // ✅ Check if transaction already exists before trying to save
+    const { data: existing, error: checkError } = await supabase
+      .from('transactions')
+      .select('transaction_id')
+      .eq('transaction_id', sale.transaction_id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking existing transaction:', checkError);
+      failed.push(sale);
+      continue;
+    }
+    
+    if (existing) {
+      console.log(`⚠️ Transaction ${sale.transaction_id} already exists, skipping...`);
+      continue;
+    }
+    
     const success = await saveTransactionToSheet(sale);
-    if (!success) failed.push(sale);
+    if (!success) {
+      failed.push(sale);
+    }
   }
+  
   if (failed.length === 0) {
     pendingSales = [];
     localStorage.removeItem('pendingSales');
+    console.log('✅ All pending sales synced successfully');
   } else {
     pendingSales = failed;
     localStorage.setItem('pendingSales', JSON.stringify(pendingSales));
-    showAlertModal('Sync Partial', `${failed.length} sale(s) failed. Will retry later.`);
+    console.log(`⚠️ ${failed.length} sale(s) failed. Will retry later.`);
   }
   hideLoading();
 }
