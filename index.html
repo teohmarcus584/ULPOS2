@@ -2989,20 +2989,28 @@ async function autoSelectStoreByLocation() {
 
 async function fetchProductsFromSheet(force = false) {
   try {
+    // Get the current store
+    const store = currentStore;
+    const stockColumn = `stock_${store}`;
+    
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('store', currentStore)
       .order('name');
     
     if (error) throw error;
     
+    // Map the data to the format expected by the POS
     products = data.map(p => ({
       id: p.id,
       name: p.name,
       price: parseFloat(p.price),
-      stock: parseInt(p.stock) || 0,
-      category: p.category || "Uncategorized"
+      stock: parseInt(p[stockColumn]) || 0,  // Use the store-specific stock column
+      category: p.category || "Uncategorized",
+      // Keep the store-specific stock values for updating
+      stock_queens: parseInt(p.stock_queens) || 0,
+      stock_sunshine: parseInt(p.stock_sunshine) || 0,
+      stock_gurney_paragon: parseInt(p.stock_gurney_paragon) || 0
     }));
     
     updateCategoryDropdown();
@@ -3207,12 +3215,26 @@ function updateStockForProduct(productId, newStock, delta) {
   if (newStock === oldStock) return;
 
   product.stock = newStock;
+  
+  // Update the store-specific stock column
+  const store = currentStore;
+  const stockColumn = `stock_${store}`;
+  product[stockColumn] = newStock;
 
   const inputField = document.querySelector(`.stock-input[data-id="${productId}"]`);
   if (inputField) inputField.value = newStock;
 
   logStockChange(productId, product.name, product.category, oldStock, newStock, delta);
-  scheduleStockUpdate(productId, newStock);
+  
+  // Update the specific store's stock in the database
+  supabase
+    .from('products')
+    .update({ [stockColumn]: newStock, updated_at: new Date().toISOString() })
+    .eq('id', productId)
+    .then(({ error }) => {
+      if (error) console.error('Error updating stock:', error);
+    });
+    
   refreshCategoryHighlighting();
 }
 
@@ -8318,11 +8340,13 @@ async function addNewProduct() {
     const { error } = await supabase
       .from('products')
       .insert([{
+        id: `PROD-${Date.now()}`,
         name: name,
         price: price,
         category: category,
-        store: currentStore,
-        stock: 0
+        stock_queens: 0,
+        stock_sunshine: 0,
+        stock_gurney_paragon: 0
       }]);
     
     if (error) throw error;
