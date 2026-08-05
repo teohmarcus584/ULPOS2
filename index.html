@@ -4916,26 +4916,34 @@ let currentSettlementTotals = null;
 
 async function checkSettlementStatus(store, date) {
   try {
+    console.log(`Checking settlement for store: ${store}, date: ${date}`);
+    
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
       .eq('store', store)
-      .eq('date', date)
-      .single();
+      .eq('date', date);
     
     if (error) {
-      if (error.code === 'PGRST116') return false; // Not found
-      throw error;
+      console.error('Settlement check error:', error);
+      return false;
     }
-    return !!data;
+    
+    // Check if any records were returned
+    const hasSettlement = data && data.length > 0;
+    console.log(`Settlement found: ${hasSettlement}`);
+    return hasSettlement;
+    
   } catch (err) {
-    console.error(err);
+    console.error('checkSettlementStatus error:', err);
     return false;
   }
 }
 
 async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
+  console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
+  
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
   if (report) {
@@ -4948,6 +4956,7 @@ async function refreshSettlementTotals(store, silent = false) {
     currentSettlementTotals = { cash, card, qr, alipay, refund };
 
     if (!silent) {
+      // Update UI elements
       const sysCash = document.getElementById('sysCash');
       if (sysCash) sysCash.innerText = `RM ${cash.toFixed(2)}`;
       const sysCard = document.getElementById('sysCard');
@@ -4963,34 +4972,38 @@ async function refreshSettlementTotals(store, silent = false) {
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
 
+      // Enable settlement fields
       setSettlementFieldsEnabled(true);
-      const actualCash = document.getElementById('actualCash');
-      if (actualCash) actualCash.value = '';
-      const actualCard = document.getElementById('actualCard');
-      if (actualCard) actualCard.value = '';
-      const actualQR = document.getElementById('actualQR');
-      if (actualQR) actualQR.value = '';
-      const actualAlipay = document.getElementById('actualAlipay');
-      if (actualAlipay) actualAlipay.value = '';
-      const pettyCash = document.getElementById('pettyCashFloat');
-      if (pettyCash) pettyCash.value = '0.00';
       
-      const checkBtn = document.getElementById('checkSettlementBtn');
-      if (checkBtn) {
-        checkBtn.style.display = 'block';
-        checkBtn.disabled = false;
-      }
-      const recordBtn = document.getElementById('recordSettlementBtn');
-      if (recordBtn) recordBtn.style.display = 'none';
-      
-      const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
-      errorFields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.remove('error-field');
-      });
-      
+      // Clear any previous error
       const settlementError = document.getElementById('settlementError');
       if (settlementError) settlementError.style.display = 'none';
+      
+      // Check if settlement already exists for today
+      const alreadySettled = await checkSettlementStatus(store, todayStr);
+      if (alreadySettled) {
+        console.log('Settlement already recorded for today');
+        if (settlementError) {
+          settlementError.innerHTML = '⚠️ Settlement already recorded for today.';
+          settlementError.style.display = 'block';
+          settlementError.style.color = '#f59e0b';
+        }
+        // Disable settlement fields if already settled
+        setSettlementFieldsEnabled(false);
+        const checkBtn = document.getElementById('checkSettlementBtn');
+        if (checkBtn) checkBtn.style.display = 'none';
+        const recordBtn = document.getElementById('recordSettlementBtn');
+        if (recordBtn) recordBtn.style.display = 'none';
+      } else {
+        // Enable check button
+        const checkBtn = document.getElementById('checkSettlementBtn');
+        if (checkBtn) {
+          checkBtn.style.display = 'block';
+          checkBtn.disabled = false;
+        }
+        const recordBtn = document.getElementById('recordSettlementBtn');
+        if (recordBtn) recordBtn.style.display = 'none';
+      }
     }
   } else {
     if (!silent) {
