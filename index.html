@@ -2549,7 +2549,39 @@ const LOW_STOCK_THRESHOLD = 5;
 let cachedEmployees = [];
 let employeesLastFetched = 0;
 const EMPLOYEE_CACHE_TTL = 1 * 60 * 1000;
+function openSideMenu() {
+    if (stockTakeMode) {
+        toggleStockTakeMode();
+    }
+    if (inventoryMode) toggleInventoryMode();
+    const sideMenuOverlay = document.getElementById('sideMenuOverlay');
+    const sideMenuDiv = document.getElementById('sideMenu');
+    if (sideMenuOverlay) sideMenuOverlay.style.display = 'flex';
+    if (sideMenuDiv) {
+        setTimeout(() => { sideMenuDiv.classList.add('open'); }, 10);
+    }
+}
 
+function closeSideMenu() {
+    const sideMenuDiv = document.getElementById('sideMenu');
+    const sideMenuOverlay = document.getElementById('sideMenuOverlay');
+    if (sideMenuDiv) sideMenuDiv.classList.remove('open');
+    if (sideMenuOverlay) {
+        setTimeout(() => { sideMenuOverlay.style.display = 'none'; }, 300);
+    }
+}
+
+// ==================== WRAP MENU ACTION ====================
+function wrapMenuAction(actionFn) {
+    return async (...args) => {
+        if (stockTakeMode) {
+            toggleStockTakeMode();
+        }
+        if (inventoryMode && actionFn !== toggleInventoryMode) toggleInventoryMode();
+        await actionFn(...args);
+        closeSideMenu();
+    };
+}
 // Telegram accounts
 let telegramAccounts = localStorage.getItem('telegramAccounts');
 const DEFAULT_TELEGRAM_ACCOUNTS = 
@@ -10045,35 +10077,13 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
   const sideMenuDiv = document.getElementById('sideMenu');
   const closeSideMenuBtn = document.getElementById('closeSideMenuBtn');
 
-  // ==================== SIDE MENU FUNCTIONS ====================
-function openSideMenu() {
-    if (stockTakeMode) {
-        toggleStockTakeMode();
-    }
-    if (inventoryMode) toggleInventoryMode();
-    sideMenuOverlay.style.display = 'flex';
-    setTimeout(() => { sideMenuDiv.classList.add('open'); }, 10);
-}
-
-function closeSideMenu() {
-    sideMenuDiv.classList.remove('open');
-    setTimeout(() => { sideMenuOverlay.style.display = 'none'; }, 300);
-}
+ 
 
   if (logo) logo.addEventListener('click', openSideMenu);
   if (closeSideMenuBtn) closeSideMenuBtn.addEventListener('click', closeSideMenu);
   if (sideMenuOverlay) sideMenuOverlay.addEventListener('click', (e) => { if (e.target === sideMenuOverlay) closeSideMenu(); });
 
-  function wrapMenuAction(actionFn) {
-    return async (...args) => {
-      if (stockTakeMode) {
-        toggleStockTakeMode();
-      }
-      if (inventoryMode && actionFn !== toggleInventoryMode) toggleInventoryMode();
-      await actionFn(...args);
-      closeSideMenu();
-    };
-  }
+  
 
   // Auto-select store on load
   (async function autoSelectOnLoad() {
