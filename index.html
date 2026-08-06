@@ -5321,7 +5321,6 @@ async function refreshSettlementTotals(store, silent = false) {
     const qr = report.otherTotal || 0;
     const alipay = report.alipayTotal || 0;
     const refund = report.refundTotal || 0;
-    // ✅ Use netTotal from report
     const netTotal = report.netTotal || (cash + card + qr + alipay + refund);
 
     currentSettlementTotals = { cash, card, qr, alipay, refund, netTotal };
@@ -5329,6 +5328,7 @@ async function refreshSettlementTotals(store, silent = false) {
     if (!silent) {
       console.log(`💰 Updating UI with totals - Cash: ${cash}, Card: ${card}, QR: ${qr}, Alipay: ${alipay}, Net: ${netTotal}`);
       
+      // Update system totals display
       const sysCash = document.getElementById('sysCash');
       if (sysCash) sysCash.innerText = `RM ${cash.toFixed(2)}`;
       const sysCard = document.getElementById('sysCard');
@@ -5340,44 +5340,22 @@ async function refreshSettlementTotals(store, silent = false) {
       const sysRefund = document.getElementById('sysRefund');
       if (sysRefund) sysRefund.innerText = `RM ${Math.abs(refund).toFixed(2)}`;
 
-      // ✅ Update net total
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
-      console.log(`✅ Set sysNetTotal to: RM ${netTotal.toFixed(2)}`);
 
+      // Enable settlement fields
       setSettlementFieldsEnabled(true);
       
       const settlementError = document.getElementById('settlementError');
       if (settlementError) settlementError.style.display = 'none';
       
-      const unsettledCount = await getUnsettledTransactionCount(store, todayStr);
-      console.log(`📊 Unsettled transactions for today: ${unsettledCount}`);
-      
       const checkBtn = document.getElementById('checkSettlementBtn');
-      const recordBtn = document.getElementById('recordSettlementBtn');
-      
-      if (unsettledCount === 0) {
-        if (settlementError) {
-          settlementError.innerHTML = '✅ All transactions are already settled for today.';
-          settlementError.style.display = 'block';
-          settlementError.style.color = '#10b981';
-        }
-        if (checkBtn) checkBtn.style.display = 'none';
-        if (recordBtn) recordBtn.style.display = 'none';
-        setSettlementFieldsEnabled(false);
-      } else {
-        if (settlementError) {
-          settlementError.innerHTML = `📊 ${unsettledCount} unsettled transaction(s) found. You can settle them now.`;
-          settlementError.style.display = 'block';
-          settlementError.style.color = '#f59e0b';
-        }
-        if (checkBtn) {
-          checkBtn.style.display = 'block';
-          checkBtn.disabled = false;
-        }
-        if (recordBtn) recordBtn.style.display = 'none';
-        setSettlementFieldsEnabled(true);
+      if (checkBtn) {
+        checkBtn.style.display = 'block';
+        checkBtn.disabled = false;
       }
+      const recordBtn = document.getElementById('recordSettlementBtn');
+      if (recordBtn) recordBtn.style.display = 'none';
       
       const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
       errorFields.forEach(id => {
@@ -5385,11 +5363,23 @@ async function refreshSettlementTotals(store, silent = false) {
         if (el) el.classList.remove('error-field');
       });
       
-      // ✅ Pre-fill actual fields with correct totals
-      document.getElementById('actualCash').value = cash.toFixed(2);
-      document.getElementById('actualCard').value = card.toFixed(2);
-      document.getElementById('actualQR').value = qr.toFixed(2);
-      document.getElementById('actualAlipay').value = alipay.toFixed(2);
+      // ✅ REMOVED: Do NOT pre-fill actual fields - let user input
+      // document.getElementById('actualCash').value = cash.toFixed(2);
+      // document.getElementById('actualCard').value = card.toFixed(2);
+      // document.getElementById('actualQR').value = qr.toFixed(2);
+      // document.getElementById('actualAlipay').value = alipay.toFixed(2);
+      
+      // ✅ Instead, leave them blank with placeholders
+      document.getElementById('actualCash').value = '';
+      document.getElementById('actualCard').value = '';
+      document.getElementById('actualQR').value = '';
+      document.getElementById('actualAlipay').value = '';
+      
+      // Set placeholders to show expected values
+      document.getElementById('actualCash').placeholder = `System: RM ${cash.toFixed(2)}`;
+      document.getElementById('actualCard').placeholder = `System: RM ${card.toFixed(2)}`;
+      document.getElementById('actualQR').placeholder = `System: RM ${qr.toFixed(2)}`;
+      document.getElementById('actualAlipay').placeholder = `System: RM ${alipay.toFixed(2)}`;
     }
   } else {
     console.error('❌ Report is null, settlement totals not updated');
@@ -5455,11 +5445,20 @@ async function openSettlementModal() {
   document.getElementById('checkSettlementBtn').style.display = 'block';
   document.getElementById('settlementError').style.display = 'none';
   document.getElementById('settlementError').innerHTML = '';
+  
+  // ✅ Clear all input fields - don't auto-populate
   document.getElementById('actualCash').value = '';
   document.getElementById('actualCard').value = '';
   document.getElementById('actualQR').value = '';
   document.getElementById('actualAlipay').value = '';
   document.getElementById('pettyCashFloat').value = '0.00';
+  
+  // ✅ Set placeholders
+  document.getElementById('actualCash').placeholder = 'Enter actual cash count';
+  document.getElementById('actualCard').placeholder = 'Enter actual card settlement';
+  document.getElementById('actualQR').placeholder = 'Enter actual QR settlement';
+  document.getElementById('actualAlipay').placeholder = 'Enter actual Alipay settlement';
+  
   document.getElementById('actualCash').classList.remove('error-field');
   document.getElementById('actualCard').classList.remove('error-field');
   document.getElementById('actualQR').classList.remove('error-field');
