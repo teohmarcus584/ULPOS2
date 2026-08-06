@@ -5736,7 +5736,6 @@ async function openCollectionModal() {
 async function loadAllUnsettledCash() {
   showLoading('Loading unsettled cash...');
   try {
-    // ✅ Get unsettled cash from settlements table
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
@@ -5745,13 +5744,13 @@ async function loadAllUnsettledCash() {
     
     if (error) throw error;
     
-    // ✅ Ensure cash_actual is a number
-    allUnsettledCash = (data || []).map(rec => ({
-      ...rec,
-      cash_actual: parseFloat(rec.cash_actual) || 0
-    }));
+    // ✅ Filter out records with invalid cash_actual
+    allUnsettledCash = (data || []).filter(rec => {
+      const amount = parseFloat(rec.cash_actual);
+      return !isNaN(amount) && amount > 0;
+    });
     
-    console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements`);
+    console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements with cash`);
     updateStoreCashSummary();
     updateTotalOutstanding();
     filterCollectionTable();
@@ -5765,36 +5764,56 @@ async function loadAllUnsettledCash() {
 
 function updateStoreCashSummary() {
   const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
-  allUnsettledCash.forEach(rec => {
+  
+  for (const rec of allUnsettledCash) {
     if (storeTotals.hasOwnProperty(rec.store)) {
-      // ✅ Ensure we're adding a number, not NULL or undefined
-      const amount = parseFloat(rec.cash_actual) || 0;
-      storeTotals[rec.store] += amount;
+      const amount = parseFloat(rec.cash_actual);
+      if (!isNaN(amount) && amount > 0) {
+        storeTotals[rec.store] += amount;
+      }
     }
-  });
+  }
+  
   for (const [store, total] of Object.entries(storeTotals)) {
     const card = document.querySelector(`.store-cash-card[data-store="${store}"]`);
     if (card) {
       const amountSpan = card.querySelector('.store-cash-amount');
-      if (amountSpan) amountSpan.innerText = `RM ${total.toFixed(2)}`;
+      if (amountSpan) {
+        amountSpan.innerText = `RM ${total.toFixed(2)}`;
+      }
     }
   }
   attachCashCardClickListeners();
 }
 
 function updateTotalOutstanding() {
-  // ✅ Ensure we're summing numbers
-  const total = allUnsettledCash.reduce((sum, rec) => {
-    const amount = parseFloat(rec.cash_actual) || 0;
-    return sum + amount;
-  }, 0);
+  // ✅ Safe calculation with fallback
+  let total = 0;
+  for (const rec of allUnsettledCash) {
+    const amount = parseFloat(rec.cash_actual);
+    if (!isNaN(amount) && amount > 0) {
+      total += amount;
+    }
+  }
   const totalSpan = document.getElementById('totalOutstandingCash');
-  if (totalSpan) totalSpan.innerText = `RM ${total.toFixed(2)}`;
+  if (totalSpan) {
+    totalSpan.innerText = `RM ${total.toFixed(2)}`;
+  }
 }
 
 function filterCollectionTable() {
   const selectedStore = document.getElementById('collectionStoreSelect').value;
-  const filtered = selectedStore === 'all' ? allUnsettledCash : allUnsettledCash.filter(rec => rec.store === selectedStore);
+  
+  // ✅ Only include records with valid cash_actual
+  const filtered = allUnsettledCash.filter(rec => {
+    const amount = parseFloat(rec.cash_actual);
+    const isValid = !isNaN(amount) && amount > 0;
+    if (!isValid) return false;
+    
+    if (selectedStore === 'all') return true;
+    return rec.store === selectedStore;
+  });
+  
   renderCollectionTable(filtered);
 }
 
@@ -5804,20 +5823,28 @@ function renderCollectionTable(records) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No unsettled cash records found.</td></tr>';
   } else {
     let html = '';
-    records.forEach(rec => {
+    for (const rec of records) {
       const date = new Date(rec.date).toLocaleDateString();
       const employeeName = rec.employee_name || 'Unknown';
-      // ✅ Ensure amount is a valid number
       const amount = parseFloat(rec.cash_actual) || 0;
+      
+      // ✅ Skip if amount is 0 or invalid
+      if (amount <= 0) continue;
+      
       html += `<tr data-id="${rec.id}">
         <td><input type="checkbox" class="collection-checkbox" value="${rec.id}"></td>
         <td>${date}</td>
         <td>${escapeHtml(employeeName)}</td>
         <td style="text-align: right;">RM ${amount.toFixed(2)}</td>
       </tr>`;
-    });
-    tbody.innerHTML = html;
-    document.querySelectorAll('.collection-checkbox').forEach(cb => cb.addEventListener('change', updateCollectionButtonState));
+    }
+    
+    if (html === '') {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No unsettled cash records with valid amounts.</td></tr>';
+    } else {
+      tbody.innerHTML = html;
+      document.querySelectorAll('.collection-checkbox').forEach(cb => cb.addEventListener('change', updateCollectionButtonState));
+    }
   }
   const selectAll = document.getElementById('selectAllCheckbox');
   if (selectAll) selectAll.checked = false;
