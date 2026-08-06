@@ -7666,7 +7666,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
         refundedTransactionCount: 0,
         transactionCount: 0,
         totalItems: 0,
-        netTotal: 0  // ✅ ADD THIS
+        netTotal: 0
       };
       if (!silent) {
         document.getElementById('adminReportTotalSales').innerText = `RM 0.00`;
@@ -7678,52 +7678,54 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
         document.getElementById('adminReportRefundedBills').innerText = `0`;
         document.getElementById('adminReportTransactionCount').innerText = `0`;
         document.getElementById('adminReportTotalItems').innerText = `0`;
-        // ✅ Update net total
         document.getElementById('sysNetTotal').innerText = `RM 0.00`;
       }
       return emptyResult;
     }
     
-    // ✅ Track refunded transactions
+    // ✅ Track which transactions are refunded
     const refundedTransactionIds = new Set();
+    const refundTransactions = [];
+    const salesTransactions = [];
+    
+    // ✅ First pass: Find all refund transactions and their original IDs
+    for (const tx of data) {
+      const total = parseFloat(tx.total) || 0;
+      if (total < 0) {
+        // This is a refund transaction
+        refundTransactions.push(tx);
+        if (tx.refund_of) {
+          refundedTransactionIds.add(tx.refund_of);
+        }
+      } else {
+        salesTransactions.push(tx);
+      }
+    }
+    
+    console.log(`📊 Found ${salesTransactions.length} sales, ${refundTransactions.length} refunds`);
+    console.log(`🔄 Refunded transaction IDs:`, [...refundedTransactionIds]);
+    
+    // ✅ Calculate totals
     let totalSales = 0;
     let cashTotal = 0;
     let cardTotal = 0;
     let otherTotal = 0;
     let alipayTotal = 0;
     let refundTotal = 0;
-    let refundedTransactionCount = 0;
     let totalItems = 0;
     
-    // ✅ First pass: Find all refund transactions
-    for (const tx of data) {
+    // ✅ Process sales (skip refunded ones)
+    for (const tx of salesTransactions) {
       const total = parseFloat(tx.total) || 0;
-      if (total < 0) {
-        // This is a refund transaction
-        if (tx.refund_of) {
-          refundedTransactionIds.add(tx.refund_of);
-        }
-        refundTotal += total;
-      }
-    }
-    
-    // ✅ Second pass: Calculate totals
-    for (const tx of data) {
-      const total = parseFloat(tx.total) || 0;
+      const txId = tx.transaction_id;
       
-      // ✅ Skip refunded transactions (they are already counted in refundTotal)
-      if (tx.transaction_id && refundedTransactionIds.has(tx.transaction_id)) {
-        console.log(`⏭️ Skipping refunded transaction: ${tx.transaction_id}`);
+      // ✅ Skip if this transaction was refunded
+      if (refundedTransactionIds.has(txId)) {
+        console.log(`⏭️ Skipping refunded transaction: ${txId}`);
         continue;
       }
       
-      // ✅ Skip refund transactions (negative totals)
-      if (total < 0) {
-        // Already counted in refundTotal
-        continue;
-      }
-      
-      // ✅ Only count positive transactions that are NOT refunded
+      // ✅ Count this sale
       totalSales += total;
       
       const payment = tx.payment_method;
@@ -7746,11 +7748,18 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       }
     }
     
-    // ✅ Count refunded transactions
-    refundedTransactionCount = refundedTransactionIds.size;
+    // ✅ Process refunds
+    for (const tx of refundTransactions) {
+      const total = parseFloat(tx.total) || 0;
+      refundTotal += total;
+    }
     
-    // ✅ Calculate net total (sales - refunds)
+    // ✅ Calculate net total
     const netTotal = totalSales + refundTotal;
+    
+    console.log(`💰 Total Sales: RM ${totalSales.toFixed(2)}`);
+    console.log(`💰 Refund Total: RM ${refundTotal.toFixed(2)}`);
+    console.log(`💰 Net Total: RM ${netTotal.toFixed(2)}`);
     
     const totals = {
       totalSales: totalSales,
@@ -7759,13 +7768,11 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       otherTotal: otherTotal,
       alipayTotal: alipayTotal,
       refundTotal: refundTotal,
-      refundedTransactionCount: refundedTransactionCount,
+      refundedTransactionCount: refundedTransactionIds.size,
       transactionCount: data.length,
       totalItems: totalItems,
-      netTotal: netTotal  // ✅ ADD THIS
+      netTotal: netTotal
     };
-    
-    console.log('📊 Totals calculated:', totals);
     
     if (!silent) {
       document.getElementById('adminReportTotalSales').innerText = `RM ${totalSales.toFixed(2)}`;
@@ -7774,11 +7781,11 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       document.getElementById('adminReportQRTotal').innerText = `RM ${otherTotal.toFixed(2)}`;
       document.getElementById('adminReportAlipayTotal').innerText = `RM ${alipayTotal.toFixed(2)}`;
       document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(refundTotal).toFixed(2)}`;
-      document.getElementById('adminReportRefundedBills').innerText = refundedTransactionCount || 0;
+      document.getElementById('adminReportRefundedBills').innerText = refundedTransactionIds.size || 0;
       document.getElementById('adminReportTransactionCount').innerText = data.length || 0;
       document.getElementById('adminReportTotalItems').innerText = totalItems || 0;
       
-      // ✅ Update settlement modal with net total
+      // ✅ Update net total in settlement modal
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
     }
