@@ -5250,6 +5250,7 @@ async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
   console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
   
+  // ✅ Get ALL transactions for today (including settled and unsettled)
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
   console.log('Report from fetchSalesReport:', report);
@@ -5260,7 +5261,6 @@ async function refreshSettlementTotals(store, silent = false) {
     const qr = report.otherTotal || 0;
     const alipay = report.alipayTotal || 0;
     const refund = report.refundTotal || 0;
-    // ✅ Use netTotal from report
     const netTotal = report.netTotal || (cash + card + qr + alipay + refund);
 
     currentSettlementTotals = { cash, card, qr, alipay, refund, netTotal };
@@ -5279,7 +5279,6 @@ async function refreshSettlementTotals(store, silent = false) {
       const sysRefund = document.getElementById('sysRefund');
       if (sysRefund) sysRefund.innerText = `RM ${Math.abs(refund).toFixed(2)}`;
 
-      // ✅ Use netTotal from report
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
 
@@ -5288,13 +5287,44 @@ async function refreshSettlementTotals(store, silent = false) {
       const settlementError = document.getElementById('settlementError');
       if (settlementError) settlementError.style.display = 'none';
       
+      // ✅ Check if there are any unsettled transactions for today
+      const unsettledCount = await getUnsettledTransactionCount(store, todayStr);
+      console.log(`📊 Unsettled transactions for today: ${unsettledCount}`);
+      
       const checkBtn = document.getElementById('checkSettlementBtn');
-      if (checkBtn) {
-        checkBtn.style.display = 'block';
-        checkBtn.disabled = false;
-      }
       const recordBtn = document.getElementById('recordSettlementBtn');
-      if (recordBtn) recordBtn.style.display = 'none';
+      
+      if (unsettledCount === 0) {
+        // ✅ No unsettled transactions - Show message
+        if (settlementError) {
+          settlementError.innerHTML = '✅ All transactions are already settled for today.';
+          settlementError.style.display = 'block';
+          settlementError.style.color = '#10b981';
+        }
+        if (checkBtn) {
+          checkBtn.style.display = 'none';
+        }
+        if (recordBtn) {
+          recordBtn.style.display = 'none';
+        }
+        // Disable settlement fields
+        setSettlementFieldsEnabled(false);
+      } else {
+        // ✅ There are unsettled transactions - Allow settlement
+        if (settlementError) {
+          settlementError.innerHTML = `📊 ${unsettledCount} unsettled transaction(s) found. You can settle them now.`;
+          settlementError.style.display = 'block';
+          settlementError.style.color = '#f59e0b';
+        }
+        if (checkBtn) {
+          checkBtn.style.display = 'block';
+          checkBtn.disabled = false;
+        }
+        if (recordBtn) {
+          recordBtn.style.display = 'none';
+        }
+        setSettlementFieldsEnabled(true);
+      }
       
       const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
       errorFields.forEach(id => {
@@ -5302,7 +5332,6 @@ async function refreshSettlementTotals(store, silent = false) {
         if (el) el.classList.remove('error-field');
       });
       
-      // ✅ Pre-fill with net totals
       document.getElementById('actualCash').value = cash.toFixed(2);
       document.getElementById('actualCard').value = card.toFixed(2);
       document.getElementById('actualQR').value = qr.toFixed(2);
@@ -5315,7 +5344,38 @@ async function refreshSettlementTotals(store, silent = false) {
     }
   }
 }
-
+async function getUnsettledTransactionCount(store, date) {
+  try {
+    console.log(`🔍 Checking unsettled transactions for ${store} on ${date}`);
+    
+    // Get all transactions for this store and date
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('settled')
+      .eq('store', store)
+      .gte('timestamp', `${date}T00:00:00+08:00`)
+      .lte('timestamp', `${date}T23:59:59+08:00`);
+    
+    if (error) {
+      console.error('Error checking unsettled transactions:', error);
+      return 0;
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('No transactions found for this date');
+      return 0;
+    }
+    
+    // Count unsettled transactions (settled = false or null)
+    const unsettledCount = data.filter(tx => tx.settled !== true).length;
+    console.log(`📊 Found ${unsettledCount} unsettled transactions out of ${data.length} total`);
+    
+    return unsettledCount;
+  } catch (err) {
+    console.error('getUnsettledTransactionCount error:', err);
+    return 0;
+  }
+}
 function setSettlementFieldsEnabled(enabled) {
   const fields = ['settlementStoreSelect', 'pettyCashFloat', 'actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
   const isNonAdmin = !currentEmployee?.isAdmin;
@@ -9095,25 +9155,14 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
   try {
     console.log('📝 Recording settlement for:', { store, date });
     
-    // Check if settlement already exists for this store and date
-    const { data: existing, error: checkError } = await supabase
-      .from('settlements')
-      .select('*')
-      .eq('store', store)
-      .eq('date', date)
-      .maybeSingle();
+    // ✅ Check if there are unsettled transactions
+    const unsettledCount = await getUnsettledTransactionCount(store, date);
     
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Check error:', checkError);
-      return { success: false, error: checkError.message };
-    }
-    
-    if (existing) {
-      console.log('⚠️ Settlement already exists for this date');
+    if (unsettledCount === 0) {
+      console.log('ℹ️ No unsettled transactions found for this date');
       return { 
-        success: true, 
-        duplicated: true, 
-        message: `Settlement already recorded for ${store} on ${date}` 
+        success: false, 
+        error: 'No unsettled transactions found for this date.' 
       };
     }
     
@@ -9149,19 +9198,24 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
     
     console.log('✅ Settlement recorded successfully:', data);
     
-    // Mark all unsettled cash transactions as settled for this store
+    // ✅ Mark ALL transactions for this store and date as settled
     const { error: updateError } = await supabase
       .from('transactions')
-      .update({ settled: true })
+      .update({ 
+        settled: true 
+      })
       .eq('store', store)
-      .eq('payment_method', 'Cash')
+      .gte('timestamp', `${date}T00:00:00+08:00`)
+      .lte('timestamp', `${date}T23:59:59+08:00`)
       .eq('settled', false);
     
     if (updateError) {
       console.warn('⚠️ Error updating unsettled transactions:', updateError);
+    } else {
+      console.log(`✅ Marked ${unsettledCount} transactions as settled for ${store} on ${date}`);
     }
     
-    return { success: true, data: data };
+    return { success: true, data: data, settled_count: unsettledCount };
     
   } catch (err) {
     console.error('❌ recordSettlement error:', err);
