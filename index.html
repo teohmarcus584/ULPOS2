@@ -4063,35 +4063,62 @@ async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
+    // ✅ Get ALL invoice numbers
     const { data, error } = await supabase
       .from('irs_reporting')
       .select('invoice_no')
-      .order('invoice_no', { ascending: false })
-      .limit(1);
+      .order('invoice_no', { ascending: false });
     
     if (error) {
-      console.error('❌ Error getting invoice number:', error);
+      console.error('❌ Error getting invoice numbers:', error);
       throw error;
     }
     
-    let nextNum = 1;
+    let highestNum = 0;
+    
     if (data && data.length > 0) {
-      const lastInvoice = data[0].invoice_no;
-      console.log(`📋 Last invoice: ${lastInvoice}`);
-      const match = lastInvoice.match(/INV-(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1]) + 1;
+      console.log(`📋 Found ${data.length} existing invoice numbers`);
+      
+      // ✅ Extract all numbers and find the highest
+      for (const row of data) {
+        const invoice = row.invoice_no;
+        // Check both formats: INV-XXXX and REF-INV-XXXX
+        let match = invoice.match(/INV-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > highestNum) {
+            highestNum = num;
+          }
+        }
+        // Also check for REF-INV-XXXX format
+        match = invoice.match(/REF-INV-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > highestNum) {
+            highestNum = num;
+          }
+        }
       }
+      
+      console.log(`📊 Highest invoice number found: ${highestNum}`);
+    } else {
+      console.log('📊 No existing invoices found, starting at 1');
     }
     
+    // ✅ Start from the highest number + 1
+    const nextNum = highestNum + 1;
     const newInvoice = `INV-${String(nextNum).padStart(4, '0')}`;
+    
     console.log(`📋 New IRS invoice number: ${newInvoice}`);
     return newInvoice;
+    
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
     // Fallback: use timestamp
     const timestamp = Date.now();
-    return `INV-${timestamp}`;
+    const fallback = `INV-${timestamp}`;
+    console.log(`⚠️ Using fallback invoice number: ${fallback}`);
+    return fallback;
   }
 }
 async function getNextTransactionNumber(store) {
@@ -4971,15 +4998,18 @@ async function processRefund(transactionId, store) {
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
 
-// ✅ IRS Reporting for refunds (Card and Alipay) - NO payment_method
+// In processRefund function
 if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
   console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
   
+  // ✅ Use the same function to get next number
   const invoiceNo = await getNextIRSInvoiceNumber();
+  const refundInvoiceNo = `REF-${invoiceNo}`;
+  
   const { error: irsError } = await supabase
     .from('irs_reporting')
     .insert([{
-      invoice_no: `REF-${invoiceNo}`,
+      invoice_no: refundInvoiceNo,
       transaction_id: refundId,
       timestamp: new Date().toISOString(),
       items: JSON.stringify(refundItems),
@@ -4987,13 +5017,12 @@ if (transaction.payment_method === 'Card' || transaction.payment_method === 'Ali
       store: store,
       employee_id: currentEmployee.id,
       employee_name: currentEmployee.name
-      // ✅ REMOVED: payment_method
     }]);
   
   if (irsError) {
     console.error('❌ IRS refund report error:', irsError);
   } else {
-    console.log(`✅ IRS refund report saved: REF-${invoiceNo}`);
+    console.log(`✅ IRS refund report saved: ${refundInvoiceNo}`);
   }
 }
 
