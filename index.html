@@ -5736,7 +5736,7 @@ async function openCollectionModal() {
 async function loadAllUnsettledCash() {
   showLoading('Loading unsettled cash...');
   try {
-    // ✅ Get unsettled cash from settlements table (not transactions)
+    // ✅ Get unsettled cash from settlements table
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
@@ -5745,7 +5745,12 @@ async function loadAllUnsettledCash() {
     
     if (error) throw error;
     
-    allUnsettledCash = data || [];
+    // ✅ Ensure cash_actual is a number
+    allUnsettledCash = (data || []).map(rec => ({
+      ...rec,
+      cash_actual: parseFloat(rec.cash_actual) || 0
+    }));
+    
     console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements`);
     updateStoreCashSummary();
     updateTotalOutstanding();
@@ -5762,7 +5767,9 @@ function updateStoreCashSummary() {
   const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
   allUnsettledCash.forEach(rec => {
     if (storeTotals.hasOwnProperty(rec.store)) {
-      storeTotals[rec.store] += rec.cash_actual || 0;
+      // ✅ Ensure we're adding a number, not NULL or undefined
+      const amount = parseFloat(rec.cash_actual) || 0;
+      storeTotals[rec.store] += amount;
     }
   });
   for (const [store, total] of Object.entries(storeTotals)) {
@@ -5776,7 +5783,11 @@ function updateStoreCashSummary() {
 }
 
 function updateTotalOutstanding() {
-  const total = allUnsettledCash.reduce((sum, rec) => sum + rec.total, 0);
+  // ✅ Ensure we're summing numbers
+  const total = allUnsettledCash.reduce((sum, rec) => {
+    const amount = parseFloat(rec.cash_actual) || 0;
+    return sum + amount;
+  }, 0);
   const totalSpan = document.getElementById('totalOutstandingCash');
   if (totalSpan) totalSpan.innerText = `RM ${total.toFixed(2)}`;
 }
@@ -5789,15 +5800,15 @@ function filterCollectionTable() {
 
 function renderCollectionTable(records) {
   const tbody = document.getElementById('collectionTableBody');
-  if (!records.length) {
+  if (!records || records.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No unsettled cash records found.</td></tr>';
   } else {
     let html = '';
     records.forEach(rec => {
       const date = new Date(rec.date).toLocaleDateString();
       const employeeName = rec.employee_name || 'Unknown';
-      // ✅ Use cash_actual from settlement
-      const amount = rec.cash_actual || 0;
+      // ✅ Ensure amount is a valid number
+      const amount = parseFloat(rec.cash_actual) || 0;
       html += `<tr data-id="${rec.id}">
         <td><input type="checkbox" class="collection-checkbox" value="${rec.id}"></td>
         <td>${date}</td>
@@ -5867,6 +5878,7 @@ async function loadCollectionHistory(fromDate = null, toDate = null) {
       const collectorTotals = {};
       data.forEach(rec => {
         const name = rec.collected_by || 'Unknown';
+        // ✅ Ensure amount is a valid number
         const amount = parseFloat(rec.cash_actual) || 0;
         collectorTotals[name] = (collectorTotals[name] || 0) + amount;
       });
@@ -5883,6 +5895,7 @@ async function loadCollectionHistory(fromDate = null, toDate = null) {
         const collectionDate = rec.collected_at || rec.timestamp;
         const formattedDate = new Date(collectionDate).toLocaleString();
         const collector = rec.collected_by || 'Unknown';
+        // ✅ Ensure amount is a valid number
         const amount = parseFloat(rec.cash_actual) || 0;
         const storeName = rec.store ? rec.store.charAt(0).toUpperCase() + rec.store.slice(1).replace('_', ' ') : 'Unknown Store';
         const settlementDate = new Date(rec.date).toLocaleDateString();
