@@ -5744,13 +5744,12 @@ async function loadAllUnsettledCash() {
     
     if (error) throw error;
     
-    // ✅ Filter out records with invalid cash_actual
-    allUnsettledCash = (data || []).filter(rec => {
-      const amount = parseFloat(rec.cash_actual);
-      return !isNaN(amount) && amount > 0;
-    });
+    // Store all records, but we'll filter in the display functions
+    allUnsettledCash = data || [];
     
-    console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements with cash`);
+    console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements`);
+    console.log('📊 Records with cash > 0:', allUnsettledCash.filter(r => parseFloat(r.cash_actual) > 0).length);
+    
     updateStoreCashSummary();
     updateTotalOutstanding();
     filterCollectionTable();
@@ -5766,9 +5765,12 @@ function updateStoreCashSummary() {
   const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
   
   for (const rec of allUnsettledCash) {
-    if (storeTotals.hasOwnProperty(rec.store)) {
-      const amount = parseFloat(rec.cash_actual);
-      if (!isNaN(amount) && amount > 0) {
+    // Skip if already collected
+    if (rec.collected === true) continue;
+    
+    const amount = parseFloat(rec.cash_actual);
+    if (!isNaN(amount) && amount > 0) {
+      if (storeTotals.hasOwnProperty(rec.store)) {
         storeTotals[rec.store] += amount;
       }
     }
@@ -5785,9 +5787,20 @@ function updateStoreCashSummary() {
   }
   attachCashCardClickListeners();
 }
+  
+  for (const [store, total] of Object.entries(storeTotals)) {
+    const card = document.querySelector(`.store-cash-card[data-store="${store}"]`);
+    if (card) {
+      const amountSpan = card.querySelector('.store-cash-amount');
+      if (amountSpan) {
+        amountSpan.innerText = `RM ${total.toFixed(2)}`;
+      }
+    }
+  }
+  attachCashCardClickListeners();
+}
 
 function updateTotalOutstanding() {
-  // ✅ Safe calculation with fallback
   let total = 0;
   for (const rec of allUnsettledCash) {
     const amount = parseFloat(rec.cash_actual);
@@ -5804,15 +5817,19 @@ function updateTotalOutstanding() {
 function filterCollectionTable() {
   const selectedStore = document.getElementById('collectionStoreSelect').value;
   
-  // ✅ Only include records with valid cash_actual
-  const filtered = allUnsettledCash.filter(rec => {
+  // Filter out collected and zero amounts
+  let filtered = allUnsettledCash.filter(rec => {
     const amount = parseFloat(rec.cash_actual);
-    const isValid = !isNaN(amount) && amount > 0;
-    if (!isValid) return false;
-    
-    if (selectedStore === 'all') return true;
-    return rec.store === selectedStore;
+    // Skip if amount is 0 or less, or already collected
+    if (rec.collected === true) return false;
+    if (isNaN(amount) || amount <= 0) return false;
+    return true;
   });
+  
+  // Apply store filter
+  if (selectedStore !== 'all') {
+    filtered = filtered.filter(rec => rec.store === selectedStore);
+  }
   
   renderCollectionTable(filtered);
 }
@@ -5824,12 +5841,13 @@ function renderCollectionTable(records) {
   } else {
     let html = '';
     for (const rec of records) {
+      // Skip if already collected or amount is 0
+      if (rec.collected === true) continue;
+      const amount = parseFloat(rec.cash_actual);
+      if (isNaN(amount) || amount <= 0) continue;
+      
       const date = new Date(rec.date).toLocaleDateString();
       const employeeName = rec.employee_name || 'Unknown';
-      const amount = parseFloat(rec.cash_actual) || 0;
-      
-      // ✅ Skip if amount is 0 or invalid
-      if (amount <= 0) continue;
       
       html += `<tr data-id="${rec.id}">
         <td><input type="checkbox" class="collection-checkbox" value="${rec.id}"></td>
