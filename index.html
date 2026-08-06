@@ -9166,37 +9166,86 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
       };
     }
     
-    // Insert the settlement record
-    const { data, error } = await supabase
+    // ✅ Check if settlement already exists
+    const { data: existing, error: checkError } = await supabase
       .from('settlements')
-      .insert([{
-        timestamp: new Date().toISOString(),
-        employee_id: currentEmployee?.id || 'EMP001',
-        employee_name: currentEmployee?.name || 'Unknown',
-        store: store,
-        petty_cash_float: parseFloat(pettyCashFloat) || 0,
-        date: date,
-        cash_system: parseFloat(cashSystem) || 0,
-        card_system: parseFloat(cardSystem) || 0,
-        qr_system: parseFloat(qrSystem) || 0,
-        alipay_system: parseFloat(alipaySystem) || 0,
-        refund_system: parseFloat(refundSystem) || 0,
-        cash_actual: parseFloat(cashActual) || 0,
-        card_actual: parseFloat(cardActual) || 0,
-        qr_actual: parseFloat(qrActual) || 0,
-        alipay_actual: parseFloat(alipayActual) || 0,
-        status: 'recorded',
-        collected: false,
-        collected_by: '',
-        collected_at: null
-      }]);
+      .select('*')
+      .eq('store', store)
+      .eq('date', date)
+      .maybeSingle();
     
-    if (error) {
-      console.error('❌ Settlement insert error:', error);
-      return { success: false, error: error.message };
+    let result;
+    
+    if (existing) {
+      // ✅ UPDATE existing settlement instead of inserting
+      console.log('⚠️ Settlement already exists, updating...');
+      
+      const { data, error } = await supabase
+        .from('settlements')
+        .update({
+          timestamp: new Date().toISOString(),
+          employee_id: currentEmployee?.id || 'EMP001',
+          employee_name: currentEmployee?.name || 'Unknown',
+          petty_cash_float: parseFloat(pettyCashFloat) || 0,
+          cash_system: parseFloat(cashSystem) || 0,
+          card_system: parseFloat(cardSystem) || 0,
+          qr_system: parseFloat(qrSystem) || 0,
+          alipay_system: parseFloat(alipaySystem) || 0,
+          refund_system: parseFloat(refundSystem) || 0,
+          cash_actual: parseFloat(cashActual) || 0,
+          card_actual: parseFloat(cardActual) || 0,
+          qr_actual: parseFloat(qrActual) || 0,
+          alipay_actual: parseFloat(alipayActual) || 0,
+          status: 'recorded',
+          collected: false
+        })
+        .eq('store', store)
+        .eq('date', date)
+        .select();
+      
+      if (error) {
+        console.error('❌ Settlement update error:', error);
+        return { success: false, error: error.message };
+      }
+      
+      result = { success: true, data: data, updated: true };
+      console.log('✅ Settlement updated successfully:', data);
+      
+    } else {
+      // ✅ Insert new settlement
+      const { data, error } = await supabase
+        .from('settlements')
+        .insert([{
+          timestamp: new Date().toISOString(),
+          employee_id: currentEmployee?.id || 'EMP001',
+          employee_name: currentEmployee?.name || 'Unknown',
+          store: store,
+          petty_cash_float: parseFloat(pettyCashFloat) || 0,
+          date: date,
+          cash_system: parseFloat(cashSystem) || 0,
+          card_system: parseFloat(cardSystem) || 0,
+          qr_system: parseFloat(qrSystem) || 0,
+          alipay_system: parseFloat(alipaySystem) || 0,
+          refund_system: parseFloat(refundSystem) || 0,
+          cash_actual: parseFloat(cashActual) || 0,
+          card_actual: parseFloat(cardActual) || 0,
+          qr_actual: parseFloat(qrActual) || 0,
+          alipay_actual: parseFloat(alipayActual) || 0,
+          status: 'recorded',
+          collected: false,
+          collected_by: '',
+          collected_at: null
+        }])
+        .select();
+      
+      if (error) {
+        console.error('❌ Settlement insert error:', error);
+        return { success: false, error: error.message };
+      }
+      
+      result = { success: true, data: data, updated: false };
+      console.log('✅ Settlement recorded successfully:', data);
     }
-    
-    console.log('✅ Settlement recorded successfully:', data);
     
     // ✅ Mark ALL transactions for this store and date as settled
     const { error: updateError } = await supabase
@@ -9215,7 +9264,7 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
       console.log(`✅ Marked ${unsettledCount} transactions as settled for ${store} on ${date}`);
     }
     
-    return { success: true, data: data, settled_count: unsettledCount };
+    return result;
     
   } catch (err) {
     console.error('❌ recordSettlement error:', err);
@@ -9673,13 +9722,11 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
     );
     
     if (result.success) {
-      if (result.duplicated) {
-        await showAlertModal('Settlement Already Done', result.message);
-      } else {
-        await showAlertModal('✅ Settlement Recorded', 
-          `Settlement for ${data.store} on ${data.date} has been saved successfully.`
-        );
-      }
+      const message = result.updated 
+        ? `Settlement for ${data.store} on ${data.date} has been updated successfully.`
+        : `Settlement for ${data.store} on ${data.date} has been recorded successfully.`;
+      
+      await showAlertModal('✅ Settlement Complete', message);
       
       // Close modal and refresh
       document.getElementById('settlementModal').style.display = 'none';
