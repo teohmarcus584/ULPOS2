@@ -5736,8 +5736,6 @@ async function openCollectionModal() {
 async function loadAllUnsettledCash() {
   showLoading('Loading unsettled cash...');
   try {
-    console.log('📊 Loading unsettled cash from settlements...');
-    
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
@@ -5750,17 +5748,13 @@ async function loadAllUnsettledCash() {
     
     console.log(`💰 Found ${allUnsettledCash.length} unsettled settlements`);
     
-    // Log each record for debugging
-    allUnsettledCash.forEach((rec, idx) => {
-      console.log(`  ${idx + 1}. Store: ${rec.store}, Date: ${rec.date}, cash_actual: ${rec.cash_actual}, collected: ${rec.collected}`);
-    });
-    
+    // Update all displays
     updateStoreCashSummary();
     updateTotalOutstanding();
     filterCollectionTable();
     
   } catch (err) {
-    console.error('❌ Error loading unsettled cash:', err);
+    console.error(err);
     await showAlertModal('Error', 'Connection error while loading unsettled cash.');
   } finally {
     hideLoading();
@@ -5768,25 +5762,17 @@ async function loadAllUnsettledCash() {
 }
 
 function updateStoreCashSummary() {
-  console.log('📊 Updating store cash summary...');
-  
   const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
-  let validCount = 0;
   
   for (const rec of allUnsettledCash) {
-    // Skip if already collected
     if (rec.collected === true) continue;
-    
     const amount = parseFloat(rec.cash_actual);
     if (!isNaN(amount) && amount > 0) {
       if (storeTotals.hasOwnProperty(rec.store)) {
         storeTotals[rec.store] += amount;
-        validCount++;
       }
     }
   }
-  
-  console.log('📊 Store totals:', storeTotals);
   
   for (const [store, total] of Object.entries(storeTotals)) {
     const card = document.querySelector(`.store-cash-card[data-store="${store}"]`);
@@ -5801,87 +5787,48 @@ function updateStoreCashSummary() {
 }
 
 function updateTotalOutstanding() {
-  console.log('📊 Calculating total outstanding...');
-  
   let total = 0;
-  let validCount = 0;
-  
   for (const rec of allUnsettledCash) {
-    // Skip if already collected
-    if (rec.collected === true) continue;
-    
     const amount = parseFloat(rec.cash_actual);
-    console.log(`  Store: ${rec.store}, cash_actual: ${rec.cash_actual}, parsed: ${amount}`);
-    
-    if (!isNaN(amount) && amount > 0) {
+    if (!isNaN(amount) && amount > 0 && rec.collected !== true) {
       total += amount;
-      validCount++;
     }
   }
-  
-  console.log(`📊 Total: RM ${total.toFixed(2)} from ${validCount} valid records`);
-  
   const totalSpan = document.getElementById('totalOutstandingCash');
   if (totalSpan) {
     totalSpan.innerText = `RM ${total.toFixed(2)}`;
-  } else {
-    console.error('❌ totalOutstandingCash element not found!');
+    console.log(`✅ Total outstanding updated: RM ${total.toFixed(2)}`);
   }
 }
 
 function filterCollectionTable() {
-  console.log('📊 Filtering collection table...');
-  
   const selectedStore = document.getElementById('collectionStoreSelect').value;
-  console.log(`  Selected store: ${selectedStore}`);
   
-  // Filter out collected and zero amounts
   let filtered = allUnsettledCash.filter(rec => {
-    // Skip if already collected
     if (rec.collected === true) return false;
-    
     const amount = parseFloat(rec.cash_actual);
     if (isNaN(amount) || amount <= 0) return false;
-    
     return true;
   });
   
-  console.log(`  Valid records before store filter: ${filtered.length}`);
-  
-  // Apply store filter
   if (selectedStore !== 'all') {
     filtered = filtered.filter(rec => rec.store === selectedStore);
-    console.log(`  Valid records after store filter: ${filtered.length}`);
   }
   
   renderCollectionTable(filtered);
 }
 
 function renderCollectionTable(records) {
-  console.log(`📊 Rendering ${records?.length || 0} records...`);
-  
   const tbody = document.getElementById('collectionTableBody');
-  if (!tbody) {
-    console.error('❌ collectionTableBody element not found!');
-    return;
-  }
-  
   if (!records || records.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No unsettled cash records found.</td></tr>';
     return;
   }
   
   let html = '';
-  let totalDisplay = 0;
-  
   for (const rec of records) {
-    // Extra safety check
-    if (rec.collected === true) continue;
-    
     const amount = parseFloat(rec.cash_actual);
     if (isNaN(amount) || amount <= 0) continue;
-    
-    totalDisplay += amount;
     
     const date = new Date(rec.date).toLocaleDateString();
     const employeeName = rec.employee_name || 'Unknown';
@@ -5904,8 +5851,6 @@ function renderCollectionTable(records) {
   const selectAll = document.getElementById('selectAllCheckbox');
   if (selectAll) selectAll.checked = false;
   updateCollectionButtonState();
-  
-  console.log(`💰 Total displayed: RM ${totalDisplay.toFixed(2)}`);
 }
 
 function updateCollectionButtonState() {
