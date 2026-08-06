@@ -3781,26 +3781,27 @@ async function completeCheckout(paymentMethod, cashReceived) {
       total: (item.quantity - item.freeQuantity) * item.product.price
     }));
 
-    const transaction = {
-      transaction_id: transactionId,
-      items: saleItems,
-      total: totalAmount,
-      payment_method: paymentMethod,
-      cash_received: cashReceived,
-      timestamp: new Date().toISOString(),
-      discount: discountAmount,
-      buy2_free1_discount: buy2Free1Discount,
-      buy3_free1_discount: buy3Free1Discount,
-      custom_discount: customDiscount,
-      staff_discount: staffDiscount,
-      prize_claimed: claimedReceiptInfo,
-      customer_id: selectedCustomer ? selectedCustomer.id : null,
-      store: currentStore,
-      employee_name: currentEmployee.name,
-      employee_id: currentEmployee.id,
-      sales_person_name: salesPersonName,
-      sales_person_id: salesPersonId,
-    };
+   // Inside completeCheckout function, when creating the transaction object:
+const transaction = {
+  transaction_id: transactionId,
+  items: saleItems,
+  total: totalAmount,
+  payment_method: paymentMethod,
+  cash_received: cashReceived || 0,
+  timestamp: new Date().toISOString(),
+  discount: discountAmount || 0,
+  buy2_free1_discount: buy2Free1Discount || 0,
+  buy3_free1_discount: buy3Free1Discount || 0,
+  custom_discount: customDiscount || 0,
+  staff_discount: staffDiscount || 0,
+  prize_claimed: claimedReceiptInfo || null,
+  customer_id: selectedCustomer ? selectedCustomer.id : null,
+  store: currentStore,
+  employee_id: currentEmployee.id,
+  employee_name: currentEmployee.name,  // ✅ IMPORTANT: Add this
+  sales_person_name: salesPersonName || '',
+  sales_person_id: salesPersonId || ''
+};
 
     // Print receipt
     let receiptPrinted = false;
@@ -3947,19 +3948,21 @@ async function completeCheckout(paymentMethod, cashReceived) {
 async function saveTransactionToSheet(transaction) {
   try {
     console.log('💾 Saving transaction:', transaction.transaction_id);
+    console.log('📋 Transaction data:', JSON.stringify(transaction, null, 2));
     
-    // ✅ Use the transaction_id as-is (don't generate a new one)
-    const { error } = await supabase
+    // Insert the transaction with ALL fields
+    const { data, error } = await supabase
       .from('transactions')
       .insert([{
-        transaction_id: transaction.transaction_id,  // Use the one passed in
+        transaction_id: transaction.transaction_id,
         timestamp: transaction.timestamp,
-        items: transaction.items,
-        total: transaction.total,
-        payment_method: transaction.payment_method,
+        items: transaction.items || [],
+        total: transaction.total || 0,
+        payment_method: transaction.payment_method || 'Cash',
         cash_received: transaction.cash_received || 0,
-        store: transaction.store,
+        store: transaction.store || 'queens',
         employee_id: transaction.employee_id,
+        employee_name: transaction.employee_name || currentEmployee?.name || '',
         settled: transaction.settled || false,
         refunded: transaction.refunded || false,
         refund_of: transaction.refund_of || '',
@@ -3974,47 +3977,65 @@ async function saveTransactionToSheet(transaction) {
         staff_discount: transaction.staff_discount || 0,
         sales_person_name: transaction.sales_person_name || '',
         sales_person_id: transaction.sales_person_id || ''
-      }]);
+      }])
+      .select();
     
     if (error) {
       console.error('❌ Save transaction error:', error);
-      throw error;
+      console.error('❌ Error details:', error.message, error.code, error.details);
+      return false;
     }
     
-    console.log('✅ Transaction saved:', transaction.transaction_id);
+    console.log('✅ Transaction saved successfully:', data);
     
-    // IRS Reporting for Card and Alipay
+    // 2. ✅ IRS Reporting for Card and Alipay
     const paymentMethod = String(transaction.payment_method).toLowerCase();
+    console.log(`📋 Checking IRS report for payment method: ${paymentMethod}`);
+    
     if (paymentMethod === 'card' || paymentMethod === 'alipay') {
       console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
       
-      const invoiceNo = await getNextIRSInvoiceNumber();
-      
-      const { error: irsError } = await supabase
-        .from('irs_reporting')
-        .insert([{
+      try {
+        // Get next invoice number
+        const invoiceNo = await getNextIRSInvoiceNumber();
+        console.log(`📋 Generated invoice number: ${invoiceNo}`);
+        
+        const irsData = {
           invoice_no: invoiceNo,
           transaction_id: transaction.transaction_id,
           timestamp: transaction.timestamp,
-          items: JSON.stringify(transaction.items),
-          total: transaction.total,
-          store: transaction.store,
+          items: JSON.stringify(transaction.items || []),
+          total: transaction.total || 0,
+          store: transaction.store || 'queens',
           employee_id: transaction.employee_id,
           employee_name: transaction.employee_name || currentEmployee?.name || '',
           payment_method: transaction.payment_method,
           created_at: new Date().toISOString()
-        }]);
-      
-      if (irsError) {
-        console.error('❌ IRS reporting error:', irsError);
-      } else {
-        console.log(`✅ IRS report saved: ${invoiceNo}`);
+        };
+        
+        console.log('📋 IRS data:', irsData);
+        
+        const { error: irsError } = await supabase
+          .from('irs_reporting')
+          .insert([irsData]);
+        
+        if (irsError) {
+          console.error('❌ IRS reporting error:', irsError);
+        } else {
+          console.log(`✅ IRS report saved: ${invoiceNo}`);
+        }
+      } catch (irsErr) {
+        console.error('❌ IRS reporting failed:', irsErr);
       }
+    } else {
+      console.log(`ℹ️ Skipping IRS report for ${transaction.payment_method} (only Card and Alipay)`);
     }
     
     return true;
+    
   } catch (err) {
     console.error('❌ saveTransactionToSheet error:', err);
+    console.error('❌ Error stack:', err.stack);
     return false;
   }
 }
