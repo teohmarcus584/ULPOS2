@@ -7169,25 +7169,39 @@ async function approveStoreGroup(groupId, modal) {
         let successCount = 0;
         let failCount = 0;
         let errors = [];
+        let store = currentStore; // ✅ Get the current store
         
         for (const [requestId, items] of Object.entries(groupedByRequest)) {
           const category = items[0]?.category || 'Unknown';
           
           try {
+            // ✅ Update each product's stock for the specific store
             for (const item of items) {
+              const stockColumn = `stock_${store}`; // ✅ Use store-specific column
+              
+              // Update the product in Supabase
               const { error } = await supabase
                 .from('products')
-                .update({ stock: item.counted_stock })
+                .update({ [stockColumn]: item.counted_stock })
                 .eq('id', item.product_id);
               
-              if (error) throw error;
+              if (error) {
+                console.error(`❌ Error updating product ${item.product_id}:`, error);
+                throw new Error(`Failed to update product: ${error.message}`);
+              }
               
+              // Update local product cache
               const localProduct = products.find(p => p.id == item.product_id);
               if (localProduct) {
                 localProduct.stock = item.counted_stock;
+                // Also update the store-specific stock
+                localProduct[stockColumn] = item.counted_stock;
               }
+              
+              successCount++;
             }
             
+            // ✅ Update the request status
             const { error } = await supabase
               .from('stock_take_requests')
               .update({
@@ -7198,21 +7212,25 @@ async function approveStoreGroup(groupId, modal) {
               })
               .eq('id', requestId);
             
-            if (error) throw error;
+            if (error) {
+              console.error(`❌ Error updating request ${requestId}:`, error);
+            }
             
-            successCount += items.length;
           } catch (err) {
             failCount += items.length;
             errors.push(`Category "${category}": ${err.message}`);
+            console.error(`❌ Error processing category "${category}":`, err);
           }
         }
         
+        // Show result
         await showAlertModal('✅ Approval Complete', 
           `<div style="text-align:left;">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
               <span style="font-size:2.5rem;">📋</span>
               <div>
                 <div style="font-weight:600; color:#0f172a; font-size:1.2rem;">Stock Take ${failCount === 0 ? 'Approved' : 'Partially Approved'}</div>
+                <div style="font-size:0.9rem; color:#64748b;">Store: ${store}</div>
               </div>
             </div>
             <div style="background:#f0fdf4; border-radius:12px; padding:16px 20px; border-left:4px solid #059669;">
@@ -7241,13 +7259,15 @@ async function approveStoreGroup(groupId, modal) {
         
         await new Promise(resolve => setTimeout(resolve, 500));
         await loadPendingStockTakeRequests(modal);
+        
+        // ✅ Refresh products
         await fetchProductsFromSheet(true);
         renderProductGrid();
         
         hideLoading();
         
       } catch (err) {
-        console.error(err);
+        console.error('Approval error:', err);
         await showAlertModal('Error', 'Failed to approve selected items: ' + err.message);
         hideLoading();
       }
