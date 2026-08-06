@@ -7655,7 +7655,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     console.log(`📊 Found ${data?.length || 0} transactions`);
     
     if (!data || data.length === 0) {
-      console.log('ℹ️ No transactions found in date range');
       const emptyResult = {
         totalSales: 0,
         cashTotal: 0,
@@ -7721,7 +7720,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       
       // ✅ Skip if this transaction was refunded
       if (refundedTransactionIds.has(txId)) {
-        console.log(`⏭️ Skipping refunded transaction: ${txId}`);
+        console.log(`⏭️ Skipping refunded transaction: ${txId} (RM ${total.toFixed(2)})`);
         continue;
       }
       
@@ -7754,10 +7753,10 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       refundTotal += total;
     }
     
-    // ✅ Calculate net total
+    // ✅ Calculate net total (sales - refunds)
     const netTotal = totalSales + refundTotal;
     
-    console.log(`💰 Total Sales: RM ${totalSales.toFixed(2)}`);
+    console.log(`💰 Total Sales (excluding refunded): RM ${totalSales.toFixed(2)}`);
     console.log(`💰 Refund Total: RM ${refundTotal.toFixed(2)}`);
     console.log(`💰 Net Total: RM ${netTotal.toFixed(2)}`);
     
@@ -7788,6 +7787,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       // ✅ Update net total in settlement modal
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
+      console.log(`✅ Set sysNetTotal to: RM ${netTotal.toFixed(2)}`);
     }
     
     return totals;
