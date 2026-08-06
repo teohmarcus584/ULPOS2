@@ -4074,7 +4074,6 @@ async function getNextTransactionNumber(store) {
     const prefix = prefixMap[store];
     if (!prefix) {
       console.error(`❌ Unknown store: ${store}`);
-      // Fallback
       const fallbackPrefix = store.substring(0, 3).toUpperCase();
       const timestamp = Date.now();
       const random = Math.floor(Math.random() * 1000);
@@ -4083,35 +4082,43 @@ async function getNextTransactionNumber(store) {
     
     console.log(`🔍 Getting next transaction number for ${store} with prefix ${prefix}`);
     
-    // Get all transactions with this prefix
+    // Get ALL transactions with this prefix
     const { data, error } = await supabase
       .from('transactions')
       .select('transaction_id')
-      .like('transaction_id', `${prefix}%`)
-      .order('transaction_id', { ascending: false })
-      .limit(1);
+      .ilike('transaction_id', `${prefix}%`)
+      .order('transaction_id', { ascending: false });
     
     if (error) {
       console.error('❌ Error fetching transactions:', error);
       throw error;
     }
     
-    let nextNum = 1;
+    let highestNum = 0;
+    
     if (data && data.length > 0) {
-      const lastId = data[0].transaction_id;
-      console.log(`📋 Last transaction ID: ${lastId}`);
+      console.log(`📋 Found ${data.length} transactions with prefix ${prefix}`);
       
-      // Extract the number from TXN38XXXXX format
-      const match = lastId.match(new RegExp(`${prefix}(\\d{6})`));
-      if (match) {
-        nextNum = parseInt(match[1]) + 1;
-        console.log(`📊 Next number: ${nextNum}`);
-      } else {
-        console.warn(`⚠️ Could not extract number from ${lastId}, starting at 1`);
+      // Extract all numbers and find the highest
+      for (const row of data) {
+        const id = row.transaction_id;
+        // Extract number from TXN38XXXXX format
+        const match = id.match(new RegExp(`${prefix}(\\d+)`));
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > highestNum) {
+            highestNum = num;
+          }
+        }
       }
+      
+      console.log(`📊 Highest number found: ${highestNum}`);
     } else {
       console.log(`📊 No existing transactions found for ${prefix}, starting at 1`);
     }
+    
+    // Start from 1 if no transactions found
+    const nextNum = highestNum + 1;
     
     // Ensure we have 6 digits (pad with zeros)
     const paddedNum = String(nextNum).padStart(6, '0');
