@@ -5362,23 +5362,17 @@ async function refreshSettlementTotals(store, silent = false) {
         if (el) el.classList.remove('error-field');
       });
       
-      // ✅ REMOVED: Do NOT pre-fill actual fields - let user input
-      // document.getElementById('actualCash').value = cash.toFixed(2);
-      // document.getElementById('actualCard').value = card.toFixed(2);
-      // document.getElementById('actualQR').value = qr.toFixed(2);
-      // document.getElementById('actualAlipay').value = alipay.toFixed(2);
-      
-      // ✅ Instead, leave them blank with placeholders
+      // ✅ CLEAR all input fields - NO placeholders with system values
       document.getElementById('actualCash').value = '';
       document.getElementById('actualCard').value = '';
       document.getElementById('actualQR').value = '';
       document.getElementById('actualAlipay').value = '';
       
-      // Set placeholders to show expected values
-      document.getElementById('actualCash').placeholder = `System: RM ${cash.toFixed(2)}`;
-      document.getElementById('actualCard').placeholder = `System: RM ${card.toFixed(2)}`;
-      document.getElementById('actualQR').placeholder = `System: RM ${qr.toFixed(2)}`;
-      document.getElementById('actualAlipay').placeholder = `System: RM ${alipay.toFixed(2)}`;
+      // ✅ Set simple, clean placeholders without system values
+      document.getElementById('actualCash').placeholder = 'Enter cash amount';
+      document.getElementById('actualCard').placeholder = 'Enter card amount';
+      document.getElementById('actualQR').placeholder = 'Enter QR amount';
+      document.getElementById('actualAlipay').placeholder = 'Enter Alipay amount';
     }
   } else {
     console.error('❌ Report is null, settlement totals not updated');
@@ -5445,18 +5439,18 @@ async function openSettlementModal() {
   document.getElementById('settlementError').style.display = 'none';
   document.getElementById('settlementError').innerHTML = '';
   
-  // ✅ Clear all input fields - don't auto-populate
+  // ✅ Clear all input fields
   document.getElementById('actualCash').value = '';
   document.getElementById('actualCard').value = '';
   document.getElementById('actualQR').value = '';
   document.getElementById('actualAlipay').value = '';
   document.getElementById('pettyCashFloat').value = '0.00';
   
-  // ✅ Set placeholders
-  document.getElementById('actualCash').placeholder = 'Enter actual cash count';
-  document.getElementById('actualCard').placeholder = 'Enter actual card settlement';
-  document.getElementById('actualQR').placeholder = 'Enter actual QR settlement';
-  document.getElementById('actualAlipay').placeholder = 'Enter actual Alipay settlement';
+  // ✅ Set clean placeholders (NO system hints)
+  document.getElementById('actualCash').placeholder = 'Enter cash amount';
+  document.getElementById('actualCard').placeholder = 'Enter card amount';
+  document.getElementById('actualQR').placeholder = 'Enter QR amount';
+  document.getElementById('actualAlipay').placeholder = 'Enter Alipay amount';
   
   document.getElementById('actualCash').classList.remove('error-field');
   document.getElementById('actualCard').classList.remove('error-field');
