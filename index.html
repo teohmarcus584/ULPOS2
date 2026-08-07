@@ -7665,7 +7665,8 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     
     let query = supabase
       .from('transactions')
-      .select('*');
+      .select('*')
+      .gt('total', 0);  // ✅ EXCLUDE refunds (negative totals)
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
@@ -7685,7 +7686,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       throw error;
     }
     
-    console.log(`📊 Found ${data?.length || 0} transactions`);
+    console.log(`📊 Found ${data?.length || 0} transactions (excluding refunds)`);
     
     if (!data || data.length === 0) {
       console.log('ℹ️ No transactions found in date range');
@@ -7727,9 +7728,11 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     const refundedTransactionIds = new Set();
     const refundTransactions = [];
     
-    // ✅ First pass: Find all refund transactions
+    // ✅ First pass: Find all refund transactions (they should already be excluded by .gt('total', 0))
+    // But let's double-check
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
+      // Refunds should have been excluded, but just in case
       if (total < 0) {
         refundTransactions.push(tx);
         if (tx.refund_of) {
@@ -7742,11 +7745,11 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     console.log(`📊 Found ${data.length - refundTransactions.length} sales, ${refundTransactions.length} refunds`);
     console.log(`🔄 Refunded transaction IDs:`, [...refundedTransactionIds]);
     
-    // ✅ Second pass: Calculate ALL sales (including refunded ones)
+    // ✅ Second pass: Calculate ALL sales (including refunded ones, but refunds are excluded)
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
       
-      // Skip refund transactions (they are negative)
+      // Skip refund transactions (they are negative, but should already be excluded)
       if (total < 0) continue;
       
       // ✅ Count ALL sales (including ones that were refunded)
@@ -7772,7 +7775,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       }
     }
     
-    // ✅ Net total = ALL sales + refunds (refunds are negative)
+    // ✅ Net total = ALL sales + refunds (refunds are negative, but excluded)
     const netTotal = totalSales + refundTotal;
     
     console.log(`💰 Total Sales (all): RM ${totalSales.toFixed(2)}`);
@@ -7909,21 +7912,42 @@ async function fetchSalesChartData(store, employeeId, from, to) {
 
 async function fetchProductSalesReport(store, employeeId, from, to) {
   try {
+    console.log('📊 Fetching product sales report...');
+    
     let query = supabase
       .from('transactions')
-      .select('*');
+      .select('*')
+      .gt('total', 0);  // ✅ EXCLUDE refunds (negative totals)
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
-    if (from) query = query.gte('timestamp', from);
-    if (to) query = query.lte('timestamp', to);
+    if (from) {
+      const fromDate = new Date(from + 'T00:00:00+08:00');
+      query = query.gte('timestamp', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to + 'T23:59:59+08:00');
+      query = query.lte('timestamp', toDate.toISOString());
+    }
     
     const { data, error } = await query;
     if (error) throw error;
     
-    const productMap = new Map();
+    console.log(`📊 Found ${data?.length || 0} transactions (excluding refunds)`);
     
-    for (const receipt of data) {
+    const productMap = new Map();
+    let totalPaidItems = 0; // ✅ Track total paid items
+    
+    for (const receipt of data || []) {
+      // ✅ Skip refunds (negative totals)
+      if (receipt.total < 0) continue;
+      
+      // ✅ Skip if refunded
+      if (receipt.refunded === true) continue;
+      
+      // ✅ Skip if no items
+      if (!receipt.items || !Array.isArray(receipt.items) || receipt.items.length === 0) continue;
+      
       const luckyDrawDiscount = parseFloat(receipt.discount) || 0;
       const carPromoDiscount = parseFloat(receipt.buy2_free1_discount) || 0;
       const perfumePromoDiscount = parseFloat(receipt.buy3_free1_discount) || 0;
@@ -7940,7 +7964,14 @@ async function fetchProductSalesReport(store, employeeId, from, to) {
         const quantity = parseInt(item.quantity) || 0;
         const freeQuantity = parseInt(item.free_quantity) || 0;
         const paidQty = quantity - freeQuantity;
+        
+        // ✅ Log for debugging
+        console.log(`📦 ${item.name}: quantity=${quantity}, free=${freeQuantity}, paid=${paidQty}`);
+        
+        // ✅ Skip if no paid quantity
         if (paidQty <= 0) continue;
+        
+        totalPaidItems += paidQty; // ✅ Track total paid items
         
         const origTotal = paidQty * price;
         originalSubtotal += origTotal;
@@ -7956,6 +7987,7 @@ async function fetchProductSalesReport(store, employeeId, from, to) {
       
       if (paidItems.length === 0) continue;
       
+      // Apply promos
       if (carPromoDiscount > 0) {
         const targetItem = paidItems.find(i => i.category === "CAR AROMATIC");
         if (targetItem) {
@@ -8000,7 +8032,12 @@ async function fetchProductSalesReport(store, employeeId, from, to) {
       .filter(p => p.quantity > 0)
       .sort((a, b) => b.quantity - a.quantity);
     
+    console.log(`📊 Product breakdown: ${productsArray.length} products found`);
+    console.log(`📊 Total paid items: ${totalPaidItems}`);
+    console.log(`📊 Breakdown quantity sum: ${productsArray.reduce((sum, p) => sum + p.quantity, 0)}`);
+    
     return productsArray;
+    
   } catch (err) {
     console.error('fetchProductSalesReport error:', err);
     return [];
@@ -8053,12 +8090,22 @@ function renderProductDetails(productsData) {
   const sortedData = [...(productsData || [])].sort((a, b) => b.quantity - a.quantity);
   
   if (sortedData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No products sold in this period.</td></tr>';
+    tbody.innerHTML = `<tr>
+      <td colspan="4" style="text-align: center; padding: 30px; color: #94a3b8;">
+        📭 No products sold in this period.<br>
+        <span style="font-size: 0.85rem;">Try adjusting your date range or check if there are sales.</span>
+      </td>
+    </tr>`;
     return;
   }
   
   let html = '';
+  let totalQuantity = 0;
+  let totalRevenue = 0;
+  
   sortedData.forEach(p => {
+    totalQuantity += p.quantity;
+    totalRevenue += p.total;
     html += `<tr>
       <td>${escapeHtml(p.name)}</td>
       <td>${escapeHtml(p.category)}</td>
@@ -8066,6 +8113,27 @@ function renderProductDetails(productsData) {
       <td style="text-align: right;">RM ${p.total.toFixed(2)}</td>
     </tr>`;
   });
+  
+  // ✅ Add summary row with correct totals
+  html += `<tr style="font-weight: 700; border-top: 2px solid #e2e8f0; background: #f1f5f9;">
+    <td colspan="2" style="text-align: right; font-size: 1.1rem;">📊 TOTAL</td>
+    <td style="text-align: right; font-size: 1.1rem; color: #0f172a;">${totalQuantity}</td>
+    <td style="text-align: right; font-size: 1.1rem; color: #2c7a4b;">RM ${totalRevenue.toFixed(2)}</td>
+  </tr>`;
+  
+  // ✅ Add note if there's a discrepancy
+  const totalItemsDisplay = document.getElementById('adminReportTotalItems');
+  if (totalItemsDisplay) {
+    const reportedTotal = parseInt(totalItemsDisplay.innerText) || 0;
+    if (reportedTotal !== totalQuantity) {
+      html += `<tr>
+        <td colspan="4" style="text-align: center; padding: 8px; color: #f59e0b; font-size: 0.85rem;">
+          ⚠️ Note: ${reportedTotal} items total (includes free gifts), ${totalQuantity} paid items shown above
+        </td>
+      </tr>`;
+    }
+  }
+  
   tbody.innerHTML = html;
 }
 
@@ -8588,8 +8656,14 @@ async function openReportsModal() {
 
 async function updateNonAdminReport(from, to) {
   if (!currentEmployee || currentEmployee.isAdmin) return;
+  
+  console.log('🔄 Updating non-admin report...');
+  console.log('Employee:', currentEmployee.name, 'ID:', currentEmployee.id);
+  console.log('Date range:', from, 'to', to);
+  
   const store = currentStore;
-
+  
+  // ✅ Get store totals
   const storeTotals = await fetchSalesReport(store, 'all', from, to, false, true);
   if (storeTotals) {
     document.getElementById('adminReportTotalSales').innerText = `RM ${storeTotals.totalSales.toFixed(2)}`;
@@ -8598,18 +8672,65 @@ async function updateNonAdminReport(from, to) {
     document.getElementById('adminReportTransactionCount').innerText = storeTotals.transactionCount || 0;
     document.getElementById('adminReportTotalItems').innerText = storeTotals.totalItems || 0;
   }
-
-  const staffAgg = await fetchEmployeeSalesAggregate('all', from, to);
-  if (staffAgg && staffAgg.labels.length) {
-    const staffIndex = staffAgg.labels.findIndex(name =>
-      name === currentEmployee.name || name.includes(currentEmployee.id)
-    );
-    const mySales = staffIndex !== -1 ? staffAgg.data[staffIndex] : 0;
-    document.getElementById('adminReportTotalSales').innerText = `RM ${mySales.toFixed(2)}`;
-    const empTotalEl = document.getElementById('nonAdminEmployeeTotal');
-    if (empTotalEl) empTotalEl.innerText = `RM ${mySales.toFixed(2)}`;
+  
+  // ✅ Calculate employee's sales directly from transactions
+  let query = supabase
+    .from('transactions')
+    .select('total')
+    .eq('store', store)
+    .eq('employee_id', currentEmployee.id)
+    .gt('total', 0); // Only positive totals (exclude refunds)
+  
+  if (from) {
+    const fromDate = new Date(from + 'T00:00:00+08:00');
+    query = query.gte('timestamp', fromDate.toISOString());
   }
-
+  if (to) {
+    const toDate = new Date(to + 'T23:59:59+08:00');
+    query = query.lte('timestamp', toDate.toISOString());
+  }
+  
+  try {
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('❌ Error fetching employee sales:', error);
+      return;
+    }
+    
+    let mySales = 0;
+    for (const tx of data || []) {
+      mySales += parseFloat(tx.total) || 0;
+    }
+    
+    console.log(`👤 Employee ${currentEmployee.name} sales: RM ${mySales.toFixed(2)}`);
+    
+    // Update the report total to show employee's sales
+    const reportTotal = document.getElementById('adminReportTotalSales');
+    if (reportTotal) {
+      reportTotal.innerText = `RM ${mySales.toFixed(2)}`;
+    }
+    
+    // Update the employee stats card
+    const empTotalElem = document.getElementById('nonAdminEmployeeTotal');
+    if (empTotalElem) {
+      empTotalElem.innerText = `RM ${mySales.toFixed(2)}`;
+    }
+    
+    // Also update the first stat item label
+    const firstStatItem = document.querySelector('#adminReportModal .stat-item:first-child');
+    if (firstStatItem) {
+      const labelSpan = firstStatItem.querySelector('span:first-child');
+      if (labelSpan) {
+        labelSpan.innerText = `👤 My Sales:`;
+      }
+    }
+    
+  } catch (err) {
+    console.error('Error calculating employee sales:', err);
+  }
+  
+  // Show product details if visible
   if (productDetailsVisible) {
     const productData = await fetchProductSalesReport(store, currentEmployee.id, from, to);
     renderProductDetails(productData);
@@ -8618,34 +8739,92 @@ async function updateNonAdminReport(from, to) {
 
 async function updateNonAdminStatsCards(from, to) {
   if (!currentEmployee || currentEmployee.isAdmin) return;
+  
+  console.log('🔄 Updating non-admin stats cards...');
+  console.log('Current employee:', currentEmployee);
+  
   const store = currentStore;
-
+  
+  // Get store totals
   const storeTotals = await fetchSalesReport(store, 'all', from, to, false, true);
   const storeTotalElem = document.getElementById('nonAdminStoreTotal');
   const storeNameElem = document.getElementById('nonAdminStoreName');
+  
   if (storeTotalElem && storeTotals) {
     storeTotalElem.innerText = `RM ${storeTotals.totalSales.toFixed(2)}`;
+    console.log(`🏪 Store total: RM ${storeTotals.totalSales.toFixed(2)}`);
   }
   if (storeNameElem) {
     storeNameElem.innerText = store.charAt(0).toUpperCase() + store.slice(1);
   }
-
-  const staffAgg = await fetchEmployeeSalesAggregate('all', from, to);
-  let mySales = 0;
-  if (staffAgg && staffAgg.labels.length) {
-    const idx = staffAgg.labels.findIndex(name =>
-      name === currentEmployee.name || name.includes(currentEmployee.id)
-    );
-    if (idx !== -1) mySales = staffAgg.data[idx];
+  
+  // ✅ Get employee sales - fetch ALL transactions for this store
+  let query = supabase
+    .from('transactions')
+    .select('employee_id, total, employee_name')
+    .eq('store', store);
+  
+  if (from) {
+    const fromDate = new Date(from + 'T00:00:00+08:00');
+    query = query.gte('timestamp', fromDate.toISOString());
   }
-  const empTotalElem = document.getElementById('nonAdminEmployeeTotal');
-  const empNameElem = document.getElementById('nonAdminEmployeeName');
-  if (empTotalElem) empTotalElem.innerText = `RM ${mySales.toFixed(2)}`;
-  if (empNameElem) empNameElem.innerText = currentEmployee.name;
+  if (to) {
+    const toDate = new Date(to + 'T23:59:59+08:00');
+    query = query.lte('timestamp', toDate.toISOString());
+  }
+  
+  try {
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('❌ Error fetching employee transactions:', error);
+      return;
+    }
+    
+    console.log(`📊 Found ${data?.length || 0} transactions for employee sales`);
+    
+    let mySales = 0;
+    const employeeId = String(currentEmployee.id);
+    
+    // ✅ Calculate total sales for this employee
+    for (const tx of data || []) {
+      const total = parseFloat(tx.total) || 0;
+      const txEmployeeId = String(tx.employee_id);
+      
+      // ✅ Match by employee_id
+      if (total > 0 && txEmployeeId === employeeId) {
+        mySales += total;
+      }
+    }
+    
+    console.log(`👤 My sales: RM ${mySales.toFixed(2)}`);
+    
+    // Update UI
+    const empTotalElem = document.getElementById('nonAdminEmployeeTotal');
+    const empNameElem = document.getElementById('nonAdminEmployeeName');
+    
+    if (empTotalElem) {
+      empTotalElem.innerText = `RM ${mySales.toFixed(2)}`;
+    }
+    if (empNameElem) {
+      empNameElem.innerText = currentEmployee.name || 'Unknown';
+    }
+    
+    // ✅ Also update the main report total
+    const reportTotal = document.getElementById('adminReportTotalSales');
+    if (reportTotal) {
+      reportTotal.innerText = `RM ${mySales.toFixed(2)}`;
+    }
+    
+  } catch (err) {
+    console.error('Error calculating employee sales:', err);
+  }
 }
 
 async function fetchEmployeeSalesAggregate(store, from, to) {
   try {
+    console.log('🔍 Fetching employee sales aggregate...');
+    
     let query = supabase
       .from('transactions')
       .select('employee_id, total');
@@ -8657,23 +8836,39 @@ async function fetchEmployeeSalesAggregate(store, from, to) {
     const { data, error } = await query;
     if (error) throw error;
     
+    console.log(`📊 Found ${data?.length || 0} transactions`);
+    
+    // Aggregate by employee_id
     const employeeMap = {};
     data.forEach(tx => {
-      const id = tx.employee_id || 'Unknown';
+      const id = tx.employee_id;
       const total = parseFloat(tx.total) || 0;
-      if (total > 0) {
-        employeeMap[id] = (employeeMap[id] || 0) + total;
+      
+      // ✅ Only count positive sales (not refunds)
+      if (total > 0 && id) {
+        const key = String(id); // Convert to string for consistent keys
+        employeeMap[key] = (employeeMap[key] || 0) + total;
       }
     });
     
+    console.log('📊 Employee sales map:', employeeMap);
+    
     // Convert IDs to names
-    const labels = Object.keys(employeeMap).map(id => {
+    const labels = [];
+    const salesData = [];
+    
+    for (const [id, total] of Object.entries(employeeMap)) {
+      // Find employee by ID (convert both to string for comparison)
       const emp = cachedEmployees.find(e => String(e.id) === String(id));
-      return emp ? emp.name : id;
-    });
-    const salesData = Object.values(employeeMap);
+      const name = emp ? emp.name : `Employee ${id}`;
+      labels.push(name);
+      salesData.push(total);
+    }
+    
+    console.log('📊 Employee sales results:', { labels, salesData });
     
     return { labels, data: salesData };
+    
   } catch (err) {
     console.error('fetchEmployeeSalesAggregate error:', err);
     return null;
