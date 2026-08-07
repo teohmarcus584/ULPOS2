@@ -5302,17 +5302,34 @@ async function checkSettlementStatus(store, date) {
       return { exists: false, isCollected: false, settlement: null };
     }
     
-    // ✅ Check if already collected
+    // ✅ Check if collected (this means the settlement is complete)
     const isCollected = data.collected === true;
     console.log(`📊 Settlement found: collected = ${isCollected}`);
     
-    // ✅ Check if status is 'recorded' or 'collected'
-    const isRecorded = data.status === 'recorded' || data.status === 'collected';
+    // ✅ Also check if status is 'collected'
+    const isCollectedStatus = data.status === 'collected';
+    
+    // ✅ Check if there are any unsettled transactions for this date
+    // ✅ FIX: Use timestamp range instead of date column
+    const startDate = new Date(date + 'T00:00:00+08:00');
+    const endDate = new Date(date + 'T23:59:59+08:00');
+    
+    const { data: txData, error: txError } = await supabase
+      .from('transactions')
+      .select('settled')
+      .eq('store', store)
+      .gte('timestamp', startDate.toISOString())
+      .lte('timestamp', endDate.toISOString())
+      .eq('settled', false)
+      .limit(1);
+    
+    const hasUnsettled = txData && txData.length > 0;
+    console.log(`📊 Has unsettled transactions: ${hasUnsettled}`);
     
     return { 
       exists: true, 
-      isCollected: isCollected,
-      isRecorded: isRecorded,
+      isCollected: isCollected || isCollectedStatus,
+      hasUnsettled: hasUnsettled,
       settlement: data 
     };
     
@@ -5325,6 +5342,69 @@ async function checkSettlementStatus(store, date) {
 async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
   console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
+  
+  // ✅ FIRST: Check if already settled/collected
+  const settlementStatus = await checkSettlementStatus(store, todayStr);
+  
+  // ✅ If already collected, show zero and disable everything
+  if (settlementStatus.exists && settlementStatus.isCollected) {
+    console.log('ℹ️ Settlement already collected - showing zero totals');
+    
+    if (!silent) {
+      // Set all totals to ZERO
+      const sysCash = document.getElementById('sysCash');
+      if (sysCash) sysCash.innerText = 'RM 0.00';
+      const sysCard = document.getElementById('sysCard');
+      if (sysCard) sysCard.innerText = 'RM 0.00';
+      const sysQR = document.getElementById('sysQR');
+      if (sysQR) sysQR.innerText = 'RM 0.00';
+      const sysAlipay = document.getElementById('sysAlipay');
+      if (sysAlipay) sysAlipay.innerText = 'RM 0.00';
+      const sysRefund = document.getElementById('sysRefund');
+      if (sysRefund) sysRefund.innerText = 'RM 0.00';
+      const sysNetTotal = document.getElementById('sysNetTotal');
+      if (sysNetTotal) sysNetTotal.innerText = 'RM 0.00';
+      
+      // Disable all fields
+      const allFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay', 'pettyCashFloat'];
+      allFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = true;
+          el.value = '';
+          el.placeholder = 'Settlement already collected';
+        }
+      });
+      
+      // Hide check button
+      const checkBtn = document.getElementById('checkSettlementBtn');
+      if (checkBtn) {
+        checkBtn.style.display = 'none';
+        checkBtn.disabled = true;
+      }
+      const recordBtn = document.getElementById('recordSettlementBtn');
+      if (recordBtn) recordBtn.style.display = 'none';
+      
+      // Show message
+      const settlementError = document.getElementById('settlementError');
+      if (settlementError) {
+        settlementError.innerHTML = `
+          ✅ This store has already been settled for today.<br>
+          <span style="font-size: 0.85rem; color: #64748b;">
+            Collected on: ${new Date(settlementStatus.settlement.collected_at).toLocaleString()}<br>
+            Collected by: ${settlementStatus.settlement.collected_by || 'Unknown'}
+          </span>
+        `;
+        settlementError.style.display = 'block';
+        settlementError.style.color = '#2c7a4b';
+      }
+    }
+    
+    return { settled: true, totals: null };
+  }
+  
+  // ✅ If NOT settled, fetch and show the actual totals
+  console.log('ℹ️ No settlement yet - showing actual totals');
   
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
@@ -5378,36 +5458,42 @@ async function refreshSettlementTotals(store, silent = false) {
         if (el) el.classList.remove('error-field');
       });
       
-      // ✅ CLEAR all input fields - NO placeholders with system values
+      // Clear all input fields with clean placeholders
       document.getElementById('actualCash').value = '';
       document.getElementById('actualCard').value = '';
       document.getElementById('actualQR').value = '';
       document.getElementById('actualAlipay').value = '';
       
-      // ✅ Set simple, clean placeholders without system values
       document.getElementById('actualCash').placeholder = 'Enter cash amount';
       document.getElementById('actualCard').placeholder = 'Enter card amount';
       document.getElementById('actualQR').placeholder = 'Enter QR amount';
       document.getElementById('actualAlipay').placeholder = 'Enter Alipay amount';
     }
+    
+    return { settled: false, totals: currentSettlementTotals };
   } else {
     console.error('❌ Report is null, settlement totals not updated');
     if (!silent) {
       await showAlertModal('Error', 'Failed to load settlement data. Please check network and try again.');
     }
+    return { settled: false, totals: null };
   }
 }
 async function getUnsettledTransactionCount(store, date) {
   try {
     console.log(`🔍 Checking unsettled transactions for ${store} on ${date}`);
     
-    // Get all transactions for this store and date
+    // ✅ FIX: Use timestamp range instead of date column
+    const startDate = new Date(date + 'T00:00:00+08:00');
+    const endDate = new Date(date + 'T23:59:59+08:00');
+    
+    // Get all transactions for this store and date range
     const { data, error } = await supabase
       .from('transactions')
       .select('settled')
       .eq('store', store)
-      .gte('timestamp', `${date}T00:00:00+08:00`)
-      .lte('timestamp', `${date}T23:59:59+08:00`);
+      .gte('timestamp', startDate.toISOString())
+      .lte('timestamp', endDate.toISOString());
     
     if (error) {
       console.error('Error checking unsettled transactions:', error);
@@ -5455,14 +5541,14 @@ async function openSettlementModal() {
   document.getElementById('settlementError').style.display = 'none';
   document.getElementById('settlementError').innerHTML = '';
   
-  // ✅ Clear all input fields
+  // Clear all input fields
   document.getElementById('actualCash').value = '';
   document.getElementById('actualCard').value = '';
   document.getElementById('actualQR').value = '';
   document.getElementById('actualAlipay').value = '';
   document.getElementById('pettyCashFloat').value = '0.00';
   
-  // ✅ Set clean placeholders (NO system hints)
+  // Set clean placeholders
   document.getElementById('actualCash').placeholder = 'Enter cash amount';
   document.getElementById('actualCard').placeholder = 'Enter card amount';
   document.getElementById('actualQR').placeholder = 'Enter QR amount';
@@ -5473,6 +5559,7 @@ async function openSettlementModal() {
   document.getElementById('actualQR').classList.remove('error-field');
   document.getElementById('actualAlipay').classList.remove('error-field');
 
+  // Disable fields initially
   const fieldsToDisable = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
   fieldsToDisable.forEach(id => {
     const el = document.getElementById(id);
@@ -5524,72 +5611,33 @@ async function openSettlementModal() {
       });
     }
 
-    // ✅ FIRST: Check if settlement already exists and is collected
-    const date = getLocalDateString(new Date());
-    const settlementStatus = await checkSettlementStatus(store, date);
-    
-    if (settlementStatus.exists && settlementStatus.isCollected) {
-      // ✅ Settlement already collected - show zero and disable everything
-      console.log('ℹ️ Settlement already collected for today');
-      
-      // ✅ Set all totals to RM 0.00
-      document.getElementById('sysCash').innerText = 'RM 0.00';
-      document.getElementById('sysCard').innerText = 'RM 0.00';
-      document.getElementById('sysQR').innerText = 'RM 0.00';
-      document.getElementById('sysAlipay').innerText = 'RM 0.00';
-      document.getElementById('sysRefund').innerText = 'RM 0.00';
-      document.getElementById('sysNetTotal').innerText = 'RM 0.00';
-      
-      // ✅ Disable all input fields
-      const allFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay', 'pettyCashFloat'];
-      allFields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.disabled = true;
-          el.placeholder = 'Settlement already collected';
-        }
-      });
-      
-      // ✅ Hide check button and show message
-      document.getElementById('checkSettlementBtn').style.display = 'none';
-      document.getElementById('recordSettlementBtn').style.display = 'none';
-      
-      // ✅ Show message
-      const settlementError = document.getElementById('settlementError');
-      settlementError.innerHTML = `
-        ✅ This store has already been settled for today.<br>
-        <span style="font-size: 0.85rem; color: #64748b;">
-          Collected on: ${new Date(settlementStatus.settlement.collected_at).toLocaleString()}<br>
-          Collected by: ${settlementStatus.settlement.collected_by || 'Unknown'}
-        </span>
-      `;
-      settlementError.style.display = 'block';
-      settlementError.style.color = '#2c7a4b'; // Green color for success message
-      
-      loadingMsg.style.display = 'none';
-      return;
-    }
-    
-    // ✅ If not settled yet, load the totals normally
-    await refreshSettlementTotals(store);
+    // ✅ Use the updated refreshSettlementTotals which checks settlement status
+    const result = await refreshSettlementTotals(store);
     loadingMsg.style.display = 'none';
+    
     if (!currentEmployee.isAdmin) {
       const netTotalRow = document.getElementById('sysNetTotal')?.parentElement;
       if (netTotalRow) netTotalRow.style.display = 'block';
     }
     
-    // ✅ Enable fields (they were disabled above)
-    const enableFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
-    enableFields.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.disabled = false;
-        el.placeholder = id === 'actualCash' ? 'Enter cash amount' : 
-                        id === 'actualCard' ? 'Enter card amount' :
-                        id === 'actualQR' ? 'Enter QR amount' : 'Enter Alipay amount';
-      }
-    });
-    document.getElementById('checkSettlementBtn').disabled = false;
+    // ✅ If already settled, fields remain disabled
+    if (result && result.settled) {
+      // Everything is already handled by refreshSettlementTotals
+      console.log('✅ Settlement already collected - UI updated');
+    } else {
+      // ✅ Enable fields (they were disabled above)
+      const enableFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
+      enableFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = false;
+          el.placeholder = id === 'actualCash' ? 'Enter cash amount' : 
+                          id === 'actualCard' ? 'Enter card amount' :
+                          id === 'actualQR' ? 'Enter QR amount' : 'Enter Alipay amount';
+        }
+      });
+      document.getElementById('checkSettlementBtn').disabled = false;
+    }
     
   } catch (err) {
     console.error(err);
@@ -9593,7 +9641,6 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
           qr_actual: parseFloat(qrActual) || 0,
           alipay_actual: parseFloat(alipayActual) || 0,
           status: 'recorded',
-          // ✅ Keep collected as false until cash collection
           collected: false,
           collected_by: null,
           collected_at: null
@@ -9631,7 +9678,7 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
           qr_actual: parseFloat(qrActual) || 0,
           alipay_actual: parseFloat(alipayActual) || 0,
           status: 'recorded',
-          collected: false,  // ✅ Default to not collected
+          collected: false,
           collected_by: null,
           collected_at: null
         }])
@@ -9647,14 +9694,18 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
     }
     
     // ✅ Mark ALL transactions for this store and date as settled
+    // ✅ FIX: Use timestamp range instead of date column
+    const startDate = new Date(date + 'T00:00:00+08:00');
+    const endDate = new Date(date + 'T23:59:59+08:00');
+    
     const { error: updateError } = await supabase
       .from('transactions')
       .update({ 
         settled: true 
       })
       .eq('store', store)
-      .gte('timestamp', `${date}T00:00:00+08:00`)
-      .lte('timestamp', `${date}T23:59:59+08:00`)
+      .gte('timestamp', startDate.toISOString())
+      .lte('timestamp', endDate.toISOString())
       .eq('settled', false);
     
     if (updateError) {
@@ -9669,7 +9720,8 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
     console.error('❌ recordSettlement error:', err);
     return { success: false, error: err.message };
   }
-}// ==================== PENDING SALES ====================
+}
+// ==================== PENDING SALES ====================
 
 let pendingSales = [];
 
