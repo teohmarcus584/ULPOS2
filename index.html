@@ -3262,7 +3262,6 @@ function updateStockForProduct(productId, newStock, delta) {
 
   product.stock = newStock;
   
-  // Update the store-specific stock column
   const store = currentStore;
   const stockColumn = `stock_${store}`;
   product[stockColumn] = newStock;
@@ -3272,10 +3271,10 @@ function updateStockForProduct(productId, newStock, delta) {
 
   logStockChange(productId, product.name, product.category, oldStock, newStock, delta);
   
-  // Update the specific store's stock in the database
+  // ✅ FIXED: Removed updated_at
   supabase
     .from('products')
-    .update({ [stockColumn]: newStock, updated_at: new Date().toISOString() })
+    .update({ [stockColumn]: newStock })
     .eq('id', productId)
     .then(({ error }) => {
       if (error) console.error('Error updating stock:', error);
