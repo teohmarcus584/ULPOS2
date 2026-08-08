@@ -4125,8 +4125,6 @@ async function getNextIRSInvoiceNumber() {
 }
 // ==================== LUCKY DRAW FUNCTIONS ====================
 
-// ==================== LUCKY DRAW FUNCTIONS ====================
-
 async function saveToLuckyDraw(transaction) {
   try {
     console.log('🎲 SAVE TO LUCKY DRAW CALLED!');
@@ -4142,10 +4140,10 @@ async function saveToLuckyDraw(transaction) {
     
     console.log('✅ Transaction qualifies for Lucky Draw!');
     
-    // Check if this transaction already has a lucky draw entry
+    // ✅ Check if this transaction already has a lucky draw entry
     const { data: existing, error: checkError } = await supabase
       .from('lucky_draw_prizes')
-      .select('id')
+      .select('id, receipt')
       .eq('receipt', transaction.transaction_id)
       .maybeSingle();
     
@@ -4153,59 +4151,29 @@ async function saveToLuckyDraw(transaction) {
       console.error('Error checking existing lucky draw:', checkError);
     }
     
+    // ✅ If already exists, show modal and return
     if (existing) {
       console.log('Lucky draw entry already exists for this transaction');
-      // Show modal with existing prize
       document.getElementById('luckyTxId').innerText = transaction.transaction_id;
       document.getElementById('luckyDrawModal').style.display = 'flex';
       return true;
     }
     
-    // Random prize selection
-    const luckyPrizes = [
-      { label: 'RM 38 FREE GIFT', value: 38 },
-      { label: 'RM 75 FREE GIFT', value: 75 },
-      { label: 'RM 109 FREE GIFT', value: 109 }
-    ];
+    // ✅ IMPORTANT: DO NOT save the lucky draw result here!
+    // The customer will spin and the result will be saved on the Lucky Draw page
+    console.log('✅ Transaction qualifies - showing Lucky Draw modal WITHOUT saving');
     
-    const selectedPrize = luckyPrizes[Math.floor(Math.random() * luckyPrizes.length)];
-    
-    console.log('🎁 Selected prize:', selectedPrize);
-    
-    // Save to lucky_draw_prizes table
-    const { data, error } = await supabase
-      .from('lucky_draw_prizes')
-      .insert([{
-        receipt: transaction.transaction_id,
-        prize_label: selectedPrize.label,
-        discount_value: selectedPrize.value,
-        claimed: false,
-        claimed_at: null,
-        store: transaction.store || currentStore,
-        created_at: new Date().toISOString()
-      }])
-      .select();
-    
-    if (error) {
-      console.error('❌ Error saving to lucky draw:', error);
-      return false;
-    }
-    
-    console.log('✅ Lucky draw entry created:', data);
-    
-    // ✅ SHOW THE LUCKY DRAW MODAL
-    console.log('🎲 SHOWING LUCKY DRAW MODAL NOW!');
-    const luckyModal = document.getElementById('luckyDrawModal');
+    // ✅ Show the Lucky Draw modal with transaction ID
     const txIdSpan = document.getElementById('luckyTxId');
-    
     if (txIdSpan) {
       txIdSpan.innerText = transaction.transaction_id;
       console.log('Set transaction ID to:', transaction.transaction_id);
     }
     
+    const luckyModal = document.getElementById('luckyDrawModal');
     if (luckyModal) {
       luckyModal.style.display = 'flex';
-      console.log('Modal display set to flex');
+      console.log('🎲 Lucky Draw modal displayed');
     } else {
       console.error('Lucky draw modal not found!');
     }
