@@ -4307,10 +4307,15 @@ document.getElementById('printPrizeVoucherBtn').addEventListener('click', async 
 });
 
 // Check for Lucky Draw Result (polling)
+// ==================== LUCKY DRAW CHECK FUNCTION ====================
+
 function checkForLuckyDrawResult(txId) {
+  console.log('🔍 Starting to check for lucky draw result for:', txId);
+  
   // Clear any existing interval
   if (window._luckyDrawCheckInterval) {
     clearInterval(window._luckyDrawCheckInterval);
+    window._luckyDrawCheckInterval = null;
   }
   
   let attempts = 0;
@@ -4318,11 +4323,12 @@ function checkForLuckyDrawResult(txId) {
   
   window._luckyDrawCheckInterval = setInterval(async function() {
     attempts++;
+    console.log(`🔍 Checking attempt ${attempts}/${maxAttempts} for:`, txId);
     
     try {
       const { data, error } = await supabase
         .from('lucky_draw_prizes')
-        .select('prize_label, discount_value')
+        .select('prize_label, discount_value, claimed')
         .eq('receipt', txId)
         .maybeSingle();
       
@@ -4334,10 +4340,13 @@ function checkForLuckyDrawResult(txId) {
       if (data) {
         // Found the prize - update the print modal
         console.log('✅ Lucky draw prize found!', data);
-        document.getElementById('luckyDrawReceiptNumber').innerText = txId;
-        document.getElementById('luckyDrawPrizeLabel').innerText = data.prize_label || 'RM 38 FREE GIFT';
         
-        // Update the button text or status
+        // Update the print modal
+        document.getElementById('luckyDrawReceiptNumber').innerText = txId;
+        const prizeLabel = data.prize_label || 'RM 38 FREE GIFT';
+        document.getElementById('luckyDrawPrizeLabel').innerText = prizeLabel;
+        
+        // Enable the print button
         const printBtn = document.getElementById('printPrizeVoucherBtn');
         if (printBtn) {
           printBtn.disabled = false;
@@ -4350,10 +4359,11 @@ function checkForLuckyDrawResult(txId) {
           window._luckyDrawCheckInterval = null;
         }
         
-        // Show a notification that the prize is ready
+        // Show notification
         await showAlertModal('🎉 Prize Ready!', 
-          `The customer has won: ${data.prize_label}\nClick "Print Voucher" to print the prize.`
+          `The customer has won: ${prizeLabel}\n\nClick "Print Voucher" to print the prize.`
         );
+        
       } else if (attempts >= maxAttempts) {
         // Timeout - stop checking
         console.log('⏰ Lucky draw check timed out');
@@ -4363,7 +4373,11 @@ function checkForLuckyDrawResult(txId) {
         }
         
         document.getElementById('luckyDrawPrizeLabel').innerText = '⚠️ Spin not completed';
-        await showAlertModal('Timeout', 'The customer has not completed the spin. Please ask them to spin the wheel.');
+        await showAlertModal('⏰ Timeout', 
+          'The customer has not completed the spin.\n\n' +
+          'Please make sure they spin the wheel on the Lucky Draw page.\n' +
+          'You can try again by clicking the Lucky Draw button again.'
+        );
       }
       
     } catch (err) {
@@ -5255,13 +5269,14 @@ function renderReceiptsList(receipts) {
     });
   });
 
-  document.querySelectorAll('.lucky-reprint-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const txId = btn.dataset.txid;
-      e.stopPropagation();
-      await reprintLuckyDraw(txId);
-    });
+// In renderReceiptsList function, the lucky draw button:
+document.querySelectorAll('.lucky-reprint-btn').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const txId = btn.dataset.txid;
+    e.stopPropagation();
+    await reprintLuckyDraw(txId);
   });
+});
 
   document.querySelectorAll('.refund-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -5523,51 +5538,82 @@ async function reprintReceipt(receipt) {
 }
 
 async function reprintLuckyDraw(txId) {
-  if (!isPrinterConnected) {
-    showLoading('Printer not connected. Opening Bluetooth selection...');
-    try {
-      await connectPrinter();
-      hideLoading();
-    } catch (err) {
-      hideLoading();
-      await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
-      return;
-    }
-  }
-
+  console.log('🔄 Reprint Lucky Draw called for:', txId);
+  
   try {
-    // ✅ Get the lucky draw prize data from your table
+    // ✅ First, check if the lucky draw entry exists
     const { data, error } = await supabase
       .from('lucky_draw_prizes')
       .select('*')
       .eq('receipt', txId)
       .maybeSingle();
     
-    if (error || !data) {
-      await showAlertModal('Not Found', 'No lucky draw entry found for this receipt.');
-      return;
-    }
-
-    if (data.claimed === true) {
-      await showAlertModal('Already Claimed', 'This lucky draw prize has already been claimed and cannot be reprinted.');
+    if (error) {
+      console.error('Error checking lucky draw:', error);
+      await showAlertModal('Error', 'Failed to check lucky draw status.');
       return;
     }
     
-    const prizeLabel = data.prize_label || 'RM 38 FREE GIFT';
-    if (!window.printerAPI || !window.printerAPI.printPrizeVoucher) {
-      await showAlertModal('Printer Error', 'Printer not connected or print function unavailable.');
+    // ✅ If entry exists, print the voucher
+    if (data) {
+      console.log('✅ Lucky draw entry found:', data);
+      
+      if (data.claimed === true) {
+        await showAlertModal('Already Claimed', 'This lucky draw prize has already been claimed and cannot be reprinted.');
+        return;
+      }
+      
+      // Check printer connection
+      if (!isPrinterConnected) {
+        showLoading('Printer not connected. Opening Bluetooth selection...');
+        try {
+          await connectPrinter();
+          hideLoading();
+        } catch (err) {
+          hideLoading();
+          await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
+          return;
+        }
+      }
+      
+      const prizeLabel = data.prize_label || 'RM 38 FREE GIFT';
+      const success = await printPrizeVoucher(prizeLabel, txId);
+      
+      if (success) {
+        await showAlertModal('Success', 'Lucky Draw voucher reprinted successfully!');
+      } else {
+        await showAlertModal('Print Failed', 'Could not print voucher. Check printer connection.');
+      }
       return;
     }
     
-    const success = await window.printerAPI.printPrizeVoucher(prizeLabel, txId);
-    if (success) {
-      await showAlertModal('Success', 'Lucky Draw voucher reprinted successfully!');
-    } else {
-      await showAlertModal('Print Failed', 'Could not print voucher. Check printer connection.');
-    }
+    // ✅ No entry found - redirect to Lucky Draw page
+    console.log('ℹ️ No lucky draw entry found - redirecting to spin page');
+    
+    // Store the transaction ID globally
+    window._luckyDrawTransactionId = txId;
+    
+    // Show the print modal with waiting status
+    document.getElementById('luckyDrawReceiptNumber').innerText = txId;
+    document.getElementById('luckyDrawPrizeLabel').innerText = 'Waiting for spin result...';
+    document.getElementById('luckyDrawPrintModal').style.display = 'flex';
+    
+    // Open the Lucky Draw page in a new tab
+    window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
+    
+    // Show info message
+    await showAlertModal('🎲 Lucky Draw', 
+      `The customer needs to spin the wheel on the Lucky Draw page.\n\n` +
+      `Once they win, the voucher will be ready to print.\n` +
+      `The print modal will update automatically.`
+    );
+    
+    // Start checking for the lucky draw result
+    checkForLuckyDrawResult(txId);
+    
   } catch (err) {
-    console.error(err);
-    await showAlertModal('Error', 'Failed to reprint lucky draw: ' + err.message);
+    console.error('Reprint Lucky Draw error:', err);
+    await showAlertModal('Error', 'Failed to process Lucky Draw: ' + err.message);
   }
 }
 
