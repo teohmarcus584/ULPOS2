@@ -3905,27 +3905,27 @@ async function completeCheckout(paymentMethod, cashReceived) {
       total: (item.quantity - item.freeQuantity) * item.product.price
     }));
 
-   // Inside completeCheckout function, when creating the transaction object:
-const transaction = {
-  transaction_id: transactionId,
-  items: saleItems,
-  total: totalAmount,
-  payment_method: paymentMethod,
-  cash_received: cashReceived || 0,
-  timestamp: new Date().toISOString(),
-  discount: discountAmount || 0,
-  buy2_free1_discount: buy2Free1Discount || 0,
-  buy3_free1_discount: buy3Free1Discount || 0,
-  custom_discount: customDiscount || 0,
-  staff_discount: staffDiscount || 0,
-  prize_claimed: claimedReceiptInfo || null,
-  customer_id: selectedCustomer ? selectedCustomer.id : null,
-  store: currentStore,
-  employee_id: currentEmployee.id,
-  employee_name: currentEmployee.name,  // ✅ IMPORTANT: Add this
-  sales_person_name: salesPersonName || '',
-  sales_person_id: salesPersonId || ''
-};
+    // Inside completeCheckout function, when creating the transaction object:
+    const transaction = {
+      transaction_id: transactionId,
+      items: saleItems,
+      total: totalAmount,
+      payment_method: paymentMethod,
+      cash_received: cashReceived || 0,
+      timestamp: new Date().toISOString(),
+      discount: discountAmount || 0,
+      buy2_free1_discount: buy2Free1Discount || 0,
+      buy3_free1_discount: buy3Free1Discount || 0,
+      custom_discount: customDiscount || 0,
+      staff_discount: staffDiscount || 0,
+      prize_claimed: claimedReceiptInfo || null,
+      customer_id: selectedCustomer ? selectedCustomer.id : null,
+      store: currentStore,
+      employee_id: currentEmployee.id,
+      employee_name: currentEmployee.name,
+      sales_person_name: salesPersonName || '',
+      sales_person_id: salesPersonId || ''
+    };
 
     // Print receipt
     let receiptPrinted = false;
@@ -3977,18 +3977,16 @@ const transaction = {
     hideLoading();
 
     if (success) {
-  for (let item of saleItems) {
-    const product = products.find(p => p.id == item.id);
-    if (product) {
-      const oldStock = product.stock;
-      const newStock = oldStock - item.quantity;
-      product.stock = newStock;
-      checkAndNotifyOutOfStock(product.id, product.name, newStock);
-    }
-  }
-  
-  // ✅ Save to Lucky Draw if eligible
-  await saveToLuckyDraw(transaction);
+      // Update stock
+      for (let item of saleItems) {
+        const product = products.find(p => p.id == item.id);
+        if (product) {
+          const oldStock = product.stock;
+          const newStock = oldStock - item.quantity;
+          product.stock = newStock;
+          checkAndNotifyOutOfStock(product.id, product.name, newStock);
+        }
+      }
 
       localStorage.setItem(`products_${currentStore}`, JSON.stringify({
         timestamp: Date.now(),
@@ -3996,6 +3994,7 @@ const transaction = {
       }));
       renderProductGrid();
 
+      // Customer points
       if (selectedCustomer && selectedCustomer.id) {
         const POINTS_PER_RM = 1;
         const pointsEarned = Math.floor(totalAmount * POINTS_PER_RM);
@@ -4005,8 +4004,10 @@ const transaction = {
         }
       }
 
+      // ✅ Prize was already marked as claimed when applied to cart
+      // Just clear the pending prize reference
       if (pendingPrize) {
-        await claimPrizeAfterSale(pendingPrize.receipt, pendingPrize.value, totalAmount);
+        console.log('🎯 Prize already claimed when applied to cart:', pendingPrize);
         pendingPrize = null;
       }
 
@@ -4043,6 +4044,9 @@ const transaction = {
       }
 
       fetchAndCacheReceipts();
+
+      // ✅ Show Lucky Draw modal if transaction qualifies
+      await saveToLuckyDraw(transaction);
 
       if (receiptPrinted) {
         await showAlertModal('✅ Transaction Complete', 
@@ -6759,8 +6763,19 @@ async function checkReceiptForClaim() {
     
     console.log('📋 Found lucky draw entry:', data);
     
+    // ✅ Check if already claimed - ONE TIME USE
     if (data.claimed === true) {
-      showClaimError('This prize has already been claimed.');
+      showClaimError('❌ This prize has already been claimed and cannot be used again.');
+      return;
+    }
+    
+    // ✅ Check if expired (30 days)
+    const createdDate = new Date(data.created_at);
+    const today = new Date();
+    const diffDays = Math.floor((today - createdDate) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 30) {
+      showClaimError(`❌ This prize has expired (${diffDays} days ago). Valid for 30 days only.`);
       return;
     }
     
@@ -6787,7 +6802,25 @@ async function checkReceiptForClaim() {
     showClaimError('Connection error. Please try again.');
   }
 }
-
+async function isPrizeAlreadyClaimed(receiptNumber) {
+  try {
+    const { data, error } = await supabase
+      .from('lucky_draw_prizes')
+      .select('claimed, claimed_at')
+      .eq('receipt', receiptNumber)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking prize status:', error);
+      return false;
+    }
+    
+    return data ? data.claimed === true : false;
+  } catch (err) {
+    console.error('Error checking prize status:', err);
+    return false;
+  }
+}
 function applyPrizeToCart() {
   if (!window.pendingClaimReceipt) {
     console.error('No pending claim receipt found');
@@ -6805,11 +6838,25 @@ function applyPrizeToCart() {
     prizeText: prizeText
   });
 
-  // Store the prize info for after checkout
+  // ✅ IMMEDIATELY mark the prize as claimed (ONE TIME USE)
+  claimPrizeAfterSale(receiptNumber, prizeValue, 0).then(success => {
+    if (success) {
+      console.log('✅ Prize marked as claimed immediately!');
+      if (window.pendingClaimReceipt) {
+        window.pendingClaimReceipt.claimed = true;
+        window.pendingClaimReceipt.claimed_at = new Date().toISOString();
+      }
+    } else {
+      console.warn('⚠️ Failed to mark prize as claimed, but continuing with discount');
+    }
+  });
+
+  // Store the prize info for reference
   pendingPrize = { 
     receipt: receiptNumber, 
     value: prizeValue, 
-    name: prizeText 
+    name: prizeText,
+    claimed: true  // ✅ Already marked as claimed
   };
   
   discountAmount = prizeValue;
@@ -6822,11 +6869,27 @@ function applyPrizeToCart() {
 
 async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
   try {
-    console.log('🎯 Claiming prize for receipt:', receipt);
+    console.log('🎯 Marking prize as claimed for receipt:', receipt);
     console.log('Prize value:', prizeValue);
-    console.log('Final total:', finalTotal);
     
-    // ✅ Update the lucky_draw_prizes table
+    // ✅ Check if already claimed
+    const { data: checkData, error: checkError } = await supabase
+      .from('lucky_draw_prizes')
+      .select('claimed')
+      .eq('receipt', receipt)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking prize status:', checkError);
+      // Continue anyway to try marking it
+    }
+    
+    if (checkData && checkData.claimed === true) {
+      console.log('⚠️ Prize already claimed!');
+      return true; // Already claimed, return success
+    }
+    
+    // ✅ Update the lucky_draw_prizes table - mark as claimed
     const { data, error } = await supabase
       .from('lucky_draw_prizes')
       .update({
@@ -6838,12 +6901,13 @@ async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
       .select();
     
     if (error) {
-      console.error('❌ Error claiming prize:', error);
+      console.error('❌ Error marking prize as claimed:', error);
       return false;
     }
     
-    console.log('✅ Prize claimed successfully:', data);
+    console.log('✅ Prize marked as claimed successfully:', data);
     return true;
+    
   } catch (err) {
     console.error('Error claiming prize:', err);
     return false;
