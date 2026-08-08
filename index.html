@@ -4698,30 +4698,52 @@ async function fetchAndCacheReceipts() {
 
 async function fetchReceipts(store, employeeId, from, to, search) {
   try {
-    console.log('📜 Fetching receipts with filters...');
+    console.log('Fetching receipts with filters...');
+    console.log('Store:', store);
+    console.log('Employee:', employeeId);
     
     let query = supabase
       .from('transactions')
       .select('*')
       .order('timestamp', { ascending: false });
     
-    if (store && store !== 'all') query = query.eq('store', store);
-    if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
-    if (from) query = query.gte('timestamp', from);
-    if (to) query = query.lte('timestamp', to);
+    // ✅ Filter by store if provided and not 'all'
+    if (store && store !== 'all') {
+      query = query.eq('store', store);
+      console.log('Filtering by store:', store);
+    }
+    
+    // ✅ Filter by employee if provided and not 'all'
+    if (employeeId && employeeId !== 'all') {
+      query = query.eq('employee_id', employeeId);
+      console.log('Filtering by employee:', employeeId);
+    }
+    
+    if (from) {
+      const fromDate = new Date(from + 'T00:00:00+08:00');
+      query = query.gte('timestamp', fromDate.toISOString());
+      console.log('From date:', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to + 'T23:59:59+08:00');
+      query = query.lte('timestamp', toDate.toISOString());
+      console.log('To date:', toDate.toISOString());
+    }
+    
     if (search) {
       query = query.or(`transaction_id.ilike.%${search}%`);
+      console.log('Search term:', search);
     }
     
     const { data, error } = await query;
     if (error) {
-      console.error('❌ fetchReceipts error:', error);
+      console.error('fetchReceipts error:', error);
       cachedReceipts = [];
       renderReceiptsList(cachedReceipts);
       return;
     }
     
-    console.log(`✅ Fetched ${data?.length || 0} receipts`);
+    console.log('Fetched receipts:', data ? data.length : 0);
     
     cachedReceipts = data || [];
     renderReceiptsList(cachedReceipts);
@@ -5221,17 +5243,20 @@ async function fetchReceiptById(txId) {
 
 function updateReceipts() {
   let store;
+  let employeeId = 'all';
+  
+  // ✅ For non-admin: Force to their specific store, but show ALL employees
   if (currentEmployee?.isAdmin) {
+    // Admin can select store and employee
     const receiptsStore = document.getElementById('receiptsStoreSelect');
     store = receiptsStore ? receiptsStore.value : 'all';
-  } else {
-    store = currentStore;
-  }
-
-  let employeeId = 'all';
-  if (currentEmployee?.isAdmin) {
+    
     const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
     employeeId = receiptsEmpSelect ? receiptsEmpSelect.value : 'all';
+  } else {
+    // ✅ Non-admin: force to their specific store
+    store = currentStore;  // Use the employee's assigned store
+    employeeId = 'all';    // ✅ Show ALL employees in this store!
   }
 
   const rangeSelect = document.getElementById('receiptsDateRangeSelect');
@@ -5273,6 +5298,7 @@ function updateReceipts() {
     if (!from || !to) return;
   }
 
+  // ✅ Pass the correct store and employee filters
   fetchReceipts(store, employeeId, from, to, search);
 }
 
@@ -9068,13 +9094,30 @@ function populateStoreSelects() {
   const stores = Array.from(storeSelect.options).map(opt => ({ value: opt.value, text: opt.text }));
   const receiptsStore = document.getElementById('receiptsStoreSelect');
   if (receiptsStore) {
-    receiptsStore.innerHTML = '<option value="all">All Stores</option>';
-    stores.forEach(s => {
+    // ✅ For non-admin, only show their store
+    if (currentEmployee && !currentEmployee.isAdmin) {
+      const storeNames = {
+        queens: '🏬 Queens',
+        sunshine: '☀️ Sunshine',
+        gurney_paragon: '🏙️ Gurney Paragon'
+      };
+      receiptsStore.innerHTML = '';
       const opt = document.createElement('option');
-      opt.value = s.value;
-      opt.textContent = s.text;
+      opt.value = currentStore;
+      opt.textContent = storeNames[currentStore] || currentStore;
       receiptsStore.appendChild(opt);
-    });
+      receiptsStore.disabled = true;
+    } else {
+      // Admin: show all stores
+      receiptsStore.innerHTML = '<option value="all">All Stores</option>';
+      stores.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.value;
+        opt.textContent = s.text;
+        receiptsStore.appendChild(opt);
+      });
+      receiptsStore.disabled = false;
+    }
   }
 }
 
@@ -9989,73 +10032,95 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('sideSettlementBtn').addEventListener('click', wrapMenuAction(() => { openSettlementModal(); }));
   document.getElementById('sideCollectionBtn').addEventListener('click', wrapMenuAction(() => { openCollectionModal(); }));
   document.getElementById('sideInventoryBtn').addEventListener('click', wrapMenuAction(() => { toggleInventoryMode(); }));
-  document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAction(async () => {
-    const modal = document.getElementById('receiptsModal');
-    if (modal) {
-      modal.style.display = 'flex';
-      const cached = localStorage.getItem('cachedReceipts');
-      if (cached) {
-        try {
-          const { timestamp, receipts } = JSON.parse(cached);
-          if (Date.now() - timestamp < 5 * 60 * 1000) {
-            cachedReceipts = receipts;
-            renderReceiptsList(cachedReceipts);
-            const msg = document.getElementById('receiptsLoadingMsg');
-            if (msg) msg.style.display = 'none';
-          }
-        } catch(e) { console.warn(e); }
-      }
+ // ==================== OPEN RECEIPTS MODAL ====================
 
-      let loadingMsg = document.getElementById('receiptsLoadingMsg');
-      if (!loadingMsg) {
-        loadingMsg = document.createElement('div');
-        loadingMsg.id = 'receiptsLoadingMsg';
-        loadingMsg.style.textAlign = 'center';
-        loadingMsg.style.padding = '20px';
-        loadingMsg.style.background = '#f8fafc';
-        loadingMsg.style.borderRadius = '12px';
-        loadingMsg.style.margin = '10px 0';
-        loadingMsg.innerText = 'Loading receipts...';
-        const receiptsList = document.getElementById('receiptsList');
-        if (receiptsList) receiptsList.insertAdjacentElement('beforebegin', loadingMsg);
+// ==================== OPEN RECEIPTS MODAL ====================
+
+// ==================== OPEN RECEIPTS MODAL ====================
+
+// ==================== OPEN RECEIPTS MODAL ====================
+
+document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAction(async () => {
+  const modal = document.getElementById('receiptsModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    
+    // Check if we have cached receipts
+    const cached = localStorage.getItem('cachedReceipts');
+    if (cached) {
+      try {
+        const { timestamp, receipts } = JSON.parse(cached);
+        if (Date.now() - timestamp < 5 * 60 * 1000) {
+          cachedReceipts = receipts;
+          renderReceiptsList(cachedReceipts);
+          const msg = document.getElementById('receiptsLoadingMsg');
+          if (msg) msg.style.display = 'none';
+        }
+      } catch(e) { 
+        console.warn('Cache read error:', e); 
       }
-      loadingMsg.style.display = 'block';
     }
 
-    if (currentEmployee?.isAdmin) {
-      const employees = await fetchEmployees();
-      const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
-      if (receiptsEmpSelect) {
-        receiptsEmpSelect.innerHTML = '<option value="all">All Employees</option>';
-        employees.forEach(emp => {
-          const opt = document.createElement('option');
-          opt.value = emp.id;
-          opt.textContent = `${emp.name} (ID: ${emp.id})`;
-          receiptsEmpSelect.appendChild(opt);
-        });
-      }
-      const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
-      const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
-      if (receiptsEmpFilter) receiptsEmpFilter.style.display = 'flex';
-      if (receiptsStoreFilter) receiptsStoreFilter.style.display = 'flex';
-    } else {
-      const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
-      const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
-      if (receiptsEmpFilter) receiptsEmpFilter.style.display = 'none';
-      if (receiptsStoreFilter) receiptsStoreFilter.style.display = 'none';
-      const receiptsStore = document.getElementById('receiptsStoreSelect');
-      if (receiptsStore) receiptsStore.value = currentStore;
+    // Show loading message
+    let loadingMsg = document.getElementById('receiptsLoadingMsg');
+    if (!loadingMsg) {
+      loadingMsg = document.createElement('div');
+      loadingMsg.id = 'receiptsLoadingMsg';
+      loadingMsg.style.textAlign = 'center';
+      loadingMsg.style.padding = '20px';
+      loadingMsg.style.background = '#f8fafc';
+      loadingMsg.style.borderRadius = '12px';
+      loadingMsg.style.margin = '10px 0';
+      loadingMsg.innerText = 'Loading receipts...';
+      const receiptsList = document.getElementById('receiptsList');
+      if (receiptsList) receiptsList.insertAdjacentElement('beforebegin', loadingMsg);
     }
+    loadingMsg.style.display = 'block';
+  }
 
-    populateStoreSelects();
-
-    if (cachedReceipts) {
-      renderReceiptsList(cachedReceipts);
-      const msg = document.getElementById('receiptsLoadingMsg');
-      if (msg) msg.style.display = 'none';
+  // ✅ Handle Admin vs Non-Admin UI
+  if (currentEmployee?.isAdmin) {
+    // ADMIN: Show store and employee filters (enabled)
+    const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
+    const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
+    if (receiptsEmpFilter) receiptsEmpFilter.style.display = 'flex';
+    if (receiptsStoreFilter) receiptsStoreFilter.style.display = 'flex';
+    
+    // Populate employee dropdown
+    const employees = await fetchEmployees();
+    const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
+    if (receiptsEmpSelect) {
+      receiptsEmpSelect.innerHTML = '<option value="all">All Employees</option>';
+      employees.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.id;
+        opt.textContent = `${emp.name} (ID: ${emp.id})`;
+        receiptsEmpSelect.appendChild(opt);
+      });
     }
-    updateReceipts();
-  }));
+  } else {
+    // ✅ NON-ADMIN: Hide employee filter (only show store filter)
+    const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
+    if (receiptsEmpFilter) receiptsEmpFilter.style.display = 'none';
+    
+    // ✅ Show store filter but force to their store and disable it
+    const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
+    if (receiptsStoreFilter) receiptsStoreFilter.style.display = 'flex';
+  }
+
+  // ✅ Populate store dropdowns (this will handle non-admin showing only their store)
+  populateStoreSelects();
+
+  // If we have cached receipts, display them
+  if (cachedReceipts) {
+    renderReceiptsList(cachedReceipts);
+    const msg = document.getElementById('receiptsLoadingMsg');
+    if (msg) msg.style.display = 'none';
+  }
+  
+  // Update receipts with filters
+  updateReceipts();
+}));
   document.getElementById('sideDrawerBtn').addEventListener('click', wrapMenuAction(async () => {
     if (!window.printerAPI || !window.printerAPI.isConnected) {
       await showAlertModal('Printer not connected', 'Please connect a printer first using the printer icon.');
