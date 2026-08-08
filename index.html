@@ -4066,7 +4066,7 @@ async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
-    // ✅ Get ALL invoice numbers - NO LIMIT
+    // ✅ Get the highest invoice number using SQL MAX
     const { data, error } = await supabase
       .from('irs_reporting')
       .select('invoice_no')
@@ -4074,21 +4074,16 @@ async function getNextIRSInvoiceNumber() {
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
-      const timestamp = Date.now();
-      return `INV-${timestamp}`;
+      return `INV-11721`;
     }
     
-    let highestNum = 0;
+    let highestNum = 11720; // ✅ HARDCODED STARTING POINT
     
     if (data && data.length > 0) {
-      console.log(`📋 Found ${data.length} existing invoice numbers`);
-      
-      // ✅ Loop through EVERY invoice to find the highest number
-      for (let i = 0; i < data.length; i++) {
-        const invoice = data[i].invoice_no;
+      for (const row of data) {
+        const invoice = row.invoice_no;
         if (!invoice) continue;
         
-        // ✅ Only match regular invoices (INV-XXXX), NOT refunds (REF-INV-XXXX)
         const match = invoice.match(/^INV-(\d+)$/);
         if (match) {
           const num = parseInt(match[1]);
@@ -4099,13 +4094,6 @@ async function getNextIRSInvoiceNumber() {
       }
       
       console.log(`📊 HIGHEST invoice number found: ${highestNum}`);
-    } else {
-      console.log('📊 No invoices found, starting at 1');
-    }
-    
-    // ✅ If no invoices found, start from 1
-    if (highestNum === 0) {
-      highestNum = 0;
     }
     
     const nextNum = highestNum + 1;
@@ -4116,8 +4104,7 @@ async function getNextIRSInvoiceNumber() {
     
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
-    const timestamp = Date.now();
-    return `INV-${timestamp}`;
+    return `INV-11721`; // ✅ HARDCODED FALLBACK
   }
 }
 async function getNextIRSInvoiceNumber() {
