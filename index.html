@@ -6737,6 +6737,8 @@ async function checkReceiptForClaim() {
     return;
   }
   
+  console.log('🔍 Checking receipt for claim:', receipt);
+  
   try {
     const { data, error } = await supabase
       .from('lucky_draw_prizes')
@@ -6744,19 +6746,34 @@ async function checkReceiptForClaim() {
       .eq('receipt', receipt)
       .maybeSingle();
     
-    if (error || !data) {
+    if (error) {
+      console.error('Error checking receipt:', error);
+      showClaimError('Error checking receipt. Please try again.');
+      return;
+    }
+    
+    if (!data) {
       showClaimError('Receipt not found in lucky draw.');
       return;
     }
     
-    if (data.claimed) {
+    console.log('📋 Found lucky draw entry:', data);
+    
+    if (data.claimed === true) {
       showClaimError('This prize has already been claimed.');
       return;
     }
     
+    // Store the receipt data for later use
     window.pendingClaimReceipt = data;
-    window.pendingPrizeValue = parseFloat(data.discount_value);
-    window.pendingPrizeLabel = data.prize_label;
+    window.pendingPrizeValue = parseFloat(data.discount_value) || 38;
+    window.pendingPrizeLabel = data.prize_label || 'RM 38 FREE GIFT';
+    
+    console.log('✅ Prize ready to claim:', {
+      receipt: receipt,
+      value: window.pendingPrizeValue,
+      label: window.pendingPrizeLabel
+    });
     
     document.getElementById('claimStep1').style.display = 'none';
     document.getElementById('claimStep2').style.display = 'block';
@@ -6766,17 +6783,35 @@ async function checkReceiptForClaim() {
     prizeSelect.innerHTML = `<option value="${window.pendingPrizeValue}">${window.pendingPrizeLabel} - RM ${window.pendingPrizeValue}</option>`;
     
   } catch (err) {
-    console.error(err);
-    showClaimError('Connection error.');
+    console.error('Connection error:', err);
+    showClaimError('Connection error. Please try again.');
   }
 }
 
 function applyPrizeToCart() {
-  if (!window.pendingClaimReceipt) return;
+  if (!window.pendingClaimReceipt) {
+    console.error('No pending claim receipt found');
+    showClaimError('No prize to claim. Please try again.');
+    return;
+  }
+  
   const prizeValue = window.pendingPrizeValue || 38;
   const prizeText = window.pendingPrizeLabel || `RM ${prizeValue} FREE GIFT`;
+  const receiptNumber = window.pendingClaimReceipt.receipt;
 
-  pendingPrize = { receipt: window.pendingClaimReceipt.receipt, value: prizeValue, name: prizeText };
+  console.log('🎁 Applying prize to cart:', {
+    receipt: receiptNumber,
+    prizeValue: prizeValue,
+    prizeText: prizeText
+  });
+
+  // Store the prize info for after checkout
+  pendingPrize = { 
+    receipt: receiptNumber, 
+    value: prizeValue, 
+    name: prizeText 
+  };
+  
   discountAmount = prizeValue;
   claimedReceiptInfo = pendingPrize;
   updateCartUI();
@@ -6787,16 +6822,27 @@ function applyPrizeToCart() {
 
 async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
   try {
-    const { error } = await supabase
+    console.log('🎯 Claiming prize for receipt:', receipt);
+    console.log('Prize value:', prizeValue);
+    console.log('Final total:', finalTotal);
+    
+    // ✅ Update the lucky_draw_prizes table
+    const { data, error } = await supabase
       .from('lucky_draw_prizes')
       .update({
         claimed: true,
         claimed_at: new Date().toISOString(),
-        purchase_total: finalTotal
+        purchase_total: finalTotal || 0
       })
-      .eq('receipt', receipt);
+      .eq('receipt', receipt)
+      .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error claiming prize:', error);
+      return false;
+    }
+    
+    console.log('✅ Prize claimed successfully:', data);
     return true;
   } catch (err) {
     console.error('Error claiming prize:', err);
