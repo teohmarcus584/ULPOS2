@@ -8414,13 +8414,9 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     
     let query = supabase
       .from('transactions')
-      .select('*');
-    
-    // ✅ For non-admin employee reports, EXCLUDE refunded transactions
-    if (employeeId && employeeId !== 'all') {
-      // ✅ For employee-specific reports, only include active sales (not refunded)
-      query = query.eq('refunded', false);
-    }
+      .select('*')
+      .eq('refunded', false)  // ✅ EXCLUDE refunded transactions
+      .gt('total', 0);  // ✅ Only positive totals
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
@@ -8440,7 +8436,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       throw error;
     }
     
-    console.log(`📊 Found ${data?.length || 0} transactions`);
+    console.log(`📊 Found ${data?.length || 0} active transactions (excluding refunds)`);
     
     if (!data || data.length === 0) {
       console.log('ℹ️ No transactions found in date range');
@@ -8480,33 +8476,12 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     let refundTotal = 0;
     let totalItems = 0;
     const refundedTransactionIds = new Set();
-    let refundTransactionCount = 0;
     
-    // ✅ First pass: Identify refunds
-    for (const tx of data) {
-      const total = parseFloat(tx.total) || 0;
-      if (total < 0) {
-        refundTransactionCount++;
-        if (tx.refund_of) {
-          refundedTransactionIds.add(tx.refund_of);
-        }
-        refundTotal += total;
-      }
-    }
-    
-    console.log(`📊 Found ${data.length - refundTransactionCount} sales, ${refundTransactionCount} refunds`);
-    console.log(`🔄 Refunded transaction IDs:`, [...refundedTransactionIds]);
-    
-    // ✅ Second pass: Calculate ALL positive sales (excluding refunds)
+    // ✅ Calculate totals (all transactions are already active sales)
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
       
-      // Skip refund transactions (they are negative)
-      if (total < 0) continue;
-      
-      // ✅ Skip transactions that have been refunded (for employee reports)
-      // This is already handled by the `eq('refunded', false)` filter above
-      
+      // ✅ All transactions should be positive (filtered by .gt('total', 0))
       totalSales += total;
       
       const payment = tx.payment_method;
@@ -8529,12 +8504,26 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       }
     }
     
-    // ✅ Net total = ALL sales + refunds (refunds are negative)
-    const netTotal = totalSales + refundTotal;
+    // ✅ Net total = totalSales (refunds are excluded)
+    const netTotal = totalSales;
     
     console.log(`💰 Total Sales: RM ${totalSales.toFixed(2)}`);
-    console.log(`💰 Refund Total: RM ${refundTotal.toFixed(2)}`);
     console.log(`💰 Net Total: RM ${netTotal.toFixed(2)}`);
+    
+    // ✅ Get refund count from a separate query (for display purposes)
+    const { data: refundData, error: refundError } = await supabase
+      .from('transactions')
+      .select('refund_of')
+      .eq('store', store)
+      .lt('total', 0);
+    
+    if (!refundError && refundData) {
+      refundData.forEach(tx => {
+        if (tx.refund_of) {
+          refundedTransactionIds.add(tx.refund_of);
+        }
+      });
+    }
     
     const totals = {
       totalSales: totalSales,
@@ -8542,9 +8531,9 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       cardTotal: cardTotal,
       otherTotal: otherTotal,
       alipayTotal: alipayTotal,
-      refundTotal: Math.abs(refundTotal),
+      refundTotal: 0,  // Refunds are excluded from totals
       refundedTransactionCount: refundedTransactionIds.size,
-      transactionCount: data.length - refundTransactionCount,
+      transactionCount: data.length,
       totalItems: totalItems,
       netTotal: netTotal
     };
@@ -8555,9 +8544,9 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       document.getElementById('adminReportCardTotal').innerText = `RM ${cardTotal.toFixed(2)}`;
       document.getElementById('adminReportQRTotal').innerText = `RM ${otherTotal.toFixed(2)}`;
       document.getElementById('adminReportAlipayTotal').innerText = `RM ${alipayTotal.toFixed(2)}`;
-      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(refundTotal).toFixed(2)}`;
+      document.getElementById('adminReportRefundTotal').innerText = `RM 0.00`;
       document.getElementById('adminReportRefundedBills').innerText = refundedTransactionIds.size || 0;
-      document.getElementById('adminReportTransactionCount').innerText = data.length - refundTransactionCount || 0;
+      document.getElementById('adminReportTransactionCount').innerText = data.length || 0;
       document.getElementById('adminReportTotalItems').innerText = totalItems || 0;
       
       // ✅ Update net total in settlement modal
@@ -8581,7 +8570,6 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     if (!silent) hideLoading();
   }
 }
-
 async function fetchSalesChartData(store, employeeId, from, to) {
   try {
     let query = supabase
