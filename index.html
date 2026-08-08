@@ -5307,7 +5307,7 @@ function renderReceiptsList(receipts) {
 
           if (paidQty > 0) {
             const itemTotal = paidQty * price;
-            const isRefundItem = isRefund || total < 0;
+            const isRefundItem = isRefund || rec.total < 0;
             const itemColor = isRefundItem ? '#dc2626' : 'inherit';
             itemsHtml += `
               <div class="receipt-item-row" style="${isRefundItem ? 'color:#dc2626;' : ''}">
@@ -5334,7 +5334,8 @@ function renderReceiptsList(receipts) {
       if (customDisc > 0) discountsHtml += `<div class="receipt-discount-row"><span>💰 Custom Discount</span><span>-RM ${customDisc.toFixed(2)}</span></div>`;
       if (staffDisc > 0) discountsHtml += `<div class="receipt-discount-row"><span>👥 Staff 10% Discount</span><span>-RM ${staffDisc.toFixed(2)}</span></div>`;
 
-      const total = parseFloat(rec.total) || 0;
+      // ✅ FIX: Use a different variable name - 'receiptTotal' instead of 'total'
+      const receiptTotal = parseFloat(rec.total) || 0;
       const totalColor = isRefund ? '#dc2626' : '#2c7a4b';
       const totalPrefix = isRefund ? 'REFUND: ' : '';
 
@@ -5352,7 +5353,7 @@ function renderReceiptsList(receipts) {
             <div style="display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;">
               ${receiptIdHtml}
               <strong style="${isRefund ? 'color: #dc2626;' : ''}">Payment: ${rec.payment_method || 'N/A'}</strong>
-              <span class="receipt-total" style="color: ${totalColor};">${totalPrefix}RM ${Math.abs(total).toFixed(2)}</span>
+              <span class="receipt-total" style="color: ${totalColor};">${totalPrefix}RM ${Math.abs(receiptTotal).toFixed(2)}</span>
             </div>
             <div>
               <span class="receipt-date">${date}</span>
@@ -5368,7 +5369,7 @@ function renderReceiptsList(receipts) {
           ${discountsHtml ? `<div class="receipt-items-list" style="margin-top:4px;">${discountsHtml}</div>` : ''}
           <div class="receipt-item-row total-row" style="margin-top:8px; padding-top:6px; border-top:1px dashed ${isRefund ? '#fecaca' : '#cbd5e1'};">
             <strong style="${isRefund ? 'color: #dc2626;' : ''}">${isRefund ? 'REFUND TOTAL' : 'TOTAL'}</strong>
-            <strong style="color: ${totalColor};">RM ${Math.abs(total).toFixed(2)}</strong>
+            <strong style="color: ${totalColor};">RM ${Math.abs(receiptTotal).toFixed(2)}</strong>
           </div>
           ${actionsHtml}
         </div>
