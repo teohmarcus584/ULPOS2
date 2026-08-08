@@ -3970,16 +3970,18 @@ const transaction = {
     hideLoading();
 
     if (success) {
-      for (let item of saleItems) {
-        const product = products.find(p => p.id == item.id);
-        if (product) {
-          const oldStock = product.stock;
-          const newStock = oldStock - item.quantity;
-          product.stock = newStock;
-          checkAndNotifyOutOfStock(product.id, product.name, newStock);
-		   await saveToLuckyDraw(transaction);
-        }
-      }
+  for (let item of saleItems) {
+    const product = products.find(p => p.id == item.id);
+    if (product) {
+      const oldStock = product.stock;
+      const newStock = oldStock - item.quantity;
+      product.stock = newStock;
+      checkAndNotifyOutOfStock(product.id, product.name, newStock);
+    }
+  }
+  
+  // ✅ Save to Lucky Draw if eligible
+  await saveToLuckyDraw(transaction);
 
       localStorage.setItem(`products_${currentStore}`, JSON.stringify({
         timestamp: Date.now(),
@@ -4121,6 +4123,107 @@ async function getNextIRSInvoiceNumber() {
     return `INV-${timestamp}`;
   }
 }
+// ==================== LUCKY DRAW FUNCTIONS ====================
+
+async function saveToLuckyDraw(transaction) {
+  try {
+    // Check if transaction qualifies for lucky draw
+    // You can adjust the threshold or make it random
+    const qualifies = transaction.total >= 100; // RM 100 and above
+    
+    if (!qualifies) {
+      console.log('Transaction does not qualify for lucky draw (below RM 100)');
+      return false;
+    }
+    
+    // Check if this transaction already has a lucky draw entry
+    const { data: existing, error: checkError } = await supabase
+      .from('lucky_draw_prizes')
+      .select('id')
+      .eq('receipt', transaction.transaction_id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking existing lucky draw:', checkError);
+    }
+    
+    if (existing) {
+      console.log('Lucky draw entry already exists for this transaction');
+      return true;
+    }
+    
+    // Random prize selection
+    const prizes = [
+      { label: 'RM 38 FREE GIFT', value: 38 },
+      { label: 'RM 75 FREE GIFT', value: 75 },
+      { label: 'RM 109 FREE GIFT', value: 109 }
+    ];
+    
+    const selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
+    
+    // Match your table columns exactly
+    const { data, error } = await supabase
+      .from('lucky_draw_prizes')
+      .insert([{
+        receipt: transaction.transaction_id,
+        prize_label: selectedPrize.label,
+        discount_value: selectedPrize.value,
+        claimed: false,
+        claimed_at: null,
+        store: transaction.store || currentStore,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    
+    if (error) {
+      console.error('Error saving to lucky draw:', error);
+      return false;
+    }
+    
+    console.log('✅ Lucky draw entry created:', data);
+    
+    // Show lucky draw modal
+    document.getElementById('luckyTxId').innerText = transaction.transaction_id;
+    document.getElementById('luckyDrawModal').style.display = 'flex';
+    
+    return true;
+    
+  } catch (err) {
+    console.error('Lucky draw error:', err);
+    return false;
+  }
+}
+
+// Open Lucky Draw link
+document.getElementById('openLuckyDrawBtn').addEventListener('click', function() {
+  const txId = document.getElementById('luckyTxId').innerText;
+  window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
+  document.getElementById('luckyDrawModal').style.display = 'none';
+});
+
+// Close Lucky Draw Modal
+document.getElementById('luckyDrawModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.style.display = 'none';
+  }
+});
+
+// Add close button to lucky draw modal
+setTimeout(function() {
+  const luckyModal = document.getElementById('luckyDrawModal');
+  const container = luckyModal?.querySelector('.modal-container');
+  if (container && !container.querySelector('.close-modal')) {
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'close-modal';
+    closeBtn.id = 'closeLuckyDrawModal';
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = 'position: absolute; top: 16px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #64748b; line-height: 1;';
+    container.prepend(closeBtn);
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('luckyDrawModal').style.display = 'none';
+    });
+  }
+}, 100);
 async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
