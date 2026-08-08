@@ -4065,12 +4065,11 @@ async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
-    // ✅ Get ALL invoice numbers and find the highest
+    // ✅ Get ALL invoice numbers
     const { data, error } = await supabase
       .from('irs_reporting')
       .select('invoice_no')
-      .not('invoice_no', 'is', null)
-      .order('invoice_no', { ascending: false });
+      .not('invoice_no', 'is', null);
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
@@ -4097,7 +4096,7 @@ async function getNextIRSInvoiceNumber() {
         }
       }
       
-      console.log(`📊 Highest invoice number found: ${highestNum}`);
+      console.log(`📊 HIGHEST invoice number found: ${highestNum}`);
     }
     
     // ✅ Start from the highest number + 1
