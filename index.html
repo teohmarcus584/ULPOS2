@@ -9441,7 +9441,7 @@ async function updateNonAdminReport(from, to) {
   console.log('Date range from:', from);
   console.log('Date range to:', to);
   
-  // Store Total Sales = SPECIFIC store only (for display only)
+  // ✅ Store Total Sales = SPECIFIC store only, EXCLUDING refunds
   const store = currentStore;
   const storeTotals = await fetchSalesReport(store, 'all', from, to, false, true);
   if (storeTotals) {
@@ -9451,14 +9451,16 @@ async function updateNonAdminReport(from, to) {
     document.getElementById('adminReportTotalItems').innerText = storeTotals.totalItems || 0;
   }
   
-  // My Sales = Employee sales across ALL stores filtered by sales_person_id
+  // ✅ My Sales = Employee sales across ALL stores, EXCLUDING refunded transactions
   try {
     // Build query WITHOUT store filter - use sales_person_id
+    // ✅ IMPORTANT: Exclude refunded transactions
     let query = supabase
       .from('transactions')
       .select('*')
-      .eq('sales_person_id', currentEmployee.id)  // ✅ Use sales_person_id!
-      .gt('total', 0);  // Exclude refunds
+      .eq('sales_person_id', currentEmployee.id)
+      .eq('refunded', false)  // ✅ ONLY active sales (exclude refunded)
+      .gt('total', 0);  // ✅ Only positive totals (exclude refunds)
     
     // Add date filters
     if (from) {
@@ -9560,7 +9562,7 @@ async function updateNonAdminStatsCards(from, to) {
   console.log('Employee:', currentEmployee.name);
   console.log('Employee ID:', currentEmployee.id);
   
-  // Store Total Sales = SPECIFIC store only
+  // ✅ Store Total Sales = SPECIFIC store only, EXCLUDING refunds
   const store = currentStore;
   const storeTotals = await fetchSalesReport(store, 'all', from, to, false, true);
   const storeTotalElem = document.getElementById('nonAdminStoreTotal');
@@ -9579,13 +9581,14 @@ async function updateNonAdminStatsCards(from, to) {
     storeNameElem.innerText = storeNames[store] || store;
   }
   
-  // My Sales = Employee sales across ALL stores filtered by sales_person_id
+  // ✅ My Sales = Employee sales across ALL stores, EXCLUDING refunds
   try {
     let query = supabase
       .from('transactions')
       .select('*')  // Get all columns
-      .eq('sales_person_id', currentEmployee.id)  // ✅ Use sales_person_id!
-      .gt('total', 0);  // Exclude refunds
+      .eq('sales_person_id', currentEmployee.id)
+      .eq('refunded', false)  // ✅ ONLY active sales (exclude refunded)
+      .gt('total', 0);  // ✅ Only positive totals (exclude refunds)
     
     if (from) {
       const fromDate = new Date(from + 'T00:00:00+08:00');
