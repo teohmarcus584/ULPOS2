@@ -8629,7 +8629,7 @@ async function fetchProductSalesReport(store, employeeId, from, to) {
     
     // Filter by sales_person_id if provided
     if (employeeId && employeeId !== 'all') {
-      query = query.eq('sales_person_id', employeeId);  // ✅ Use sales_person_id!
+      query = query.eq('sales_person_id', employeeId);
       console.log('Filtering by sales_person_id:', employeeId);
     }
     
@@ -8647,89 +8647,93 @@ async function fetchProductSalesReport(store, employeeId, from, to) {
     
     console.log('Found transactions:', data ? data.length : 0);
     
+    // ✅ Safety check - if no data, return empty array
+    if (!data || data.length === 0) {
+      console.log('No transactions found');
+      return [];
+    }
+    
     const productMap = new Map();
     let totalPaidItems = 0;
     
-    if (data) {
-      for (let i = 0; i < data.length; i++) {
-        const receipt = data[i];
-        if (receipt.total < 0) continue;
-        if (receipt.refunded === true) continue;
-        if (!receipt.items || !Array.isArray(receipt.items) || receipt.items.length === 0) continue;
+    for (let i = 0; i < data.length; i++) {
+      const receipt = data[i];
+      if (receipt.total < 0) continue;
+      if (receipt.refunded === true) continue;
+      if (!receipt.items || !Array.isArray(receipt.items) || receipt.items.length === 0) continue;
+      
+      const luckyDrawDiscount = parseFloat(receipt.discount) || 0;
+      const carPromoDiscount = parseFloat(receipt.buy2_free1_discount) || 0;
+      const perfumePromoDiscount = parseFloat(receipt.buy3_free1_discount) || 0;
+      const customDiscount = parseFloat(receipt.custom_discount) || 0;
+      const staffDiscount = parseFloat(receipt.staff_discount) || 0;
+      const otherDiscounts = luckyDrawDiscount + customDiscount + staffDiscount;
+      
+      const paidItems = [];
+      let originalSubtotal = 0;
+      
+      for (let j = 0; j < receipt.items.length; j++) {
+        const item = receipt.items[j];
+        const price = parseFloat(item.price) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        const freeQuantity = parseInt(item.free_quantity) || 0;
+        const paidQty = quantity - freeQuantity;
         
-        const luckyDrawDiscount = parseFloat(receipt.discount) || 0;
-        const carPromoDiscount = parseFloat(receipt.buy2_free1_discount) || 0;
-        const perfumePromoDiscount = parseFloat(receipt.buy3_free1_discount) || 0;
-        const customDiscount = parseFloat(receipt.custom_discount) || 0;
-        const staffDiscount = parseFloat(receipt.staff_discount) || 0;
-        const otherDiscounts = luckyDrawDiscount + customDiscount + staffDiscount;
+        if (paidQty <= 0) continue;
         
-        const paidItems = [];
-        let originalSubtotal = 0;
+        totalPaidItems = totalPaidItems + paidQty;
         
-        for (let j = 0; j < receipt.items.length; j++) {
-          const item = receipt.items[j];
-          const price = parseFloat(item.price) || 0;
-          const quantity = parseInt(item.quantity) || 0;
-          const freeQuantity = parseInt(item.free_quantity) || 0;
-          const paidQty = quantity - freeQuantity;
-          
-          if (paidQty <= 0) continue;
-          
-          totalPaidItems = totalPaidItems + paidQty;
-          
-          const origTotal = paidQty * price;
-          originalSubtotal = originalSubtotal + origTotal;
-          paidItems.push({
-            id: item.id,
-            name: item.name,
-            category: item.category || "Uncategorized",
-            paidQty: paidQty,
-            origTotal: origTotal,
-            price: price
-          });
+        const origTotal = paidQty * price;
+        originalSubtotal = originalSubtotal + origTotal;
+        paidItems.push({
+          id: item.id,
+          name: item.name,
+          category: item.category || "Uncategorized",
+          paidQty: paidQty,
+          origTotal: origTotal,
+          price: price
+        });
+      }
+      
+      if (paidItems.length === 0) continue;
+      
+      if (carPromoDiscount > 0) {
+        const targetItem = paidItems.find(function(item) { return item.category === "CAR AROMATIC"; });
+        if (targetItem) {
+          const newTotal = Math.max(0, targetItem.origTotal - carPromoDiscount);
+          targetItem.origTotal = newTotal;
         }
-        
-        if (paidItems.length === 0) continue;
-        
-        if (carPromoDiscount > 0) {
-          const targetItem = paidItems.find(function(item) { return item.category === "CAR AROMATIC"; });
-          if (targetItem) {
-            const newTotal = Math.max(0, targetItem.origTotal - carPromoDiscount);
-            targetItem.origTotal = newTotal;
-          }
+      }
+      
+      if (perfumePromoDiscount > 0) {
+        const targetItem = paidItems.find(function(item) { return item.category === "15ML PERFUME EDP"; });
+        if (targetItem) {
+          const newTotal = Math.max(0, targetItem.origTotal - perfumePromoDiscount);
+          targetItem.origTotal = newTotal;
         }
-        
-        if (perfumePromoDiscount > 0) {
-          const targetItem = paidItems.find(function(item) { return item.category === "15ML PERFUME EDP"; });
-          if (targetItem) {
-            const newTotal = Math.max(0, targetItem.origTotal - perfumePromoDiscount);
-            targetItem.origTotal = newTotal;
-          }
-        }
-        
-        if (otherDiscounts > 0 && originalSubtotal > 0) {
-          const ratio = 1 - (otherDiscounts / originalSubtotal);
-          for (let k = 0; k < paidItems.length; k++) {
-            paidItems[k].origTotal = paidItems[k].origTotal * ratio;
-          }
-        }
-        
+      }
+      
+      if (otherDiscounts > 0 && originalSubtotal > 0) {
+        const ratio = 1 - (otherDiscounts / originalSubtotal);
         for (let k = 0; k < paidItems.length; k++) {
-          const item = paidItems[k];
-          const id = item.id;
-          if (productMap.has(id)) {
-            const existing = productMap.get(id);
-            existing.quantity = existing.quantity + item.paidQty;
-            existing.total = existing.total + item.origTotal;
-          } else {
-            productMap.set(id, {
-              name: item.name,
-              category: item.category,
-              quantity: item.paidQty,
-              total: item.origTotal
-            });
-          }
+          paidItems[k].origTotal = paidItems[k].origTotal * ratio;
+        }
+      }
+      
+      for (let k = 0; k < paidItems.length; k++) {
+        const item = paidItems[k];
+        const id = item.id;
+        if (productMap.has(id)) {
+          const existing = productMap.get(id);
+          existing.quantity = existing.quantity + item.paidQty;
+          existing.total = existing.total + item.origTotal;
+        } else {
+          productMap.set(id, {
+            name: item.name,
+            category: item.category,
+            quantity: item.paidQty,
+            total: item.origTotal
+          });
         }
       }
     }
@@ -8792,7 +8796,17 @@ function renderProductDetails(productsData) {
   const tbody = document.getElementById('productDetailsBody');
   if (!tbody) return;
   
-  const sortedData = [...(productsData || [])].sort((a, b) => b.quantity - a.quantity);
+  // ✅ Add safety check for productsData
+  if (!productsData || !Array.isArray(productsData)) {
+    tbody.innerHTML = `<tr>
+      <td colspan="4" style="text-align: center; padding: 30px; color: #94a3b8;">
+        📭 No product data available.
+      </td>
+    </tr>`;
+    return;
+  }
+  
+  const sortedData = [...productsData].sort((a, b) => b.quantity - a.quantity);
   
   if (sortedData.length === 0) {
     tbody.innerHTML = `<tr>
@@ -8819,14 +8833,14 @@ function renderProductDetails(productsData) {
     </tr>`;
   });
   
-  // ✅ Add summary row with correct totals
+  // Add summary row with correct totals
   html += `<tr style="font-weight: 700; border-top: 2px solid #e2e8f0; background: #f1f5f9;">
     <td colspan="2" style="text-align: right; font-size: 1.1rem;">📊 TOTAL</td>
     <td style="text-align: right; font-size: 1.1rem; color: #0f172a;">${totalQuantity}</td>
     <td style="text-align: right; font-size: 1.1rem; color: #2c7a4b;">RM ${totalRevenue.toFixed(2)}</td>
   </tr>`;
   
-  // ✅ Add note if there's a discrepancy
+  // Add note if there's a discrepancy
   const totalItemsDisplay = document.getElementById('adminReportTotalItems');
   if (totalItemsDisplay) {
     const reportedTotal = parseInt(totalItemsDisplay.innerText) || 0;
