@@ -4099,59 +4099,47 @@ async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
-    // ✅ Get ALL invoice numbers
+    // ✅ Get the SINGLE highest invoice number
     const { data, error } = await supabase
       .from('irs_reporting')
       .select('invoice_no')
-      .not('invoice_no', 'is', null)
-      .order('invoice_no', { ascending: false });
+      .order('invoice_no', { ascending: false })
+      .limit(10);  // Get top 10 to see what's happening
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
-      const timestamp = Date.now();
-      const fallback = `INV-${timestamp}`;
-      console.log(`⚠️ Using fallback invoice number: ${fallback}`);
-      return fallback;
+      return `INV-${Date.now()}`;
     }
+    
+    console.log('📋 Top 10 invoice numbers:', data);
     
     let highestNum = 0;
     
     if (data && data.length > 0) {
-      console.log(`📋 Found ${data.length} existing invoice numbers`);
-      
       for (const row of data) {
         const invoice = row.invoice_no;
         if (!invoice) continue;
         
-        console.log(`📋 Checking: ${invoice}`);
-        
-        // ✅ Extract number from INV-XXXX (regular invoices)
-        let match = invoice.match(/INV-(\d+)/);
+        // ✅ Extract number from INV-XXXX (ignore REF-INV)
+        const match = invoice.match(/^INV-(\d+)$/);
         if (match) {
           const num = parseInt(match[1]);
-          console.log(`   Found INV number: ${num}`);
-          if (num > highestNum) {
-            highestNum = num;
-          }
-        }
-        
-        // ✅ Also check REF-INV-XXXX (refund invoices)
-        match = invoice.match(/REF-INV-(\d+)/);
-        if (match) {
-          const num = parseInt(match[1]);
-          console.log(`   Found REF-INV number: ${num}`);
+          console.log(`   Found INV number: ${num} from ${invoice}`);
           if (num > highestNum) {
             highestNum = num;
           }
         }
       }
       
-      console.log(`📊 HIGHEST number found: ${highestNum}`);
-    } else {
-      console.log('📊 No existing invoices found, starting at 1');
+      console.log(`📊 Highest INV number found: ${highestNum}`);
     }
     
-    // ✅ Start from the highest number + 1
+    // ✅ If highestNum is still 0, start from 1
+    if (highestNum === 0) {
+      console.log('📊 No INV numbers found, starting at 1');
+      highestNum = 0;
+    }
+    
     const nextNum = highestNum + 1;
     const newInvoice = `INV-${nextNum}`;
     
@@ -4160,13 +4148,9 @@ async function getNextIRSInvoiceNumber() {
     
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
-    const timestamp = Date.now();
-    const fallback = `INV-${timestamp}`;
-    console.log(`⚠️ Using fallback invoice number: ${fallback}`);
-    return fallback;
+    return `INV-${Date.now()}`;
   }
 }
-
 async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
