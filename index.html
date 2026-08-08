@@ -4083,9 +4083,9 @@ async function getNextIRSInvoiceNumber() {
     if (data && data.length > 0) {
       console.log(`📋 Found ${data.length} existing invoice numbers`);
       
-      // ✅ Loop through ALL invoices to find the highest number
-      for (const row of data) {
-        const invoice = row.invoice_no;
+      // ✅ Loop through EVERY invoice to find the highest number
+      for (let i = 0; i < data.length; i++) {
+        const invoice = data[i].invoice_no;
         if (!invoice) continue;
         
         // ✅ Only match regular invoices (INV-XXXX), NOT refunds (REF-INV-XXXX)
