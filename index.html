@@ -4007,36 +4007,55 @@ async function completeCheckout(paymentMethod, cashReceived) {
         }
       }
 
+      // ============================================================
       // ✅ MARK PRIZE AS CLAIMED AFTER SUCCESSFUL CHECKOUT
-      if (pendingPrize && pendingPrize.receipt && !pendingPrize.claimed) {
+      // ============================================================
+      const prizeToClaim = pendingPrize || window._pendingPrize;
+
+      if (prizeToClaim && prizeToClaim.receipt && !prizeToClaim.claimed) {
         console.log('🎯 ========================================');
-        console.log('🎯 MARKING PRIZE AS CLAIMED AFTER CHECKOUT');
-        console.log('🎯 Receipt:', pendingPrize.receipt);
-        console.log('🎯 Value:', pendingPrize.value);
+        console.log('🎯 FOUND PRIZE TO CLAIM!');
+        console.log('🎯 Receipt:', prizeToClaim.receipt);
+        console.log('🎯 Value:', prizeToClaim.value);
+        console.log('🎯 Name:', prizeToClaim.name);
         console.log('🎯 ========================================');
         
-        const claimed = await claimPrizeAfterSale(
-          pendingPrize.receipt, 
-          pendingPrize.value, 
-          totalAmount
-        );
-        
-        if (claimed) {
-          console.log('✅ Prize marked as claimed successfully!');
-          pendingPrize.claimed = true;
-          claimedReceiptInfo = null;
-        } else {
-          console.warn('⚠️ Failed to mark prize as claimed');
-          await showAlertModal('⚠️ Prize Claim Warning', 
-            'Transaction completed but prize was not marked as claimed.\n' +
-            `Receipt: ${pendingPrize.receipt}\n\n` +
-            'Please contact support to manually mark it.'
+        try {
+          const claimed = await claimPrizeAfterSale(
+            prizeToClaim.receipt, 
+            prizeToClaim.value, 
+            totalAmount
           );
+          
+          if (claimed) {
+            console.log('✅ Prize marked as claimed successfully!');
+            prizeToClaim.claimed = true;
+            pendingPrize = null;
+            window._pendingPrize = null;
+            claimedReceiptInfo = null;
+            
+            // ✅ Show success message
+            await showAlertModal('🎉 Prize Claimed!', 
+              `Your prize has been successfully claimed!\n\n` +
+              `Receipt: ${prizeToClaim.receipt}\n` +
+              `Prize: ${prizeToClaim.name}`
+            );
+          } else {
+            console.warn('⚠️ Failed to mark prize as claimed');
+            await showAlertModal('⚠️ Prize Claim Warning', 
+              'Transaction completed but prize was NOT marked as claimed.\n\n' +
+              `Receipt: ${prizeToClaim.receipt}\n` +
+              `Prize: ${prizeToClaim.name}\n\n` +
+              'Please manually claim the prize from the Receipts section.'
+            );
+          }
+        } catch (err) {
+          console.error('Error claiming prize:', err);
         }
       } else {
         console.log('ℹ️ No pending prize to claim');
-        if (pendingPrize) {
-          console.log('pendingPrize exists but claimed is already:', pendingPrize.claimed);
+        if (prizeToClaim) {
+          console.log('prizeToClaim exists but claimed is already:', prizeToClaim.claimed);
         }
       }
 
@@ -4062,7 +4081,8 @@ async function completeCheckout(paymentMethod, cashReceived) {
         custom_discount: transaction.custom_discount,
         staff_discount: transaction.staff_discount,
         sales_person_name: transaction.sales_person_name,
-        sales_person_id: transaction.sales_person_id
+        sales_person_id: transaction.sales_person_id,
+        prize_claimed: prizeToClaim || null  // ✅ Add this line
       };
       if (!cachedReceipts) cachedReceipts = [];
       cachedReceipts.unshift(fakeReceipt);
@@ -6852,7 +6872,7 @@ async function isPrizeAlreadyClaimed(receiptNumber) {
 }
 function applyPrizeToCart() {
   if (!window.pendingClaimReceipt) {
-    console.error('No pending claim receipt found');
+    console.error('❌ No pending claim receipt found');
     showClaimError('No prize to claim. Please try again.');
     return;
   }
@@ -6867,7 +6887,7 @@ function applyPrizeToCart() {
     prizeText: prizeText
   });
 
-  // Store the prize info - WILL BE CLAIMED AFTER CHECKOUT
+  // ✅ Store the prize info - will be claimed after checkout
   pendingPrize = { 
     receipt: receiptNumber, 
     value: prizeValue, 
@@ -6875,36 +6895,51 @@ function applyPrizeToCart() {
     claimed: false  // Will be marked after successful checkout
   };
   
+  // ✅ Store in global variable for completeCheckout
+  window._pendingPrize = pendingPrize;
+  
   discountAmount = prizeValue;
   claimedReceiptInfo = pendingPrize;
   updateCartUI();
 
-  showAlertModal('Prize Applied', `Discount of RM ${prizeValue.toFixed(2)} has been applied to this sale.`);
+  showAlertModal('Prize Applied', `✅ Discount of RM ${prizeValue.toFixed(2)} has been applied to this sale.\n\nThe prize will be claimed after checkout.`);
   document.getElementById('claimPrizeModal').style.display = 'none';
 }
 
 async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
   try {
-    console.log('🎯 Claiming prize for receipt:', receipt);
-    console.log('Prize value:', prizeValue);
+    console.log('========================================');
+    console.log('🎯 CLAIM PRIZE FUNCTION CALLED!');
+    console.log('📋 Receipt:', receipt);
+    console.log('📋 Prize Value:', prizeValue);
+    console.log('========================================');
     
     // ✅ Check if already claimed
     const { data: checkData, error: checkError } = await supabase
       .from('lucky_draw_prizes')
-      .select('claimed, id')
+      .select('claimed, id, prize_label')
       .eq('receipt', receipt)
       .maybeSingle();
     
     if (checkError) {
-      console.error('Error checking prize status:', checkError);
+      console.error('❌ Error checking prize status:', checkError);
+      return false;
     }
     
-    if (checkData && checkData.claimed === true) {
+    console.log('📋 Found prize data:', checkData);
+    
+    if (!checkData) {
+      console.error('❌ No prize found for receipt:', receipt);
+      return false;
+    }
+    
+    if (checkData.claimed === true) {
       console.log('⚠️ Prize already claimed! ID:', checkData.id);
       return true;
     }
     
     // ✅ Update the lucky_draw_prizes table - mark as claimed
+    console.log('🔄 Updating prize to claimed=true...');
     const { data, error } = await supabase
       .from('lucky_draw_prizes')
       .update({
@@ -6919,11 +6954,14 @@ async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
       return false;
     }
     
-    console.log('✅ Prize marked as claimed successfully:', data);
+    console.log('✅ Prize marked as claimed successfully!');
+    console.log('📋 Updated data:', data);
+    console.log('========================================');
     return true;
     
   } catch (err) {
-    console.error('Error claiming prize:', err);
+    console.error('❌ Error claiming prize:', err);
+    console.log('========================================');
     return false;
   }
 }
