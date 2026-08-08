@@ -1885,6 +1885,42 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     }
     .progress-wrapper { max-width: 100%; }
 }
+/* Refund receipt styles */
+.receipt-item.refund-receipt {
+  background-color: #fee2e2 !important;
+  border-left: 5px solid #dc2626 !important;
+  border-color: #fecaca !important;
+}
+
+.receipt-item.refund-receipt .receipt-id {
+  color: #dc2626 !important;
+}
+
+.receipt-item.refund-receipt .receipt-total {
+  color: #dc2626 !important;
+}
+
+.receipt-item.refund-receipt .receipt-header {
+  border-bottom-color: #fecaca !important;
+}
+
+.receipt-item.refund-receipt .receipt-details {
+  color: #991b1b !important;
+}
+
+/* Refund badge */
+.refund-badge {
+  background: #dc2626;
+  color: white;
+  padding: 2px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  margin-left: 8px;
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -5236,10 +5272,16 @@ function renderReceiptsList(receipts) {
       }
       if (!employeeName) employeeName = rec.employee_id || 'Unknown';
       
-      const isRefund = rec.total < 0;
+      // ✅ Check if this is a refund
+      const isRefund = rec.total < 0 || rec.refunded === true || rec.transaction_id?.startsWith('REF-');
       const refundClass = isRefund ? 'refund-receipt' : '';
+      
+      // ✅ Refund badge
+      const refundBadge = isRefund ? '<span class="refund-badge">🔄 REFUND</span>' : '';
+      
+      // ✅ Receipt ID with refund indicator
       const receiptIdHtml = isRefund
-        ? `<span class="receipt-id">[REFUND] ${rec.transaction_id}</span>`
+        ? `<span class="receipt-id">🔴 [REFUND] ${rec.transaction_id} ${refundBadge}</span>`
         : `<span class="receipt-id">${rec.transaction_id}</span>`;
 
       let itemsHtml = '<div class="receipt-items-list">';
@@ -5265,11 +5307,13 @@ function renderReceiptsList(receipts) {
 
           if (paidQty > 0) {
             const itemTotal = paidQty * price;
+            const isRefundItem = isRefund || total < 0;
+            const itemColor = isRefundItem ? '#dc2626' : 'inherit';
             itemsHtml += `
-              <div class="receipt-item-row">
-                <span class="receipt-item-name">${escapeHtml(item.name || 'Unknown')}</span>
+              <div class="receipt-item-row" style="${isRefundItem ? 'color:#dc2626;' : ''}">
+                <span class="receipt-item-name">${isRefundItem ? '🔄 ' : ''}${escapeHtml(item.name || 'Unknown')}</span>
                 <span class="receipt-item-detail">${paidQty} x RM ${price.toFixed(2)}</span>
-                <span class="receipt-item-detail">RM ${itemTotal.toFixed(2)}</span>
+                <span class="receipt-item-detail" style="color:${itemColor};">RM ${itemTotal.toFixed(2)}</span>
               </div>
             `;
           }
@@ -5291,6 +5335,8 @@ function renderReceiptsList(receipts) {
       if (staffDisc > 0) discountsHtml += `<div class="receipt-discount-row"><span>👥 Staff 10% Discount</span><span>-RM ${staffDisc.toFixed(2)}</span></div>`;
 
       const total = parseFloat(rec.total) || 0;
+      const totalColor = isRefund ? '#dc2626' : '#2c7a4b';
+      const totalPrefix = isRefund ? 'REFUND: ' : '';
 
       const actionsHtml = `
         <div class="receipt-actions">
@@ -5301,27 +5347,28 @@ function renderReceiptsList(receipts) {
       `;
 
       html += `
-        <div class="receipt-item ${refundClass}" data-txid="${rec.transaction_id}">
-          <div class="receipt-header" style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap;">
+        <div class="receipt-item ${refundClass}" data-txid="${rec.transaction_id}" style="${isRefund ? 'background: #fee2e2; border-left: 5px solid #dc2626;' : ''}">
+          <div class="receipt-header" style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; ${isRefund ? 'border-bottom-color: #fecaca;' : ''}">
             <div style="display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;">
               ${receiptIdHtml}
-              <strong>Payment: ${rec.payment_method || 'N/A'}</strong>
-              <span class="receipt-total">RM ${total.toFixed(2)}</span>
+              <strong style="${isRefund ? 'color: #dc2626;' : ''}">Payment: ${rec.payment_method || 'N/A'}</strong>
+              <span class="receipt-total" style="color: ${totalColor};">${totalPrefix}RM ${Math.abs(total).toFixed(2)}</span>
             </div>
             <div>
               <span class="receipt-date">${date}</span>
             </div>
           </div>
-          <div class="receipt-details">
+          <div class="receipt-details" style="${isRefund ? 'color: #991b1b;' : ''}">
             <div>Store: ${rec.store || 'N/A'}</div>
             <div>Cashier ID: ${escapeHtml(employeeName)}</div>
             <div>Sales Person: ${rec.sales_person_name || 'N/A'}</div>
+            ${isRefund ? `<div style="color: #dc2626; font-weight: 600; margin-top: 4px;">🔄 This is a refund transaction</div>` : ''}
           </div>
           ${itemsHtml}
           ${discountsHtml ? `<div class="receipt-items-list" style="margin-top:4px;">${discountsHtml}</div>` : ''}
-          <div class="receipt-item-row total-row" style="margin-top:8px; padding-top:6px; border-top:1px dashed #cbd5e1;">
-            <strong>TOTAL</strong>
-            <strong>RM ${total.toFixed(2)}</strong>
+          <div class="receipt-item-row total-row" style="margin-top:8px; padding-top:6px; border-top:1px dashed ${isRefund ? '#fecaca' : '#cbd5e1'};">
+            <strong style="${isRefund ? 'color: #dc2626;' : ''}">${isRefund ? 'REFUND TOTAL' : 'TOTAL'}</strong>
+            <strong style="color: ${totalColor};">RM ${Math.abs(total).toFixed(2)}</strong>
           </div>
           ${actionsHtml}
         </div>
@@ -5353,14 +5400,13 @@ function renderReceiptsList(receipts) {
     });
   });
 
-// In renderReceiptsList function, the lucky draw button:
-document.querySelectorAll('.lucky-reprint-btn').forEach(btn => {
-  btn.addEventListener('click', async (e) => {
-    const txId = btn.dataset.txid;
-    e.stopPropagation();
-    await reprintLuckyDraw(txId);
+  document.querySelectorAll('.lucky-reprint-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const txId = btn.dataset.txid;
+      e.stopPropagation();
+      await reprintLuckyDraw(txId);
+    });
   });
-});
 
   document.querySelectorAll('.refund-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
