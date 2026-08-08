@@ -3831,19 +3831,20 @@ async function saveTransactionToSheet(transaction) {
       
       console.log(`📋 Using invoice number: ${invoiceNo}`);
       
-      const { data: irsData, error: irsError } = await supabase
-        .from('irs_reporting')
-        .insert([{
-          invoice_no: invoiceNo,
-          transaction_id: transaction.transaction_id,
-          timestamp: transaction.timestamp,
-          items: JSON.stringify(transaction.items || []),
-          total: transaction.total || 0,
-          store: transaction.store || 'queens',
-          employee_id: transaction.employee_id,
-          employee_name: transaction.employee_name || currentEmployee?.name || ''
-        }])
-        .select();
+      // In saveTransactionToSheet, when saving to irs_reporting:
+const { data: irsData, error: irsError } = await supabase
+  .from('irs_reporting')
+  .insert([{
+    invoice_no: invoiceNo,  // ✅ This should be the new number
+    transaction_id: transaction.transaction_id,
+    timestamp: transaction.timestamp,
+    items: JSON.stringify(transaction.items || []),
+    total: transaction.total || 0,
+    store: transaction.store || 'queens',
+    employee_id: transaction.employee_id,
+    employee_name: transaction.employee_name || currentEmployee?.name || ''
+  }])
+  .select();
       
       if (irsError) {
         console.error('❌ IRS reporting error:', irsError);
@@ -4073,7 +4074,8 @@ async function getNextIRSInvoiceNumber() {
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
-      return `INV-${Date.now()}`;
+      const timestamp = Date.now();
+      return `INV-${timestamp}`;
     }
     
     let highestNum = 0;
@@ -4089,7 +4091,6 @@ async function getNextIRSInvoiceNumber() {
         const match = invoice.match(/^INV-(\d+)$/);
         if (match) {
           const num = parseInt(match[1]);
-          console.log(`   Found: ${invoice} -> ${num}`);
           if (num > highestNum) {
             highestNum = num;
           }
@@ -4109,9 +4110,7 @@ async function getNextIRSInvoiceNumber() {
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
     const timestamp = Date.now();
-    const fallback = `INV-${timestamp}`;
-    console.log(`⚠️ Using fallback invoice number: ${fallback}`);
-    return fallback;
+    return `INV-${timestamp}`;
   }
 }
 async function getNextIRSInvoiceNumber() {
