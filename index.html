@@ -4125,7 +4125,9 @@ async function getNextIRSInvoiceNumber() {
         const invoice = row.invoice_no;
         if (!invoice) continue;
         
-        // Check INV-XXXX format (including INV-00001, INV-0001, etc.)
+        console.log(`📋 Checking invoice: ${invoice}`);
+        
+        // Check INV-XXXX format (including INV-11720, INV-0001, etc.)
         let match = invoice.match(/INV-(\d+)/);
         if (match) {
           const num = parseInt(match[1]);
@@ -4153,7 +4155,7 @@ async function getNextIRSInvoiceNumber() {
     
     // ✅ Start from the highest number + 1
     const nextNum = highestNum + 1;
-    const newInvoice = `INV-${String(nextNum).padStart(4, '0')}`;
+    const newInvoice = `INV-${nextNum}`;  // No padding needed
     
     console.log(`📋 New IRS invoice number: ${newInvoice}`);
     return newInvoice;
