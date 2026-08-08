@@ -3855,16 +3855,13 @@ async function saveTransactionToSheet(transaction) {
             console.error(`❌ IRS attempt ${retryCount + 1} failed:`, irsError);
             lastError = irsError;
             
-            // If duplicate key error, retry with next number
-            if (irsError.code === '23505') { // PostgreSQL duplicate key error code
-              console.warn(`⚠️ Duplicate invoice number ${invoiceNo}, retrying... (${retryCount + 1}/${maxRetries})`);
+            if (irsError.code === '23505') {
+              console.warn(`⚠️ Duplicate invoice number ${invoiceNo}, retrying...`);
               retryCount++;
-              // Add a small delay before retry
-              await new Promise(resolve => setTimeout(resolve, 200));
+              await new Promise(resolve => setTimeout(resolve, 300));
               continue;
             }
             
-            // If it's a different error, show warning and break
             await showAlertModal('⚠️ IRS Report Warning', 
               `Transaction saved but IRS report failed.\n` +
               `Error: ${irsError.message}\n\n` +
@@ -3881,7 +3878,7 @@ async function saveTransactionToSheet(transaction) {
           console.error(`❌ IRS attempt ${retryCount + 1} exception:`, irsErr);
           lastError = irsErr;
           retryCount++;
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
@@ -4102,7 +4099,7 @@ async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
-    // ✅ Get ALL invoice numbers from the irs_reporting table
+    // ✅ Query the irs_reporting table directly - NO counter table!
     const { data, error } = await supabase
       .from('irs_reporting')
       .select('invoice_no')
@@ -4111,7 +4108,7 @@ async function getNextIRSInvoiceNumber() {
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
-      // If error, use timestamp fallback with random
+      // Fallback: use timestamp with random
       const timestamp = Date.now();
       const random = Math.floor(Math.random() * 10000);
       const fallback = `INV-${timestamp}-${String(random).padStart(4, '0')}`;
@@ -4124,12 +4121,11 @@ async function getNextIRSInvoiceNumber() {
     if (data && data.length > 0) {
       console.log(`📋 Found ${data.length} existing invoice numbers`);
       
-      // ✅ Extract all numbers and find the highest
       for (const row of data) {
         const invoice = row.invoice_no;
         if (!invoice) continue;
         
-        // Check INV-XXXX format (including INV-11720, INV-0001, etc.)
+        // Check INV-XXXX format
         let match = invoice.match(/INV-(\d+)/);
         if (match) {
           const num = parseInt(match[1]);
@@ -4138,7 +4134,7 @@ async function getNextIRSInvoiceNumber() {
           }
         }
         
-        // Also check REF-INV-XXXX format (for refunds)
+        // Check REF-INV-XXXX format
         match = invoice.match(/REF-INV-(\d+)/);
         if (match) {
           const num = parseInt(match[1]);
@@ -4153,7 +4149,6 @@ async function getNextIRSInvoiceNumber() {
       console.log('📊 No existing invoices found, starting at 1');
     }
     
-    // ✅ Start from the highest number + 1
     const nextNum = highestNum + 1;
     const newInvoice = `INV-${nextNum}`;
     
@@ -4162,7 +4157,6 @@ async function getNextIRSInvoiceNumber() {
     
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
-    // Fallback: use timestamp with random suffix
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 10000);
     const fallback = `INV-${timestamp}-${String(random).padStart(4, '0')}`;
