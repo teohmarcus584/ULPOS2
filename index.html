@@ -2111,11 +2111,18 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 <div id="luckyDrawPrintModal" class="modal-overlay">
   <div class="modal-container" style="max-width: 400px;">
     <span class="close-modal" id="closeLuckyDrawPrintModal">×</span>
-    <div class="modal-title">🎉 Congratulations!</div>
+    <div class="modal-title">🎉 Print Lucky Draw Voucher</div>
     <div id="luckyDrawPrintContent">
-      <p>You have won a Lucky Draw prize!</p>
       <p>Receipt ID: <strong id="luckyDrawReceiptNumber"></strong></p>
-      <div class="modal-buttons"><button id="printPrizeVoucherBtn" class="modal-btn modal-btn-primary">🖨️ Print Voucher</button><button id="closeLuckyDrawPrintModalBtn" class="modal-btn modal-btn-secondary">Close</button></div>
+      <p>Prize: <strong id="luckyDrawPrizeLabel">Waiting for spin...</strong></p>
+      <p style="font-size: 0.85rem; color: #64748b; margin-top: 8px;">
+        The customer will spin the wheel on the Lucky Draw page.
+        Once they win, click Print Voucher below.
+      </p>
+      <div class="modal-buttons">
+        <button id="printPrizeVoucherBtn" class="modal-btn modal-btn-primary">🖨️ Print Voucher</button>
+        <button id="closeLuckyDrawPrintModalBtn" class="modal-btn modal-btn-secondary">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4125,6 +4132,8 @@ async function getNextIRSInvoiceNumber() {
 }
 // ==================== LUCKY DRAW FUNCTIONS ====================
 
+// ==================== LUCKY DRAW FUNCTIONS ====================
+
 async function saveToLuckyDraw(transaction) {
   try {
     console.log('🎲 SAVE TO LUCKY DRAW CALLED!');
@@ -4140,10 +4149,10 @@ async function saveToLuckyDraw(transaction) {
     
     console.log('✅ Transaction qualifies for Lucky Draw!');
     
-    // ✅ Check if this transaction already has a lucky draw entry
+    // Check if this transaction already has a lucky draw entry
     const { data: existing, error: checkError } = await supabase
       .from('lucky_draw_prizes')
-      .select('id, receipt')
+      .select('id, prize_label, discount_value')
       .eq('receipt', transaction.transaction_id)
       .maybeSingle();
     
@@ -4151,31 +4160,31 @@ async function saveToLuckyDraw(transaction) {
       console.error('Error checking existing lucky draw:', checkError);
     }
     
-    // ✅ If already exists, show modal and return
+    // Store the transaction ID for later use
+    window._luckyDrawTransactionId = transaction.transaction_id;
+    
+    // If already exists, show the print modal directly
     if (existing) {
       console.log('Lucky draw entry already exists for this transaction');
-      document.getElementById('luckyTxId').innerText = transaction.transaction_id;
-      document.getElementById('luckyDrawModal').style.display = 'flex';
+      console.log('Prize:', existing.prize_label, 'Value:', existing.discount_value);
+      
+      // Show the print modal with prize info
+      document.getElementById('luckyDrawReceiptNumber').innerText = transaction.transaction_id;
+      document.getElementById('luckyDrawPrizeLabel').innerText = existing.prize_label || 'RM 38 FREE GIFT';
+      document.getElementById('luckyDrawPrintModal').style.display = 'flex';
       return true;
     }
     
-    // ✅ IMPORTANT: DO NOT save the lucky draw result here!
-    // The customer will spin and the result will be saved on the Lucky Draw page
-    console.log('✅ Transaction qualifies - showing Lucky Draw modal WITHOUT saving');
-    
-    // ✅ Show the Lucky Draw modal with transaction ID
+    // Show the lucky draw modal (with Go to Lucky Draw button)
+    console.log('✅ Showing Lucky Draw modal - customer needs to spin');
     const txIdSpan = document.getElementById('luckyTxId');
     if (txIdSpan) {
       txIdSpan.innerText = transaction.transaction_id;
-      console.log('Set transaction ID to:', transaction.transaction_id);
     }
     
     const luckyModal = document.getElementById('luckyDrawModal');
     if (luckyModal) {
       luckyModal.style.display = 'flex';
-      console.log('🎲 Lucky Draw modal displayed');
-    } else {
-      console.error('Lucky draw modal not found!');
     }
     
     return true;
@@ -4186,18 +4195,184 @@ async function saveToLuckyDraw(transaction) {
   }
 }
 
-// Open Lucky Draw link
+// ==================== LUCKY DRAW EVENT LISTENERS ====================
+
+// Open Lucky Draw link AND show print modal
 document.getElementById('openLuckyDrawBtn').addEventListener('click', function() {
   const txId = document.getElementById('luckyTxId').innerText;
-  if (txId && txId !== '') {
-    window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
-    document.getElementById('luckyDrawModal').style.display = 'none';
-  } else {
+  
+  if (!txId || txId === '') {
     showAlertModal('Error', 'No transaction ID found.');
+    return;
+  }
+  
+  // Store the transaction ID globally
+  window._luckyDrawTransactionId = txId;
+  
+  // Open the Lucky Draw page in a new tab
+  window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
+  
+  // Close the lucky draw modal
+  document.getElementById('luckyDrawModal').style.display = 'none';
+  
+  // Show the print modal with a message
+  document.getElementById('luckyDrawReceiptNumber').innerText = txId;
+  document.getElementById('luckyDrawPrizeLabel').innerText = 'Waiting for spin result...';
+  document.getElementById('luckyDrawPrintModal').style.display = 'flex';
+  
+  // Start checking for the lucky draw result
+  checkForLuckyDrawResult(txId);
+});
+
+// Close Lucky Draw Print Modal
+document.getElementById('closeLuckyDrawPrintModal').addEventListener('click', function() {
+  document.getElementById('luckyDrawPrintModal').style.display = 'none';
+  if (window._luckyDrawCheckInterval) {
+    clearInterval(window._luckyDrawCheckInterval);
   }
 });
 
-// Close Lucky Draw Modal function
+document.getElementById('closeLuckyDrawPrintModalBtn').addEventListener('click', function() {
+  document.getElementById('luckyDrawPrintModal').style.display = 'none';
+  if (window._luckyDrawCheckInterval) {
+    clearInterval(window._luckyDrawCheckInterval);
+  }
+});
+
+// Print Prize Voucher
+document.getElementById('printPrizeVoucherBtn').addEventListener('click', async function() {
+  const receiptNumber = document.getElementById('luckyDrawReceiptNumber').innerText;
+  const prizeLabel = document.getElementById('luckyDrawPrizeLabel').innerText;
+  
+  if (!receiptNumber || receiptNumber === '') {
+    await showAlertModal('Error', 'No receipt number found.');
+    return;
+  }
+  
+  if (prizeLabel === 'Waiting for spin result...') {
+    await showAlertModal('Waiting', 'Please wait for the customer to spin and win a prize.');
+    return;
+  }
+  
+  // Check if the lucky draw entry exists
+  try {
+    const { data, error } = await supabase
+      .from('lucky_draw_prizes')
+      .select('*')
+      .eq('receipt', receiptNumber)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking lucky draw:', error);
+      await showAlertModal('Error', 'Failed to check prize status.');
+      return;
+    }
+    
+    if (!data) {
+      await showAlertModal('Not Found', 'No lucky draw prize found for this receipt. Please make sure the customer has spun the wheel.');
+      return;
+    }
+    
+    // Check if printer is connected
+    if (!isPrinterConnected) {
+      showLoading('Printer not connected. Opening Bluetooth selection...');
+      try {
+        await connectPrinter();
+        hideLoading();
+      } catch (err) {
+        hideLoading();
+        await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
+        return;
+      }
+    }
+    
+    // Print the prize voucher
+    const prizeLabelToPrint = data.prize_label || 'RM 38 FREE GIFT';
+    const success = await printPrizeVoucher(prizeLabelToPrint, receiptNumber);
+    
+    if (success) {
+      await showAlertModal('Success', 'Lucky Draw voucher printed successfully!');
+      document.getElementById('luckyDrawPrintModal').style.display = 'none';
+      if (window._luckyDrawCheckInterval) {
+        clearInterval(window._luckyDrawCheckInterval);
+      }
+    } else {
+      await showAlertModal('Print Failed', 'Could not print voucher. Check printer connection.');
+    }
+    
+  } catch (err) {
+    console.error('Print voucher error:', err);
+    await showAlertModal('Error', 'Failed to print voucher: ' + err.message);
+  }
+});
+
+// Check for Lucky Draw Result (polling)
+function checkForLuckyDrawResult(txId) {
+  // Clear any existing interval
+  if (window._luckyDrawCheckInterval) {
+    clearInterval(window._luckyDrawCheckInterval);
+  }
+  
+  let attempts = 0;
+  const maxAttempts = 60; // 60 * 2 seconds = 2 minutes max
+  
+  window._luckyDrawCheckInterval = setInterval(async function() {
+    attempts++;
+    
+    try {
+      const { data, error } = await supabase
+        .from('lucky_draw_prizes')
+        .select('prize_label, discount_value')
+        .eq('receipt', txId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Polling error:', error);
+        return;
+      }
+      
+      if (data) {
+        // Found the prize - update the print modal
+        console.log('✅ Lucky draw prize found!', data);
+        document.getElementById('luckyDrawReceiptNumber').innerText = txId;
+        document.getElementById('luckyDrawPrizeLabel').innerText = data.prize_label || 'RM 38 FREE GIFT';
+        
+        // Update the button text or status
+        const printBtn = document.getElementById('printPrizeVoucherBtn');
+        if (printBtn) {
+          printBtn.disabled = false;
+          printBtn.style.opacity = '1';
+        }
+        
+        // Clear the interval
+        if (window._luckyDrawCheckInterval) {
+          clearInterval(window._luckyDrawCheckInterval);
+          window._luckyDrawCheckInterval = null;
+        }
+        
+        // Show a notification that the prize is ready
+        await showAlertModal('🎉 Prize Ready!', 
+          `The customer has won: ${data.prize_label}\nClick "Print Voucher" to print the prize.`
+        );
+      } else if (attempts >= maxAttempts) {
+        // Timeout - stop checking
+        console.log('⏰ Lucky draw check timed out');
+        if (window._luckyDrawCheckInterval) {
+          clearInterval(window._luckyDrawCheckInterval);
+          window._luckyDrawCheckInterval = null;
+        }
+        
+        document.getElementById('luckyDrawPrizeLabel').innerText = '⚠️ Spin not completed';
+        await showAlertModal('Timeout', 'The customer has not completed the spin. Please ask them to spin the wheel.');
+      }
+      
+    } catch (err) {
+      console.error('Polling error:', err);
+    }
+  }, 2000); // Check every 2 seconds
+}
+
+// Close Lucky Draw Modal
 function closeLuckyDrawModal() {
   const modal = document.getElementById('luckyDrawModal');
   if (modal) {
