@@ -5377,11 +5377,9 @@ async function saveToLuckyDraw(transaction) {
   }
 }
 
-// Open Lucky Draw link
 document.getElementById('openLuckyDrawBtn').addEventListener('click', () => {
   const txId = document.getElementById('luckyTxId').innerText;
-  // You can change this URL to your actual lucky draw page
-  window.open(`https://your-lucky-draw-url.com?receipt=${txId}`, '_blank');
+  window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
   document.getElementById('luckyDrawModal').style.display = 'none';
 });
 
