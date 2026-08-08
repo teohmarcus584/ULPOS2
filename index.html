@@ -4148,7 +4148,7 @@ async function getNextIRSInvoiceNumber() {
     return `INV-${timestamp}`;
   }
 }
-// ==================== LUCKY DRAW FUNCTIONS ====================
+
 
 // ==================== LUCKY DRAW FUNCTIONS ====================
 
@@ -4158,7 +4158,7 @@ async function saveToLuckyDraw(transaction) {
     console.log('Transaction total:', transaction.total);
     
     // Check if transaction qualifies for lucky draw
-    const qualifies = transaction.total >= 100;
+    const qualifies = transaction.total >= 10;
     
     if (!qualifies) {
       console.log('❌ Transaction does not qualify for lucky draw (below RM 100)');
