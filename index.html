@@ -4024,34 +4024,35 @@ async function saveTransactionToSheet(transaction) {
     if (paymentMethod === 'card' || paymentMethod === 'alipay') {
       console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
       
-      try {
-        const invoiceNo = await getNextIRSInvoiceNumber();
-        
-        // ✅ Insert into irs_reporting
-        const { data: irsData, error: irsError } = await supabase
-          .from('irs_reporting')
-          .insert([{
-            invoice_no: invoiceNo,
-            transaction_id: transaction.transaction_id,
-            timestamp: transaction.timestamp,
-            items: JSON.stringify(transaction.items || []),
-            total: transaction.total || 0,
-            store: transaction.store || 'queens',
-            employee_id: transaction.employee_id,
-            employee_name: transaction.employee_name || currentEmployee?.name || ''
-          }])
-          .select();
-        
-        if (irsError) {
-          console.error('❌ IRS reporting error:', irsError);
-          // Log but don't fail the transaction
-          await showAlertModal('IRS Report Error', `Failed to save IRS report: ${irsError.message}`);
-        } else {
-          console.log(`✅ IRS report saved: ${invoiceNo}`, irsData);
-        }
-      } catch (irsErr) {
-        console.error('❌ IRS reporting failed:', irsErr);
-        await showAlertModal('IRS Report Error', `IRS reporting failed: ${irsErr.message}`);
+      // ✅ Generate the invoice number
+      const invoiceNo = await getNextIRSInvoiceNumber();
+      
+      console.log(`📋 Using invoice number: ${invoiceNo}`);
+      
+      const { data: irsData, error: irsError } = await supabase
+        .from('irs_reporting')
+        .insert([{
+          invoice_no: invoiceNo,
+          transaction_id: transaction.transaction_id,
+          timestamp: transaction.timestamp,
+          items: JSON.stringify(transaction.items || []),
+          total: transaction.total || 0,
+          store: transaction.store || 'queens',
+          employee_id: transaction.employee_id,
+          employee_name: transaction.employee_name || currentEmployee?.name || ''
+        }])
+        .select();
+      
+      if (irsError) {
+        console.error('❌ IRS reporting error:', irsError);
+        await showAlertModal('⚠️ IRS Report Warning', 
+          `Transaction saved but IRS report failed.\n` +
+          `Error: ${irsError.message}\n\n` +
+          `Transaction ID: ${transaction.transaction_id}\n` +
+          `Please manually record this transaction for IRS purposes.`
+        );
+      } else {
+        console.log(`✅ IRS report saved: ${invoiceNo}`, irsData);
       }
     }
     
