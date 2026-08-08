@@ -4250,7 +4250,8 @@ async function saveToLuckyDraw(transaction) {
 
 // ==================== LUCKY DRAW EVENT LISTENERS ====================
 
-// Open Lucky Draw link AND show print modal
+
+// Open Lucky Draw link AND show print modal with auto-print
 document.getElementById('openLuckyDrawBtn').addEventListener('click', function() {
   const txId = document.getElementById('luckyTxId').innerText;
   
@@ -4268,12 +4269,12 @@ document.getElementById('openLuckyDrawBtn').addEventListener('click', function()
   // Close the lucky draw modal
   document.getElementById('luckyDrawModal').style.display = 'none';
   
-  // Show the print modal with a message
+  // ✅ Show the print modal with a message
   document.getElementById('luckyDrawReceiptNumber').innerText = txId;
-  document.getElementById('luckyDrawPrizeLabel').innerText = 'Waiting for spin result...';
+  document.getElementById('luckyDrawPrizeLabel').innerText = '🎰 Waiting for spin result...';
   document.getElementById('luckyDrawPrintModal').style.display = 'flex';
   
-  // Start checking for the lucky draw result
+  // ✅ Auto-print will happen when prize is found
   checkForLuckyDrawResult(txId);
 });
 
@@ -4362,13 +4363,11 @@ document.getElementById('printPrizeVoucherBtn').addEventListener('click', async 
 // Check for Lucky Draw Result (polling)
 // ==================== LUCKY DRAW CHECK FUNCTION ====================
 
+// Check for Lucky Draw Result (polling with auto-print)
 function checkForLuckyDrawResult(txId) {
-  console.log('🔍 Starting to check for lucky draw result for:', txId);
-  
   // Clear any existing interval
   if (window._luckyDrawCheckInterval) {
     clearInterval(window._luckyDrawCheckInterval);
-    window._luckyDrawCheckInterval = null;
   }
   
   let attempts = 0;
@@ -4376,12 +4375,11 @@ function checkForLuckyDrawResult(txId) {
   
   window._luckyDrawCheckInterval = setInterval(async function() {
     attempts++;
-    console.log(`🔍 Checking attempt ${attempts}/${maxAttempts} for:`, txId);
     
     try {
       const { data, error } = await supabase
         .from('lucky_draw_prizes')
-        .select('prize_label, discount_value, claimed')
+        .select('prize_label, discount_value')
         .eq('receipt', txId)
         .maybeSingle();
       
@@ -4393,18 +4391,14 @@ function checkForLuckyDrawResult(txId) {
       if (data) {
         // Found the prize - update the print modal
         console.log('✅ Lucky draw prize found!', data);
-        
-        // Update the print modal
         document.getElementById('luckyDrawReceiptNumber').innerText = txId;
-        const prizeLabel = data.prize_label || 'RM 38 FREE GIFT';
-        document.getElementById('luckyDrawPrizeLabel').innerText = prizeLabel;
+        document.getElementById('luckyDrawPrizeLabel').innerText = data.prize_label || 'RM 38 FREE GIFT';
         
-        // Enable the print button
-        const printBtn = document.getElementById('printPrizeVoucherBtn');
-        if (printBtn) {
-          printBtn.disabled = false;
-          printBtn.style.opacity = '1';
-        }
+        // ✅ Auto-print the voucher without waiting for button click
+        console.log('🖨️ Auto-printing voucher...');
+        
+        // Close the print modal
+        document.getElementById('luckyDrawPrintModal').style.display = 'none';
         
         // Clear the interval
         if (window._luckyDrawCheckInterval) {
@@ -4412,10 +4406,37 @@ function checkForLuckyDrawResult(txId) {
           window._luckyDrawCheckInterval = null;
         }
         
-        // Show notification
-        await showAlertModal('🎉 Prize Ready!', 
-          `The customer has won: ${prizeLabel}\n\nClick "Print Voucher" to print the prize.`
-        );
+        // ✅ Print the voucher automatically
+        try {
+          // Check if printer is connected
+          if (!isPrinterConnected) {
+            showLoading('Printer not connected. Opening Bluetooth selection...');
+            try {
+              await connectPrinter();
+              hideLoading();
+            } catch (err) {
+              hideLoading();
+              await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
+              return;
+            }
+          }
+          
+          // Print the prize voucher
+          const prizeLabelToPrint = data.prize_label || 'RM 38 FREE GIFT';
+          const success = await printPrizeVoucher(prizeLabelToPrint, txId);
+          
+          if (success) {
+            await showAlertModal('🎉 Prize Printed!', 
+              `The customer has won: ${data.prize_label}\n\n🖨️ Voucher printed successfully!`
+            );
+          } else {
+            await showAlertModal('Print Failed', 'Could not print voucher. Check printer connection.');
+          }
+          
+        } catch (printErr) {
+          console.error('Print error:', printErr);
+          await showAlertModal('Print Failed', 'Error printing voucher: ' + printErr.message);
+        }
         
       } else if (attempts >= maxAttempts) {
         // Timeout - stop checking
@@ -4426,11 +4447,7 @@ function checkForLuckyDrawResult(txId) {
         }
         
         document.getElementById('luckyDrawPrizeLabel').innerText = '⚠️ Spin not completed';
-        await showAlertModal('⏰ Timeout', 
-          'The customer has not completed the spin.\n\n' +
-          'Please make sure they spin the wheel on the Lucky Draw page.\n' +
-          'You can try again by clicking the Lucky Draw button again.'
-        );
+        await showAlertModal('Timeout', 'The customer has not completed the spin. Please ask them to spin the wheel.');
       }
       
     } catch (err) {
@@ -5062,10 +5079,33 @@ let receiptPollingInterval = null;
 
 async function fetchAndCacheReceipts() {
   try {
-    const { data, error } = await supabase
+    // ✅ For non-admin, only fetch their store
+    let store = null;
+    let employeeId = null;
+    
+    if (currentEmployee && !currentEmployee.isAdmin) {
+      // Non-admin: only their store
+      store = currentStore;
+      employeeId = currentEmployee.id;
+      console.log('🔒 Non-admin fetching receipts for store:', store);
+    }
+    
+    let query = supabase
       .from('transactions')
       .select('*')
       .order('timestamp', { ascending: false });
+    
+    // ✅ Apply store filter for non-admin
+    if (store) {
+      query = query.eq('store', store);
+    }
+    
+    // ✅ Apply employee filter for non-admin
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('❌ fetchAndCacheReceipts error:', error);
@@ -5074,7 +5114,7 @@ async function fetchAndCacheReceipts() {
     }
     
     cachedReceipts = data || [];
-    console.log(`✅ Loaded ${cachedReceipts.length} receipts`);
+    console.log(`✅ Loaded ${cachedReceipts.length} receipts${store ? ' for store: ' + store : ''}`);
     
     const modal = document.getElementById('receiptsModal');
     if (modal && modal.style.display === 'flex') {
@@ -5090,9 +5130,12 @@ async function fetchAndCacheReceipts() {
 
 async function fetchReceipts(store, employeeId, from, to, search) {
   try {
-    console.log('Fetching receipts with filters...');
+    console.log('📜 Fetching receipts with filters...');
     console.log('Store:', store);
     console.log('Employee:', employeeId);
+    console.log('From:', from);
+    console.log('To:', to);
+    console.log('Search:', search);
     
     let query = supabase
       .from('transactions')
@@ -5101,39 +5144,39 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     
     if (store && store !== 'all') {
       query = query.eq('store', store);
-      console.log('Filtering by store:', store);
+      console.log('✅ Filtering by store:', store);
     }
     
     if (employeeId && employeeId !== 'all') {
       query = query.eq('employee_id', employeeId);
-      console.log('Filtering by employee:', employeeId);
+      console.log('✅ Filtering by employee:', employeeId);
     }
     
     if (from) {
       const fromDate = new Date(from + 'T00:00:00+08:00');
       query = query.gte('timestamp', fromDate.toISOString());
-      console.log('From date:', fromDate.toISOString());
+      console.log('✅ From date:', fromDate.toISOString());
     }
     if (to) {
       const toDate = new Date(to + 'T23:59:59+08:00');
       query = query.lte('timestamp', toDate.toISOString());
-      console.log('To date:', toDate.toISOString());
+      console.log('✅ To date:', toDate.toISOString());
     }
     
     if (search) {
       query = query.or(`transaction_id.ilike.%${search}%`);
-      console.log('Search term:', search);
+      console.log('✅ Search term:', search);
     }
     
     const { data, error } = await query;
     if (error) {
-      console.error('fetchReceipts error:', error);
+      console.error('❌ fetchReceipts error:', error);
       cachedReceipts = [];
       renderReceiptsList(cachedReceipts);
       return;
     }
     
-    console.log('Fetched receipts:', data ? data.length : 0);
+    console.log(`✅ Fetched receipts: ${data ? data.length : 0}`);
     
     cachedReceipts = data || [];
     renderReceiptsList(cachedReceipts);
@@ -5142,7 +5185,7 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     if (msg) msg.style.display = 'none';
     
   } catch (err) {
-    console.error('fetchReceipts error:', err);
+    console.error('❌ fetchReceipts error:', err);
     cachedReceipts = [];
     renderReceiptsList(cachedReceipts);
     await showAlertModal('Error', 'Failed to load receipts.');
@@ -5690,7 +5733,7 @@ function updateReceipts() {
   let store;
   let employeeId = 'all';
   
-  // ✅ For non-admin: Force to their specific store, show ALL employees in that store
+  // ✅ For non-admin: Force to their specific store, but show ALL employees
   if (currentEmployee?.isAdmin) {
     // Admin can select store and employee
     const receiptsStore = document.getElementById('receiptsStoreSelect');
@@ -5699,9 +5742,16 @@ function updateReceipts() {
     const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
     employeeId = receiptsEmpSelect ? receiptsEmpSelect.value : 'all';
   } else {
-    // ✅ Non-admin: force to their specific store, show ALL employees in that store
+    // ✅ Non-admin: force to their specific store
     store = currentStore;  // Use the employee's assigned store
-    employeeId = 'all';    // ✅ Show ALL employees in this store!
+    employeeId = 'all';    // Show ALL employees in this store!
+    
+    // ✅ Also make sure the store select shows their store
+    const receiptsStore = document.getElementById('receiptsStoreSelect');
+    if (receiptsStore) {
+      receiptsStore.value = currentStore;
+      receiptsStore.disabled = true;
+    }
   }
 
   const rangeSelect = document.getElementById('receiptsDateRangeSelect');
@@ -10229,7 +10279,11 @@ function updateSyncStatus(success, timestampMs) {
 
 function startReceiptPolling() {
   if (receiptPollingInterval) clearInterval(receiptPollingInterval);
+  
+  // ✅ First fetch with proper filters
   fetchAndCacheReceipts();
+  
+  // ✅ Then poll every 30 seconds with proper filters
   receiptPollingInterval = setInterval(fetchAndCacheReceipts, 30000);
 }
 
