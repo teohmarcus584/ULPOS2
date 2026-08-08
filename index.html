@@ -3976,115 +3976,26 @@ const transaction = {
   }
 }
 
-async function saveTransactionToSheet(transaction) {
-  try {
-    console.log('💾 Saving transaction:', transaction.transaction_id);
-    
-    // 1. Save to transactions table
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert([{
-        transaction_id: transaction.transaction_id,
-        timestamp: transaction.timestamp,
-        items: transaction.items || [],
-        total: transaction.total || 0,
-        payment_method: transaction.payment_method || 'Cash',
-        cash_received: transaction.cash_received || 0,
-        store: transaction.store || 'queens',
-        employee_id: transaction.employee_id,
-        employee_name: transaction.employee_name || currentEmployee?.name || '',
-        settled: transaction.settled || false,
-        refunded: transaction.refunded || false,
-        refund_of: transaction.refund_of || '',
-        original_payment_method: transaction.original_payment_method || '',
-        customer_id: transaction.customer_id || '',
-        points_awarded: transaction.points_awarded || 0,
-        discount: transaction.discount || 0,
-        buy2_free1_discount: transaction.buy2_free1_discount || 0,
-        buy3_free1_discount: transaction.buy3_free1_discount || 0,
-        custom_discount: transaction.custom_discount || 0,
-        refunded_by: transaction.refunded_by || '',
-        staff_discount: transaction.staff_discount || 0,
-        sales_person_name: transaction.sales_person_name || '',
-        sales_person_id: transaction.sales_person_id || ''
-      }])
-      .select();
-    
-    if (error) {
-      console.error('❌ Save transaction error:', error);
-      return false;
-    }
-    
-    console.log('✅ Transaction saved:', data);
-    
-    // 2. ✅ IRS Reporting for Card and Alipay
-    const paymentMethod = String(transaction.payment_method).toLowerCase();
-    
-    if (paymentMethod === 'card' || paymentMethod === 'alipay') {
-      console.log(`📋 Saving to IRS report for ${transaction.payment_method}`);
-      
-      try {
-        const invoiceNo = await getNextIRSInvoiceNumber();
-        
-        // ✅ Insert into irs_reporting
-        const { data: irsData, error: irsError } = await supabase
-          .from('irs_reporting')
-          .insert([{
-            invoice_no: invoiceNo,
-            transaction_id: transaction.transaction_id,
-            timestamp: transaction.timestamp,
-            items: JSON.stringify(transaction.items || []),
-            total: transaction.total || 0,
-            store: transaction.store || 'queens',
-            employee_id: transaction.employee_id,
-            employee_name: transaction.employee_name || currentEmployee?.name || ''
-          }])
-          .select();
-        
-        if (irsError) {
-          console.error('❌ IRS reporting error:', irsError);
-          // Show error but don't fail the transaction
-          await showAlertModal('⚠️ IRS Report Warning', 
-            `Transaction saved but IRS report failed.\nError: ${irsError.message}\n\nPlease manually record this transaction for IRS purposes.`
-          );
-        } else {
-          console.log(`✅ IRS report saved: ${invoiceNo}`, irsData);
-        }
-      } catch (irsErr) {
-        console.error('❌ IRS reporting failed:', irsErr);
-        await showAlertModal('⚠️ IRS Report Warning', 
-          `Transaction saved but IRS reporting failed.\nError: ${irsErr.message}\n\nPlease manually record this transaction.`
-        );
-      }
-    }
-    
-    return true;
-    
-  } catch (err) {
-    console.error('❌ saveTransactionToSheet error:', err);
-    return false;
-  }
-}
-
 async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
     
-    // ✅ Use a transaction to get and increment the counter
-    // First, get the current counter
+    // ✅ Use the counter table
     const { data: counterData, error: counterError } = await supabase
-      .from('invoice_counter')
-      .select('counter')
+      .from('irs_invoice_counter')
+      .select('id, counter')
       .order('id', { ascending: true })
       .limit(1)
       .single();
     
     if (counterError) {
       console.error('❌ Error getting counter:', counterError);
-      // Fallback: get from existing invoices
+      
+      // Fallback: Get the highest invoice number from existing records
       const { data, error } = await supabase
         .from('irs_reporting')
         .select('invoice_no')
+        .not('invoice_no', 'is', null)
         .order('invoice_no', { ascending: false });
       
       if (error || !data || data.length === 0) {
@@ -4093,7 +4004,8 @@ async function getNextIRSInvoiceNumber() {
       
       let highestNum = 0;
       for (const row of data) {
-        const match = row.invoice_no.match(/INV-(\d+)/);
+        const invoice = row.invoice_no;
+        let match = invoice.match(/INV-(\d+)/);
         if (match) {
           const num = parseInt(match[1]);
           if (num > highestNum) highestNum = num;
@@ -4108,12 +4020,34 @@ async function getNextIRSInvoiceNumber() {
     
     // ✅ Increment the counter
     const { error: updateError } = await supabase
-      .from('invoice_counter')
-      .update({ counter: currentCounter + 1 })
+      .from('irs_invoice_counter')
+      .update({ 
+        counter: currentCounter + 1,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', counterData.id);
     
     if (updateError) {
       console.error('❌ Error updating counter:', updateError);
+      // If update fails, try to get the highest and add 1
+      const { data, error } = await supabase
+        .from('irs_reporting')
+        .select('invoice_no')
+        .not('invoice_no', 'is', null)
+        .order('invoice_no', { ascending: false });
+      
+      if (!error && data && data.length > 0) {
+        let highestNum = 0;
+        for (const row of data) {
+          const match = row.invoice_no.match(/INV-(\d+)/);
+          if (match) {
+            const num = parseInt(match[1]);
+            if (num > highestNum) highestNum = num;
+          }
+        }
+        const nextNum = highestNum + 1;
+        return `INV-${String(nextNum).padStart(4, '0')}`;
+      }
     }
     
     console.log(`📋 New IRS invoice number: ${newInvoice}`);
@@ -4121,9 +4055,100 @@ async function getNextIRSInvoiceNumber() {
     
   } catch (err) {
     console.error('❌ getNextIRSInvoiceNumber error:', err);
-    // Fallback: use timestamp
+    // Fallback: use timestamp with random suffix
     const timestamp = Date.now();
-    const fallback = `INV-${timestamp}`;
+    const random = Math.floor(Math.random() * 10000);
+    const fallback = `INV-${timestamp}-${String(random).padStart(4, '0')}`;
+    console.log(`⚠️ Using fallback invoice number: ${fallback}`);
+    return fallback;
+  }
+}
+
+async function getNextIRSInvoiceNumber() {
+  try {
+    console.log('📋 Getting next IRS invoice number...');
+    
+    // ✅ Use a transaction with the counter table
+    // First, get the current counter
+    const { data: counterData, error: counterError } = await supabase
+      .from('irs_invoice_counter')
+      .select('id, counter')
+      .order('id', { ascending: true })
+      .limit(1)
+      .single();
+    
+    if (counterError) {
+      console.error('❌ Error getting counter:', counterError);
+      
+      // Fallback: Get the highest invoice number from existing records
+      const { data, error } = await supabase
+        .from('irs_reporting')
+        .select('invoice_no')
+        .not('invoice_no', 'is', null)
+        .order('invoice_no', { ascending: false });
+      
+      if (error || !data || data.length === 0) {
+        return 'INV-0001';
+      }
+      
+      let highestNum = 0;
+      for (const row of data) {
+        const invoice = row.invoice_no;
+        // Check both INV-XXXX and REF-INV-XXXX formats
+        let match = invoice.match(/INV-(\d+)/);
+        if (match) {
+          const num = parseInt(match[1]);
+          if (num > highestNum) highestNum = num;
+        }
+      }
+      const nextNum = highestNum + 1;
+      return `INV-${String(nextNum).padStart(4, '0')}`;
+    }
+    
+    const currentCounter = counterData?.counter || 1;
+    const newInvoice = `INV-${String(currentCounter).padStart(4, '0')}`;
+    
+    // ✅ Increment the counter
+    const { error: updateError } = await supabase
+      .from('irs_invoice_counter')
+      .update({ 
+        counter: currentCounter + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', counterData.id);
+    
+    if (updateError) {
+      console.error('❌ Error updating counter:', updateError);
+      // If update fails, try to get the highest and add 1
+      const { data, error } = await supabase
+        .from('irs_reporting')
+        .select('invoice_no')
+        .not('invoice_no', 'is', null)
+        .order('invoice_no', { ascending: false });
+      
+      if (!error && data && data.length > 0) {
+        let highestNum = 0;
+        for (const row of data) {
+          const match = row.invoice_no.match(/INV-(\d+)/);
+          if (match) {
+            const num = parseInt(match[1]);
+            if (num > highestNum) highestNum = num;
+          }
+        }
+        const nextNum = highestNum + 1;
+        return `INV-${String(nextNum).padStart(4, '0')}`;
+      }
+    }
+    
+    console.log(`📋 New IRS invoice number: ${newInvoice}`);
+    return newInvoice;
+    
+  } catch (err) {
+    console.error('❌ getNextIRSInvoiceNumber error:', err);
+    // Fallback: use timestamp with random suffix
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    const fallback = `INV-${timestamp}-${String(random).padStart(3, '0')}`;
     console.log(`⚠️ Using fallback invoice number: ${fallback}`);
     return fallback;
   }
