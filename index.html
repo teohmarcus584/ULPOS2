@@ -4091,6 +4091,7 @@ async function getNextIRSInvoiceNumber() {
         const match = invoice.match(/^INV-(\d+)$/);
         if (match) {
           const num = parseInt(match[1]);
+          console.log(`   Found: ${invoice} -> ${num}`);
           if (num > highestNum) {
             highestNum = num;
           }
