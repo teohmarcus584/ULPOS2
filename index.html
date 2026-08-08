@@ -3891,6 +3891,7 @@ const transaction = {
           const newStock = oldStock - item.quantity;
           product.stock = newStock;
           checkAndNotifyOutOfStock(product.id, product.name, newStock);
+		   await saveToLuckyDraw(transaction);
         }
       }
 
@@ -4696,6 +4697,8 @@ async function fetchAndCacheReceipts() {
   }
 }
 
+// ==================== RECEIPT FUNCTIONS ====================
+
 async function fetchReceipts(store, employeeId, from, to, search) {
   try {
     console.log('Fetching receipts with filters...');
@@ -4707,13 +4710,11 @@ async function fetchReceipts(store, employeeId, from, to, search) {
       .select('*')
       .order('timestamp', { ascending: false });
     
-    // ✅ Filter by store if provided and not 'all'
     if (store && store !== 'all') {
       query = query.eq('store', store);
       console.log('Filtering by store:', store);
     }
     
-    // ✅ Filter by employee if provided and not 'all'
     if (employeeId && employeeId !== 'all') {
       query = query.eq('employee_id', employeeId);
       console.log('Filtering by employee:', employeeId);
@@ -4748,7 +4749,6 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     cachedReceipts = data || [];
     renderReceiptsList(cachedReceipts);
     
-    // Hide loading message
     const msg = document.getElementById('receiptsLoadingMsg');
     if (msg) msg.style.display = 'none';
     
@@ -4760,8 +4760,72 @@ async function fetchReceipts(store, employeeId, from, to, search) {
   }
 }
 
+// ✅ ADD THIS FUNCTION - Update Receipts with filters
+function updateReceipts() {
+  let store;
+  let employeeId = 'all';
+  
+  // For non-admin: Force to their specific store, but show ALL employees
+  if (currentEmployee?.isAdmin) {
+    // Admin can select store and employee
+    const receiptsStore = document.getElementById('receiptsStoreSelect');
+    store = receiptsStore ? receiptsStore.value : 'all';
+    
+    const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
+    employeeId = receiptsEmpSelect ? receiptsEmpSelect.value : 'all';
+  } else {
+    // Non-admin: force to their specific store
+    store = currentStore;  // Use the employee's assigned store
+    employeeId = 'all';    // Show ALL employees in this store!
+  }
+
+  const rangeSelect = document.getElementById('receiptsDateRangeSelect');
+  const range = rangeSelect ? rangeSelect.value : 'all';
+  const search = document.getElementById('receiptsSearch').value;
+
+  let from = null, to = null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (range === 'all') {
+    from = '2000-01-01';
+    to = '2100-01-01';
+  } else if (range === 'today') {
+    from = getLocalDateString(today);
+    to = from;
+  } else if (range === 'week') {
+    const start = new Date(today);
+    const dayOfWeek = today.getDay();
+    const diffToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+    start.setDate(today.getDate() - diffToMonday);
+    from = getLocalDateString(start);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    to = getLocalDateString(end);
+  } else if (range === 'month') {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    from = getLocalDateString(start);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    to = getLocalDateString(end);
+  } else if (range === 'year') {
+    const start = new Date(today.getFullYear(), 0, 1);
+    from = getLocalDateString(start);
+    const end = new Date(today.getFullYear(), 11, 31);
+    to = getLocalDateString(end);
+  } else if (range === 'custom') {
+    from = document.getElementById('receiptsFromDate')?.value;
+    to = document.getElementById('receiptsToDate')?.value;
+    if (!from || !to) return;
+  }
+
+  // Pass the correct store and employee filters
+  fetchReceipts(store, employeeId, from, to, search);
+}
+
 function renderReceiptsList(receipts) {
   const container = document.getElementById('receiptsList');
+  if (!container) return;
+  
   if (!receipts || !receipts.length) {
     container.innerHTML = '<div style="text-align:center; padding:30px;">No receipts found.</div>';
     return;
@@ -4805,7 +4869,6 @@ function renderReceiptsList(receipts) {
     for (const rec of dayReceipts) {
       const date = new Date(rec.timestamp).toLocaleString();
       
-      // ✅ FIX: Get employee name from cache or use employee_id
       let employeeName = rec.employee_name;
       if (!employeeName && rec.employee_id) {
         const emp = cachedEmployees.find(e => String(e.id) === String(rec.employee_id));
@@ -4820,8 +4883,6 @@ function renderReceiptsList(receipts) {
         : `<span class="receipt-id">${rec.transaction_id}</span>`;
 
       let itemsHtml = '<div class="receipt-items-list">';
-      
-      // ✅ FIX: Check if items exists and is an array
       const items = Array.isArray(rec.items) ? rec.items : [];
       
       if (items.length === 0) {
@@ -5193,14 +5254,15 @@ async function reprintLuckyDraw(txId) {
   }
 
   try {
+    // ✅ Get the lucky draw prize data from your table
     const { data, error } = await supabase
-      .from('transactions')
+      .from('lucky_draw_prizes')
       .select('*')
-      .eq('transaction_id', txId)
-      .single();
+      .eq('receipt', txId)
+      .maybeSingle();
     
     if (error || !data) {
-      await showAlertModal('Not Found', 'Transaction not found.');
+      await showAlertModal('Not Found', 'No lucky draw entry found for this receipt.');
       return;
     }
 
@@ -5209,14 +5271,16 @@ async function reprintLuckyDraw(txId) {
       return;
     }
     
-    const prizeLabel = data.prize_label || data.prize || 'RM 38 FREE GIFT';
+    const prizeLabel = data.prize_label || 'RM 38 FREE GIFT';
     if (!window.printerAPI || !window.printerAPI.printPrizeVoucher) {
       await showAlertModal('Printer Error', 'Printer not connected or print function unavailable.');
       return;
     }
     
     const success = await window.printerAPI.printPrizeVoucher(prizeLabel, txId);
-    if (!success) {
+    if (success) {
+      await showAlertModal('Success', 'Lucky Draw voucher reprinted successfully!');
+    } else {
       await showAlertModal('Print Failed', 'Could not print voucher. Check printer connection.');
     }
   } catch (err) {
@@ -5240,67 +5304,111 @@ async function fetchReceiptById(txId) {
     return null;
   }
 }
+// ==================== LUCKY DRAW FUNCTIONS ====================
 
-function updateReceipts() {
-  let store;
-  let employeeId = 'all';
-  
-  // ✅ For non-admin: Force to their specific store, but show ALL employees
-  if (currentEmployee?.isAdmin) {
-    // Admin can select store and employee
-    const receiptsStore = document.getElementById('receiptsStoreSelect');
-    store = receiptsStore ? receiptsStore.value : 'all';
+// ==================== LUCKY DRAW FUNCTIONS ====================
+
+async function saveToLuckyDraw(transaction) {
+  try {
+    // Check if transaction qualifies for lucky draw
+    // You can adjust the threshold or make it random
+    const qualifies = transaction.total >= 100; // RM 100 and above
     
-    const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
-    employeeId = receiptsEmpSelect ? receiptsEmpSelect.value : 'all';
-  } else {
-    // ✅ Non-admin: force to their specific store
-    store = currentStore;  // Use the employee's assigned store
-    employeeId = 'all';    // ✅ Show ALL employees in this store!
+    if (!qualifies) {
+      console.log('Transaction does not qualify for lucky draw (below RM 100)');
+      return false;
+    }
+    
+    // Check if this transaction already has a lucky draw entry
+    const { data: existing, error: checkError } = await supabase
+      .from('lucky_draw_prizes')
+      .select('id')
+      .eq('receipt', transaction.transaction_id)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking existing lucky draw:', checkError);
+    }
+    
+    if (existing) {
+      console.log('Lucky draw entry already exists for this transaction');
+      return true;
+    }
+    
+    // Random prize selection
+    const prizes = [
+      { label: 'RM 38 FREE GIFT', value: 38 },
+      { label: 'RM 75 FREE GIFT', value: 75 },
+      { label: 'RM 109 FREE GIFT', value: 109 }
+    ];
+    
+    const selectedPrize = prizes[Math.floor(Math.random() * prizes.length)];
+    
+    // ✅ Match your table columns exactly
+    const { data, error } = await supabase
+      .from('lucky_draw_prizes')
+      .insert([{
+        receipt: transaction.transaction_id,
+        prize_label: selectedPrize.label,
+        discount_value: selectedPrize.value,
+        claimed: false,
+        claimed_at: null,
+        store: transaction.store || currentStore,
+        created_at: new Date().toISOString()
+      }])
+      .select();
+    
+    if (error) {
+      console.error('Error saving to lucky draw:', error);
+      return false;
+    }
+    
+    console.log('✅ Lucky draw entry created:', data);
+    
+    // Show lucky draw modal
+    document.getElementById('luckyTxId').innerText = transaction.transaction_id;
+    document.getElementById('luckyDrawModal').style.display = 'flex';
+    
+    return true;
+    
+  } catch (err) {
+    console.error('Lucky draw error:', err);
+    return false;
   }
-
-  const rangeSelect = document.getElementById('receiptsDateRangeSelect');
-  const range = rangeSelect ? rangeSelect.value : 'all';
-  const search = document.getElementById('receiptsSearch').value;
-
-  let from = null, to = null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (range === 'all') {
-    from = '2000-01-01';
-    to = '2100-01-01';
-  } else if (range === 'today') {
-    from = getLocalDateString(today);
-    to = from;
-  } else if (range === 'week') {
-    const start = new Date(today);
-    const dayOfWeek = today.getDay();
-    const diffToMonday = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
-    start.setDate(today.getDate() - diffToMonday);
-    from = getLocalDateString(start);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    to = getLocalDateString(end);
-  } else if (range === 'month') {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    from = getLocalDateString(start);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    to = getLocalDateString(end);
-  } else if (range === 'year') {
-    const start = new Date(today.getFullYear(), 0, 1);
-    from = getLocalDateString(start);
-    const end = new Date(today.getFullYear(), 11, 31);
-    to = getLocalDateString(end);
-  } else if (range === 'custom') {
-    from = document.getElementById('receiptsFromDate')?.value;
-    to = document.getElementById('receiptsToDate')?.value;
-    if (!from || !to) return;
-  }
-
-  // ✅ Pass the correct store and employee filters
-  fetchReceipts(store, employeeId, from, to, search);
 }
+
+// Open Lucky Draw link
+document.getElementById('openLuckyDrawBtn').addEventListener('click', () => {
+  const txId = document.getElementById('luckyTxId').innerText;
+  // You can change this URL to your actual lucky draw page
+  window.open(`https://your-lucky-draw-url.com?receipt=${txId}`, '_blank');
+  document.getElementById('luckyDrawModal').style.display = 'none';
+});
+
+// Close Lucky Draw Modal
+document.getElementById('luckyDrawModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.style.display = 'none';
+  }
+});
+
+// Add close button to lucky draw modal if it doesn't have one
+// Add this in DOMContentLoaded or anywhere after the modal exists
+setTimeout(function() {
+  const luckyModal = document.getElementById('luckyDrawModal');
+  const container = luckyModal?.querySelector('.modal-container');
+  if (container && !container.querySelector('.close-modal')) {
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'close-modal';
+    closeBtn.id = 'closeLuckyDrawModal';
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = 'position: absolute; top: 16px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #64748b; line-height: 1;';
+    container.prepend(closeBtn);
+    closeBtn.addEventListener('click', function() {
+      document.getElementById('luckyDrawModal').style.display = 'none';
+    });
+  }
+}, 100);
 
 // ==================== SETTLEMENT ====================
 
