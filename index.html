@@ -5923,7 +5923,7 @@ async function refreshSettlementTotals(store, silent = false) {
     return { settled: true, totals: null };
   }
   
-  // ✅ If NOT settled, fetch and show the actual totals
+  // ✅ If NOT settled, fetch and show the actual totals (including refunds)
   console.log('ℹ️ No settlement yet - showing actual totals');
   
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
@@ -5931,6 +5931,7 @@ async function refreshSettlementTotals(store, silent = false) {
   console.log('Report from fetchSalesReport:', report);
   
   if (report) {
+    // ✅ Use the net totals from the report (which already includes refunds)
     const cash = report.cashTotal || 0;
     const card = report.cardTotal || 0;
     const qr = report.otherTotal || 0;
@@ -5953,7 +5954,7 @@ async function refreshSettlementTotals(store, silent = false) {
       const sysAlipay = document.getElementById('sysAlipay');
       if (sysAlipay) sysAlipay.innerText = `RM ${alipay.toFixed(2)}`;
       const sysRefund = document.getElementById('sysRefund');
-      if (sysRefund) sysRefund.innerText = `RM ${Math.abs(refund).toFixed(2)}`;
+      if (sysRefund) sysRefund.innerText = `RM ${refund.toFixed(2)}`;
 
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
@@ -8413,8 +8414,9 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     
     let query = supabase
       .from('transactions')
-      .select('*')
-      .gt('total', 0);  // ✅ EXCLUDE refunds (negative totals)
+      .select('*');
+    
+    // ✅ REMOVED .gt('total', 0) - we need to include refunds to subtract them
     
     if (store && store !== 'all') query = query.eq('store', store);
     if (employeeId && employeeId !== 'all') query = query.eq('employee_id', employeeId);
@@ -8434,7 +8436,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       throw error;
     }
     
-    console.log(`📊 Found ${data?.length || 0} transactions (excluding refunds)`);
+    console.log(`📊 Found ${data?.length || 0} total transactions (including refunds)`);
     
     if (!data || data.length === 0) {
       console.log('ℹ️ No transactions found in date range');
@@ -8466,41 +8468,39 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     }
     
     // ✅ Initialize totals
-    let totalSales = 0;
+    let totalSales = 0;        // All positive sales (including refunded sales)
     let cashTotal = 0;
     let cardTotal = 0;
     let otherTotal = 0;
     let alipayTotal = 0;
-    let refundTotal = 0;
+    let refundTotal = 0;       // Negative amounts from refunds
     let totalItems = 0;
     const refundedTransactionIds = new Set();
-    const refundTransactions = [];
+    let refundTransactionCount = 0;
     
-    // ✅ First pass: Find all refund transactions (they should already be excluded by .gt('total', 0))
-    // But let's double-check
+    // ✅ First pass: Identify refunds
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
-      // Refunds should have been excluded, but just in case
       if (total < 0) {
-        refundTransactions.push(tx);
+        refundTransactionCount++;
         if (tx.refund_of) {
           refundedTransactionIds.add(tx.refund_of);
         }
-        refundTotal += total;
+        refundTotal += total;  // This will be negative
       }
     }
     
-    console.log(`📊 Found ${data.length - refundTransactions.length} sales, ${refundTransactions.length} refunds`);
+    console.log(`📊 Found ${data.length - refundTransactionCount} sales, ${refundTransactionCount} refunds`);
     console.log(`🔄 Refunded transaction IDs:`, [...refundedTransactionIds]);
     
-    // ✅ Second pass: Calculate ALL sales (including refunded ones, but refunds are excluded)
+    // ✅ Second pass: Calculate ALL positive sales
     for (const tx of data) {
       const total = parseFloat(tx.total) || 0;
       
-      // Skip refund transactions (they are negative, but should already be excluded)
+      // Skip refund transactions (they are negative)
       if (total < 0) continue;
       
-      // ✅ Count ALL sales (including ones that were refunded)
+      // ✅ Count ALL positive sales (including ones that were refunded)
       totalSales += total;
       
       const payment = tx.payment_method;
@@ -8523,7 +8523,7 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
       }
     }
     
-    // ✅ Net total = ALL sales + refunds (refunds are negative, but excluded)
+    // ✅ Net total = ALL sales + refunds (refunds are negative)
     const netTotal = totalSales + refundTotal;
     
     console.log(`💰 Total Sales (all): RM ${totalSales.toFixed(2)}`);
@@ -8531,38 +8531,50 @@ async function fetchSalesReport(store, employeeId, from, to, unsettledOnly, sile
     console.log(`💰 Net Total: RM ${netTotal.toFixed(2)}`);
     
     const totals = {
-      totalSales: totalSales,
-      cashTotal: cashTotal,
-      cardTotal: cardTotal,
-      otherTotal: otherTotal,
-      alipayTotal: alipayTotal,
-      refundTotal: refundTotal,
+      totalSales: netTotal,  // ✅ Net sales (sales - refunds)
+      cashTotal: cashTotal + (refundTotal * (cashTotal / (totalSales || 1))), // Pro-rata distribution
+      cardTotal: cardTotal + (refundTotal * (cardTotal / (totalSales || 1))),
+      otherTotal: otherTotal + (refundTotal * (otherTotal / (totalSales || 1))),
+      alipayTotal: alipayTotal + (refundTotal * (alipayTotal / (totalSales || 1))),
+      refundTotal: Math.abs(refundTotal),
       refundedTransactionCount: refundedTransactionIds.size,
-      transactionCount: data.length,
+      transactionCount: data.length - refundTransactionCount,
       totalItems: totalItems,
       netTotal: netTotal
     };
     
+    // ✅ Alternative: Simple distribution of refunds
+    // If there are refunds, subtract them proportionally from payment methods
+    if (refundTotal < 0 && totalSales > 0) {
+      const refundAmount = Math.abs(refundTotal);
+      const ratio = refundAmount / totalSales;
+      
+      totals.cashTotal = cashTotal - (cashTotal * ratio);
+      totals.cardTotal = cardTotal - (cardTotal * ratio);
+      totals.otherTotal = otherTotal - (otherTotal * ratio);
+      totals.alipayTotal = alipayTotal - (alipayTotal * ratio);
+    }
+    
     if (!silent) {
-      document.getElementById('adminReportTotalSales').innerText = `RM ${totalSales.toFixed(2)}`;
-      document.getElementById('adminReportCashTotal').innerText = `RM ${cashTotal.toFixed(2)}`;
-      document.getElementById('adminReportCardTotal').innerText = `RM ${cardTotal.toFixed(2)}`;
-      document.getElementById('adminReportQRTotal').innerText = `RM ${otherTotal.toFixed(2)}`;
-      document.getElementById('adminReportAlipayTotal').innerText = `RM ${alipayTotal.toFixed(2)}`;
-      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(refundTotal).toFixed(2)}`;
-      document.getElementById('adminReportRefundedBills').innerText = refundedTransactionIds.size || 0;
-      document.getElementById('adminReportTransactionCount').innerText = data.length || 0;
-      document.getElementById('adminReportTotalItems').innerText = totalItems || 0;
+      document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
+      document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
+      document.getElementById('adminReportCardTotal').innerText = `RM ${totals.cardTotal.toFixed(2)}`;
+      document.getElementById('adminReportQRTotal').innerText = `RM ${totals.otherTotal.toFixed(2)}`;
+      document.getElementById('adminReportAlipayTotal').innerText = `RM ${totals.alipayTotal.toFixed(2)}`;
+      document.getElementById('adminReportRefundTotal').innerText = `RM ${totals.refundTotal.toFixed(2)}`;
+      document.getElementById('adminReportRefundedBills').innerText = totals.refundedTransactionCount || 0;
+      document.getElementById('adminReportTransactionCount').innerText = totals.transactionCount || 0;
+      document.getElementById('adminReportTotalItems').innerText = totals.totalItems || 0;
       
       // ✅ Update net total in settlement modal
       const sysNetTotal = document.getElementById('sysNetTotal');
       if (sysNetTotal) sysNetTotal.innerText = `RM ${netTotal.toFixed(2)}`;
       
-      // ✅ Also update the settlement fields
-      document.getElementById('actualCash').value = cashTotal.toFixed(2);
-      document.getElementById('actualCard').value = cardTotal.toFixed(2);
-      document.getElementById('actualQR').value = otherTotal.toFixed(2);
-      document.getElementById('actualAlipay').value = alipayTotal.toFixed(2);
+      // ✅ Also update the settlement fields with correct amounts
+      document.getElementById('actualCash').value = totals.cashTotal.toFixed(2);
+      document.getElementById('actualCard').value = totals.cardTotal.toFixed(2);
+      document.getElementById('actualQR').value = totals.otherTotal.toFixed(2);
+      document.getElementById('actualAlipay').value = totals.alipayTotal.toFixed(2);
     }
     
     return totals;
