@@ -4018,7 +4018,7 @@ async function saveTransactionToSheet(transaction) {
     
     console.log('✅ Transaction saved:', data);
     
-    // 2. ✅ IRS Reporting for Card and Alipay (NO payment_method column)
+    // 2. ✅ IRS Reporting for Card and Alipay
     const paymentMethod = String(transaction.payment_method).toLowerCase();
     
     if (paymentMethod === 'card' || paymentMethod === 'alipay') {
@@ -4027,8 +4027,8 @@ async function saveTransactionToSheet(transaction) {
       try {
         const invoiceNo = await getNextIRSInvoiceNumber();
         
-        // ✅ Remove payment_method from IRS insert
-        const { error: irsError } = await supabase
+        // ✅ Insert into irs_reporting
+        const { data: irsData, error: irsError } = await supabase
           .from('irs_reporting')
           .insert([{
             invoice_no: invoiceNo,
@@ -4039,15 +4039,19 @@ async function saveTransactionToSheet(transaction) {
             store: transaction.store || 'queens',
             employee_id: transaction.employee_id,
             employee_name: transaction.employee_name || currentEmployee?.name || ''
-          }]);
+          }])
+          .select();
         
         if (irsError) {
           console.error('❌ IRS reporting error:', irsError);
+          // Log but don't fail the transaction
+          await showAlertModal('IRS Report Error', `Failed to save IRS report: ${irsError.message}`);
         } else {
-          console.log(`✅ IRS report saved: ${invoiceNo}`);
+          console.log(`✅ IRS report saved: ${invoiceNo}`, irsData);
         }
       } catch (irsErr) {
         console.error('❌ IRS reporting failed:', irsErr);
+        await showAlertModal('IRS Report Error', `IRS reporting failed: ${irsErr.message}`);
       }
     }
     
@@ -4071,7 +4075,10 @@ async function getNextIRSInvoiceNumber() {
     
     if (error) {
       console.error('❌ Error getting invoice numbers:', error);
-      throw error;
+      // If table is empty, start from 1
+      const newInvoice = `INV-0001`;
+      console.log(`📋 Starting fresh with: ${newInvoice}`);
+      return newInvoice;
     }
     
     let highestNum = 0;
@@ -5084,27 +5091,30 @@ async function processRefund(transactionId, store) {
 if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
   console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
   
-  // ✅ Use the same function to get next number
-  const invoiceNo = await getNextIRSInvoiceNumber();
-  const refundInvoiceNo = `REF-${invoiceNo}`;
-  
-  const { error: irsError } = await supabase
-    .from('irs_reporting')
-    .insert([{
-      invoice_no: refundInvoiceNo,
-      transaction_id: refundId,
-      timestamp: new Date().toISOString(),
-      items: JSON.stringify(refundItems),
-      total: refundTotal,
-      store: store,
-      employee_id: currentEmployee.id,
-      employee_name: currentEmployee.name
-    }]);
-  
-  if (irsError) {
-    console.error('❌ IRS refund report error:', irsError);
-  } else {
-    console.log(`✅ IRS refund report saved: ${refundInvoiceNo}`);
+  try {
+    const invoiceNo = await getNextIRSInvoiceNumber();
+    const refundInvoiceNo = `REF-${invoiceNo}`;
+    
+    const { error: irsError } = await supabase
+      .from('irs_reporting')
+      .insert([{
+        invoice_no: refundInvoiceNo,
+        transaction_id: refundId,
+        timestamp: new Date().toISOString(),
+        items: JSON.stringify(refundItems),
+        total: refundTotal,
+        store: store,
+        employee_id: currentEmployee.id,
+        employee_name: currentEmployee.name
+      }]);
+    
+    if (irsError) {
+      console.error('❌ IRS refund report error:', irsError);
+    } else {
+      console.log(`✅ IRS refund report saved: ${refundInvoiceNo}`);
+    }
+  } catch (irsErr) {
+    console.error('❌ IRS refund reporting failed:', irsErr);
   }
 }
 
