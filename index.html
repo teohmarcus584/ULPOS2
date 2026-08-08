@@ -2556,6 +2556,14 @@ const LOW_STOCK_THRESHOLD = 5;
 let cachedEmployees = [];
 let employeesLastFetched = 0;
 const EMPLOYEE_CACHE_TTL = 1 * 60 * 1000;
+let currentReceiptFilters = {
+    store: 'all',
+    employee: 'all',
+    from: null,
+    to: null,
+    search: '',
+    range: 'all'
+};
 function openSideMenu() {
     if (stockTakeMode) {
         toggleStockTakeMode();
@@ -5000,30 +5008,61 @@ let receiptPollingInterval = null;
 
 async function fetchAndCacheReceipts() {
   try {
-    // ✅ For non-admin, only fetch their store
-    let store = null;
-    let employeeId = null;
+    console.log('🔄 Auto-refreshing receipts with current filters...');
     
+    // ✅ Use current filters from global variable
+    let store = currentReceiptFilters.store;
+    let employeeId = currentReceiptFilters.employee;
+    let from = currentReceiptFilters.from;
+    let to = currentReceiptFilters.to;
+    let search = currentReceiptFilters.search;
+    
+    // ✅ For non-admin, force to their specific store (override if needed)
     if (currentEmployee && !currentEmployee.isAdmin) {
-      // Non-admin: only their store
       store = currentStore;
-      employeeId = currentEmployee.id;
-      console.log('🔒 Non-admin fetching receipts for store:', store);
+      employeeId = 'all';
+      console.log('🔒 Non-admin auto-refresh for store:', store);
     }
+    
+    // ✅ If no filters set, use defaults
+    if (!store || store === '' || store === undefined) {
+      store = 'all';
+      employeeId = 'all';
+    }
+    
+    console.log('📋 Auto-refresh with filters:', { store, employeeId, from, to, search });
     
     let query = supabase
       .from('transactions')
       .select('*')
       .order('timestamp', { ascending: false });
     
-    // ✅ Apply store filter for non-admin
-    if (store) {
+    // ✅ Apply store filter (if not 'all')
+    if (store && store !== 'all') {
       query = query.eq('store', store);
+      console.log('✅ Auto-refresh filtering by store:', store);
+    } else {
+      console.log('✅ Auto-refresh: Showing ALL stores');
     }
     
-    // ✅ Apply employee filter for non-admin
-    if (employeeId) {
+    // ✅ Apply employee filter (if not 'all')
+    if (employeeId && employeeId !== 'all') {
       query = query.eq('employee_id', employeeId);
+      console.log('✅ Auto-refresh filtering by employee:', employeeId);
+    }
+    
+    // ✅ Apply date filters
+    if (from) {
+      const fromDate = new Date(from + 'T00:00:00+08:00');
+      query = query.gte('timestamp', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to + 'T23:59:59+08:00');
+      query = query.lte('timestamp', toDate.toISOString());
+    }
+    
+    if (search) {
+      query = query.or(`transaction_id.ilike.%${search}%`);
     }
     
     const { data, error } = await query;
@@ -5035,7 +5074,7 @@ async function fetchAndCacheReceipts() {
     }
     
     cachedReceipts = data || [];
-    console.log(`✅ Loaded ${cachedReceipts.length} receipts${store ? ' for store: ' + store : ''}`);
+    console.log(`✅ Auto-refresh loaded ${cachedReceipts.length} receipts with filters`);
     
     const modal = document.getElementById('receiptsModal');
     if (modal && modal.style.display === 'flex') {
@@ -5057,6 +5096,15 @@ async function fetchReceipts(store, employeeId, from, to, search) {
     console.log('From:', from);
     console.log('To:', to);
     console.log('Search:', search);
+    
+    // ✅ SAVE FILTERS FOR AUTO-REFRESH (including admin selection)
+    currentReceiptFilters = {
+      store: store,
+      employee: employeeId,
+      from: from,
+      to: to,
+      search: search || ''
+    };
     
     let query = supabase
       .from('transactions')
@@ -5113,7 +5161,26 @@ async function fetchReceipts(store, employeeId, from, to, search) {
   }
 }
 
+// In DOMContentLoaded or event listeners section:
+document.getElementById('receiptsStoreSelect').addEventListener('change', function() {
+  if (currentEmployee?.isAdmin) {
+    // ✅ Update filters immediately when admin changes store
+    const store = this.value;
+    currentReceiptFilters.store = store;
+    console.log('🔄 Admin changed store to:', store);
+    updateReceipts();
+  }
+});
 
+document.getElementById('receiptsEmployeeSelect').addEventListener('change', function() {
+  if (currentEmployee?.isAdmin) {
+    // ✅ Update filters immediately when admin changes employee
+    const employee = this.value;
+    currentReceiptFilters.employee = employee;
+    console.log('🔄 Admin changed employee to:', employee);
+    updateReceipts();
+  }
+});
 
 function renderReceiptsList(receipts) {
   const container = document.getElementById('receiptsList');
@@ -5654,25 +5721,21 @@ function updateReceipts() {
   let store;
   let employeeId = 'all';
   
-  // ✅ For non-admin: Force to their specific store, but show ALL employees
+  // ✅ For admin: Get selected store from dropdown
   if (currentEmployee?.isAdmin) {
-    // Admin can select store and employee
     const receiptsStore = document.getElementById('receiptsStoreSelect');
     store = receiptsStore ? receiptsStore.value : 'all';
     
     const receiptsEmpSelect = document.getElementById('receiptsEmployeeSelect');
     employeeId = receiptsEmpSelect ? receiptsEmpSelect.value : 'all';
-  } else {
-    // ✅ Non-admin: force to their specific store
-    store = currentStore;  // Use the employee's assigned store
-    employeeId = 'all';    // Show ALL employees in this store!
     
-    // ✅ Also make sure the store select shows their store
-    const receiptsStore = document.getElementById('receiptsStoreSelect');
-    if (receiptsStore) {
-      receiptsStore.value = currentStore;
-      receiptsStore.disabled = true;
-    }
+    // ✅ SAVE ADMIN'S SELECTED STORE FOR AUTO-REFRESH
+    currentReceiptFilters.store = store;
+    currentReceiptFilters.employee = employeeId;
+  } else {
+    // Non-admin: force to their specific store
+    store = currentStore;
+    employeeId = 'all';
   }
 
   const rangeSelect = document.getElementById('receiptsDateRangeSelect');
@@ -5713,6 +5776,18 @@ function updateReceipts() {
     to = document.getElementById('receiptsToDate')?.value;
     if (!from || !to) return;
   }
+
+  // ✅ SAVE CURRENT FILTERS FOR AUTO-REFRESH (including admin selection)
+  currentReceiptFilters = {
+    store: store,
+    employee: employeeId,
+    from: from,
+    to: to,
+    search: search,
+    range: range
+  };
+  
+  console.log('✅ Receipt filters saved for auto-refresh:', currentReceiptFilters);
 
   // ✅ Pass the correct store and employee filters
   fetchReceipts(store, employeeId, from, to, search);
@@ -10198,11 +10273,14 @@ function updateSyncStatus(success, timestampMs) {
 function startReceiptPolling() {
   if (receiptPollingInterval) clearInterval(receiptPollingInterval);
   
-  // ✅ First fetch with proper filters
+  // ✅ First fetch with current filters
   fetchAndCacheReceipts();
   
-  // ✅ Then poll every 30 seconds with proper filters
-  receiptPollingInterval = setInterval(fetchAndCacheReceipts, 30000);
+  // ✅ Poll every 30 seconds with current filters
+  receiptPollingInterval = setInterval(() => {
+    console.log('🔄 Auto-refresh receipts with saved filters...');
+    fetchAndCacheReceipts();
+  }, 30000);
 }
 
 function stopReceiptPolling() {
@@ -10632,18 +10710,21 @@ document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAct
       });
     }
     
-    // Enable store select for admin
+    // ✅ Enable store select for admin and set default
     const receiptsStore = document.getElementById('receiptsStoreSelect');
     if (receiptsStore) {
       receiptsStore.disabled = false;
+      // ✅ If there's a saved filter, use it
+      if (currentReceiptFilters.store && currentReceiptFilters.store !== 'all') {
+        receiptsStore.value = currentReceiptFilters.store;
+      }
     }
     
   } else {
-    // ✅ NON-ADMIN: Hide employee filter (only show store filter)
+    // NON-ADMIN: Hide employee filter (only show store filter)
     const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
     if (receiptsEmpFilter) receiptsEmpFilter.style.display = 'none';
     
-    // ✅ Show store filter but force to their store and disable it
     const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
     if (receiptsStoreFilter) receiptsStoreFilter.style.display = 'flex';
     
@@ -10654,8 +10735,14 @@ document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAct
     }
   }
 
-  // ✅ Populate store dropdowns (this will handle non-admin showing only their store)
+  // ✅ Populate store dropdowns
   populateStoreSelects();
+
+  // ✅ If admin and no filters set, default to 'all'
+  if (currentEmployee?.isAdmin && !currentReceiptFilters.store) {
+    currentReceiptFilters.store = 'all';
+    currentReceiptFilters.employee = 'all';
+  }
 
   // If we have cached receipts, display them
   if (cachedReceipts) {
