@@ -4197,11 +4197,15 @@ async function saveToLuckyDraw(transaction) {
 // Open Lucky Draw link
 document.getElementById('openLuckyDrawBtn').addEventListener('click', function() {
   const txId = document.getElementById('luckyTxId').innerText;
-  window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
-  document.getElementById('luckyDrawModal').style.display = 'none';
+  if (txId && txId !== '') {
+    window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
+    document.getElementById('luckyDrawModal').style.display = 'none';
+  } else {
+    showAlertModal('Error', 'No transaction ID found.');
+  }
 });
 
-// Close Lucky Draw Modal
+// Close Lucky Draw Modal when clicking overlay
 document.getElementById('luckyDrawModal').addEventListener('click', function(e) {
   if (e.target === this) {
     this.style.display = 'none';
@@ -4209,7 +4213,7 @@ document.getElementById('luckyDrawModal').addEventListener('click', function(e) 
 });
 
 // Add close button to lucky draw modal
-setTimeout(function() {
+function addLuckyDrawCloseButton() {
   const luckyModal = document.getElementById('luckyDrawModal');
   const container = luckyModal?.querySelector('.modal-container');
   if (container && !container.querySelector('.close-modal')) {
@@ -4217,13 +4221,16 @@ setTimeout(function() {
     closeBtn.className = 'close-modal';
     closeBtn.id = 'closeLuckyDrawModal';
     closeBtn.innerHTML = '×';
-    closeBtn.style.cssText = 'position: absolute; top: 16px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #64748b; line-height: 1;';
+    closeBtn.style.cssText = 'position: absolute; top: 16px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #64748b; line-height: 1; z-index: 10;';
     container.prepend(closeBtn);
     closeBtn.addEventListener('click', function() {
       document.getElementById('luckyDrawModal').style.display = 'none';
     });
   }
-}, 100);
+}
+
+// Call this after DOM is ready
+setTimeout(addLuckyDrawCloseButton, 500);
 async function getNextIRSInvoiceNumber() {
   try {
     console.log('📋 Getting next IRS invoice number...');
