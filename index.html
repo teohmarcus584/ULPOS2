@@ -3271,50 +3271,97 @@ function renderStockTakeProductGrid() {
   }
   
   let html = '';
-  filtered.forEach(prod => {
-    const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
-    const lowStockClass = isLowStock ? 'low-stock-card' : '';
-    const stockTakeDataItem = stockTakeData[prod.id] || null;
-    const currentCount = stockTakeDataItem ? stockTakeDataItem.counted_stock : prod.stock;
-    const diff = stockTakeDataItem ? stockTakeDataItem.difference : 0;
-    const diffColor = diff > 0 ? '#2c7a4b' : diff < 0 ? '#dc2626' : '#64748b';
-    const diffText = diff > 0 ? `+${diff} higher` : diff < 0 ? `${diff} lower` : '✓ Matches';
-    const diffBg = diff > 0 ? '#f0fdf4' : diff < 0 ? '#fef2f2' : '#f8fafc';
-    const borderColor = diff !== 0 ? (diff > 0 ? '#2c7a4b' : '#dc2626') : '#e2e8f0';
-    const cardBg = diff !== 0 ? (diff > 0 ? '#f0fdf4' : '#fef2f2') : '#f8fafc';
-    
-    html += `
-      <div class="product-card stock-take-card ${lowStockClass}" data-id="${prod.id}" 
-           style="border: 2px solid ${borderColor}; background: ${cardBg};">
-        <div class="product-name" style="font-size: 1rem; font-weight: 600;">${escapeHtml(prod.name)}</div>
-        <div class="product-category" style="font-size: 0.8rem; color: #64748b;">${escapeHtml(prod.category)}</div>
-        <div class="product-price" style="font-size: 0.9rem; color: #2c7a4b;">RM ${prod.price.toFixed(2)}</div>
-        <div class="product-stock" style="font-size: 0.85rem;">
-          System: ${prod.stock}
-          <span class="diff-badge" style="display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; color: ${diffColor}; background: ${diffBg}; border: 1px solid ${diffColor};">
-            ${diffText}
-          </span>
+  
+  // ✅ Check view mode - use grid or list
+  if (viewMode === 'grid') {
+    // Grid view for stock take
+    filtered.forEach(prod => {
+      const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
+      const lowStockClass = isLowStock ? 'low-stock-card' : '';
+      const stockTakeDataItem = stockTakeData[prod.id] || null;
+      const currentCount = stockTakeDataItem ? stockTakeDataItem.counted_stock : prod.stock;
+      const diff = stockTakeDataItem ? stockTakeDataItem.difference : 0;
+      const diffColor = diff > 0 ? '#2c7a4b' : diff < 0 ? '#dc2626' : '#64748b';
+      const diffText = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '✓';
+      const diffBg = diff > 0 ? '#f0fdf4' : diff < 0 ? '#fef2f2' : '#f8fafc';
+      const borderColor = diff !== 0 ? (diff > 0 ? '#2c7a4b' : '#dc2626') : '#e2e8f0';
+      const cardBg = diff !== 0 ? (diff > 0 ? '#f0fdf4' : '#fef2f2') : '#f8fafc';
+      
+      html += `
+        <div class="product-card stock-take-card ${lowStockClass}" data-id="${prod.id}" 
+             style="background: ${cardBg}; border: 2px solid ${borderColor}; border-radius: 16px; padding: 12px; text-align: center;">
+          <div class="product-name" style="font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; word-wrap: break-word;">${escapeHtml(prod.name)}</div>
+          <div class="product-category" style="font-size: 0.7rem; color: #64748b; margin-bottom: 4px;">${escapeHtml(prod.category)}</div>
+          <div class="product-price" style="font-size: 0.9rem; color: #2c7a4b; margin-bottom: 4px;">RM ${prod.price.toFixed(2)}</div>
+          <div style="font-size: 0.75rem; margin-bottom: 8px;">
+            System: ${prod.stock}
+            <span class="diff-badge" style="display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 10px; font-size: 0.65rem; color: ${diffColor}; background: ${diffBg}; border: 1px solid ${diffColor};">
+              ${diffText}
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; justify-content: center;">
+            <button class="stock-take-btn" data-id="${prod.id}" data-action="dec" 
+                    style="background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; cursor: pointer; touch-action: manipulation;">−</button>
+            <input type="number" class="stock-take-input" data-id="${prod.id}" 
+                   value="${currentCount}" step="1" min="0" 
+                   style="width: 55px; text-align: center; border-radius: 20px; border: 2px solid ${borderColor}; padding: 4px; background: ${cardBg}; font-size: 0.9rem; font-weight: 600;">
+            <button class="stock-take-btn" data-id="${prod.id}" data-action="inc" 
+                    style="background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; cursor: pointer; touch-action: manipulation;">+</button>
+          </div>
+          <div class="stock-hint" style="font-size: 0.65rem; color: ${diffColor}; margin-top: 4px;">
+            ${diff !== 0 ? (diff > 0 ? `📈 +${diff}` : `📉 ${diff}`) : '✅ Matches'}
+          </div>
         </div>
-        <div class="inventory-controls" style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 8px;">
-          <button class="stock-take-btn" data-id="${prod.id}" data-action="dec" 
-                  style="background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 30px; font-weight: bold; font-size: 1.2rem; cursor: pointer;">−</button>
-          <input type="number" class="stock-take-input" data-id="${prod.id}" 
-                 value="${currentCount}" step="1" min="0" 
-                 style="width: 70px; text-align: center; border-radius: 20px; border: 2px solid ${borderColor}; padding: 6px; background: ${cardBg}; font-size: 1rem; font-weight: 600;">
-          <button class="stock-take-btn" data-id="${prod.id}" data-action="inc" 
-                  style="background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 30px; font-weight: bold; font-size: 1.2rem; cursor: pointer;">+</button>
+      `;
+    });
+    productGridEl.className = 'product-grid';
+  } else {
+    // List view for stock take
+    filtered.forEach(prod => {
+      const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
+      const lowStockClass = isLowStock ? 'low-stock-card' : '';
+      const stockTakeDataItem = stockTakeData[prod.id] || null;
+      const currentCount = stockTakeDataItem ? stockTakeDataItem.counted_stock : prod.stock;
+      const diff = stockTakeDataItem ? stockTakeDataItem.difference : 0;
+      const diffColor = diff > 0 ? '#2c7a4b' : diff < 0 ? '#dc2626' : '#64748b';
+      const diffText = diff > 0 ? `+${diff} higher` : diff < 0 ? `${diff} lower` : '✓ Matches';
+      const diffBg = diff > 0 ? '#f0fdf4' : diff < 0 ? '#fef2f2' : '#f8fafc';
+      const borderColor = diff !== 0 ? (diff > 0 ? '#2c7a4b' : '#dc2626') : '#e2e8f0';
+      const cardBg = diff !== 0 ? (diff > 0 ? '#f0fdf4' : '#fef2f2') : '#f8fafc';
+      
+      html += `
+        <div class="product-card stock-take-card ${lowStockClass}" data-id="${prod.id}" 
+             style="border: 2px solid ${borderColor}; background: ${cardBg}; padding: 16px 20px;">
+          <div class="product-name" style="font-size: 1rem; font-weight: 600; margin-bottom: 4px;">${escapeHtml(prod.name)}</div>
+          <div class="product-category" style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">${escapeHtml(prod.category)}</div>
+          <div class="product-price" style="font-size: 0.9rem; color: #2c7a4b; margin-bottom: 4px;">RM ${prod.price.toFixed(2)}</div>
+          <div class="product-stock" style="font-size: 0.85rem; margin-bottom: 8px;">
+            System: ${prod.stock}
+            <span class="diff-badge" style="display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; color: ${diffColor}; background: ${diffBg}; border: 1px solid ${diffColor};">
+              ${diffText}
+            </span>
+          </div>
+          <div class="inventory-controls" style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 8px;">
+            <button class="stock-take-btn" data-id="${prod.id}" data-action="dec" 
+                    style="background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 30px; font-weight: bold; font-size: 1.2rem; cursor: pointer; touch-action: manipulation;">−</button>
+            <input type="number" class="stock-take-input" data-id="${prod.id}" 
+                   value="${currentCount}" step="1" min="0" 
+                   style="width: 70px; text-align: center; border-radius: 20px; border: 2px solid ${borderColor}; padding: 6px; background: ${cardBg}; font-size: 1rem; font-weight: 600;">
+            <button class="stock-take-btn" data-id="${prod.id}" data-action="inc" 
+                    style="background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 30px; font-weight: bold; font-size: 1.2rem; cursor: pointer; touch-action: manipulation;">+</button>
+          </div>
+          <div class="stock-hint" style="font-size: 0.75rem; color: ${diffColor}; margin-top: 4px; text-align: center;">
+            ${diff !== 0 ? (diff > 0 ? `📈 Counted ${diff} more than system` : `📉 Counted ${Math.abs(diff)} less than system`) : '✅ Count matches system'}
+          </div>
         </div>
-        <div class="stock-hint" style="font-size: 0.75rem; color: ${diffColor}; margin-top: 4px; text-align: center;">
-          ${diff !== 0 ? (diff > 0 ? `📈 Counted ${diff} more than system` : `📉 Counted ${Math.abs(diff)} less than system`) : '✅ Count matches system'}
-        </div>
-      </div>
-    `;
-  });
+      `;
+    });
+    productGridEl.className = 'product-list';
+  }
   
   productGridEl.innerHTML = html;
-  productGridEl.className = 'product-list';
   
-  // Attach events
+  // ✅ Attach events AFTER rendering
   attachStockTakeEvents();
   updateStockTakeSummary();
 }
@@ -6531,18 +6578,29 @@ async function printSettlementReport(store, date, totals) {
   }
 }
 
+// ==================== REPRINT SETTLEMENT FUNCTIONS ====================
+
 async function fetchSettlementsForStore(store) {
   try {
+    console.log(`🔍 Fetching settlements for store: ${store}`);
+    
+    // ✅ Get ALL settlements for this store, not just the latest ones
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
       .eq('store', store)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .limit(100); // Get last 100 settlements
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ fetchSettlementsForStore error:', error);
+      throw error;
+    }
+    
+    console.log(`✅ Found ${data?.length || 0} settlements for ${store}`);
     return data || [];
   } catch (err) {
-    console.error('fetchSettlementsForStore error:', err);
+    console.error('❌ fetchSettlementsForStore error:', err);
     return [];
   }
 }
@@ -6552,78 +6610,207 @@ async function showReprintSettlementModal() {
   const select = document.getElementById('settlementDateSelect');
   const errorDiv = document.getElementById('reprintSettlementError');
   
+  // Determine which store to use
   let store = currentStore;
   if (!currentEmployee?.isAdmin) {
     store = initialStore;
   }
   
-  select.innerHTML = '<option value="">Loading settlements...</option>';
+  console.log(`📋 Opening reprint modal for store: ${store}`);
+  
+  // Show loading state
+  select.innerHTML = '<option value="">🔄 Loading settlements...</option>';
   errorDiv.style.display = 'none';
   modal.style.display = 'flex';
   
-  const settlements = await fetchSettlementsForStore(store);
-  if (settlements.length === 0) {
-    select.innerHTML = '<option value="">No previous settlements found</option>';
-    return;
+  try {
+    const settlements = await fetchSettlementsForStore(store);
+    
+    if (!settlements || settlements.length === 0) {
+      select.innerHTML = '<option value="">📭 No previous settlements found</option>';
+      return;
+    }
+    
+    console.log(`📋 Found ${settlements.length} settlements to display`);
+    
+    // Build the options list
+    let options = '';
+    let hasValidSettlements = false;
+    
+    settlements.forEach((s, index) => {
+      // Make sure we have valid data
+      if (!s.date) return;
+      
+      hasValidSettlements = true;
+      const displayDate = new Date(s.date).toLocaleDateString('en-MY', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+      
+      const employee = s.employee_name ? ` by ${s.employee_name}` : '';
+      const cashTotal = parseFloat(s.cash_actual) || 0;
+      const cardTotal = parseFloat(s.card_actual) || 0;
+      const qrTotal = parseFloat(s.qr_actual) || 0;
+      const alipayTotal = parseFloat(s.alipay_actual) || 0;
+      const total = cashTotal + cardTotal + qrTotal + alipayTotal;
+      
+      const status = s.collected === true ? '✅ Collected' : '⏳ Pending';
+      
+      // Store the full settlement data as JSON
+      const settlementJson = JSON.stringify(s).replace(/"/g, '&quot;');
+      
+      options += `<option value="${s.id}" data-settlement='${settlementJson}'>
+        ${displayDate}${employee} - RM ${total.toFixed(2)} (${status})
+      </option>`;
+    });
+    
+    if (!hasValidSettlements) {
+      select.innerHTML = '<option value="">📭 No valid settlements found</option>';
+      return;
+    }
+    
+    select.innerHTML = options;
+    console.log(`✅ Populated ${select.options.length} settlements`);
+    
+    // Auto-select the first one
+    if (select.options.length > 0) {
+      select.selectedIndex = 0;
+    }
+    
+  } catch (err) {
+    console.error('❌ Error loading settlements:', err);
+    select.innerHTML = '<option value="">❌ Error loading settlements</option>';
+    errorDiv.innerText = 'Failed to load settlement history. Please try again.';
+    errorDiv.style.display = 'block';
   }
-  
-  let options = '';
-  settlements.forEach(s => {
-    const displayDate = new Date(s.date).toLocaleDateString();
-    const employee = s.employee_name ? ` (by ${s.employee_name})` : '';
-    options += `<option value="${s.date}" data-settlement='${JSON.stringify(s)}'>${displayDate}${employee}</option>`;
-  });
-  select.innerHTML = options;
 }
 
 async function reprintSelectedSettlement() {
   const select = document.getElementById('settlementDateSelect');
   const selectedOption = select.options[select.selectedIndex];
-  if (!selectedOption || !selectedOption.value) {
-    const errorDiv = document.getElementById('reprintSettlementError');
-    errorDiv.innerText = 'Please select a settlement date.';
+  const errorDiv = document.getElementById('reprintSettlementError');
+  
+  // Validate selection
+  if (!selectedOption || !selectedOption.value || selectedOption.value === '') {
+    errorDiv.innerText = '❌ Please select a settlement to reprint.';
     errorDiv.style.display = 'block';
     return;
   }
   
-  const settlementData = JSON.parse(selectedOption.dataset.settlement);
-  const store = currentStore || initialStore;
+  // Parse the settlement data from the option
+  let settlementData;
+  try {
+    const dataAttr = selectedOption.dataset.settlement;
+    if (!dataAttr) {
+      throw new Error('No settlement data found');
+    }
+    settlementData = JSON.parse(dataAttr);
+  } catch (err) {
+    console.error('❌ Error parsing settlement data:', err);
+    errorDiv.innerText = '❌ Failed to parse settlement data. Please try again.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  console.log('📋 Reprinting settlement:', settlementData);
+  
+  // Determine store
+  const store = currentStore || initialStore || settlementData.store;
   const date = settlementData.date;
   
+  // Build totals object for printing
   const totals = {
     cashSystem: settlementData.cash_system || 0,
     cardSystem: settlementData.card_system || 0,
     qrSystem: settlementData.qr_system || 0,
     alipaySystem: settlementData.alipay_system || 0,
     refundSystem: settlementData.refund_system || 0,
-    cashActual: settlementData.cash_actual,
-    cardActual: settlementData.card_actual,
-    qrActual: settlementData.qr_actual,
-    alipayActual: settlementData.alipay_actual,
-    pettyCash: settlementData.petty_cash_float
+    cashActual: settlementData.cash_actual || 0,
+    cardActual: settlementData.card_actual || 0,
+    qrActual: settlementData.qr_actual || 0,
+    alipayActual: settlementData.alipay_actual || 0,
+    pettyCash: settlementData.petty_cash_float || 0
   };
   
-  if (!totals.refundSystem) totals.refundSystem = 0;
+  console.log('📋 Totals for printing:', totals);
   
+  // Check printer connection
   if (!isPrinterConnected) {
-    showLoading('Printer not connected. Opening Bluetooth selection...');
-    try {
-      await connectPrinter();
-      hideLoading();
-    } catch (err) {
-      hideLoading();
-      await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
+    const connectNow = await showConfirmModal(
+      '🖨️ Printer Not Connected',
+      'Would you like to connect a printer to print the settlement report?'
+    );
+    if (connectNow) {
+      showLoading('Opening Bluetooth selection...');
+      try {
+        await connectPrinter();
+        hideLoading();
+      } catch (err) {
+        hideLoading();
+        await showAlertModal('Connection Failed', 'Could not connect to printer. Please try again.');
+        return;
+      }
+    } else {
+      await showAlertModal('Cancelled', 'You can reprint later when a printer is connected.');
       return;
     }
   }
   
-  const printed = await printSettlementReport(store, date, totals);
-  if (printed) {
-    document.getElementById('reprintSettlementModal').style.display = 'none';
-  } else {
-    await showAlertModal('Error', 'Failed to print settlement. Check printer connection.');
+  // Print the settlement
+  showLoading('Printing settlement...');
+  try {
+    const printed = await printSettlementReportWithAnimation(store, date, totals);
+    hideLoading();
+    
+    if (printed) {
+      await showAlertModal('✅ Success', 'Settlement report printed successfully!');
+      document.getElementById('reprintSettlementModal').style.display = 'none';
+    } else {
+      await showAlertModal('❌ Print Failed', 'Failed to print settlement. Please check printer connection.');
+    }
+  } catch (err) {
+    hideLoading();
+    console.error('❌ Reprint error:', err);
+    await showAlertModal('Error', 'Failed to reprint settlement: ' + err.message);
   }
 }
+
+// ==================== EVENT LISTENERS ====================
+
+// Reprint Settlement button
+document.getElementById('reprintSettlementBtn').addEventListener('click', function() {
+  // Close the settlement modal first
+  const settlementModal = document.getElementById('settlementModal');
+  if (settlementModal) settlementModal.style.display = 'none';
+  
+  // Open the reprint modal
+  showReprintSettlementModal();
+});
+
+// Close reprint modal
+document.getElementById('closeReprintModal').addEventListener('click', function() {
+  document.getElementById('reprintSettlementModal').style.display = 'none';
+  // Re-open settlement modal if needed
+  openSettlementModal();
+});
+
+document.getElementById('cancelReprintSettlementBtn').addEventListener('click', function() {
+  document.getElementById('reprintSettlementModal').style.display = 'none';
+  openSettlementModal();
+});
+
+// Confirm reprint
+document.getElementById('confirmReprintSettlementBtn').addEventListener('click', reprintSelectedSettlement);
+
+// Also handle the modal overlay click to close
+document.getElementById('reprintSettlementModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.style.display = 'none';
+    openSettlementModal();
+  }
+});
 
 // ==================== COLLECTION ====================
 
@@ -7515,9 +7702,11 @@ function toggleStockTakeMode() {
 }
 
 function attachStockTakeEvents() {
-  const grid = document.getElementById('stockTakeGrid');
+  // ✅ Use the correct container - productGridEl
+  const grid = productGridEl;
   if (!grid) return;
   
+  // Remove old event listeners to prevent duplicates
   if (grid._clickHandler) {
     grid.removeEventListener('click', grid._clickHandler);
   }
@@ -7559,7 +7748,9 @@ function attachStockTakeEvents() {
   
   grid.addEventListener('click', grid._clickHandler);
   
+  // Also handle direct input changes
   document.querySelectorAll('.stock-take-input').forEach(input => {
+    // Remove old handlers to prevent duplicates
     if (input._changeHandler) {
       input.removeEventListener('change', input._changeHandler);
       input.removeEventListener('input', input._inputHandler);
@@ -7616,50 +7807,58 @@ function updateSingleCard(productId) {
   const data = stockTakeData[productId];
   if (!data) return;
   
-  const card = document.querySelector(`.stock-take-card[data-id="${productId}"]`);
-  if (!card) return;
+  const cards = document.querySelectorAll(`.stock-take-card[data-id="${productId}"]`);
+  if (cards.length === 0) return;
   
   const diffColor = data.difference > 0 ? '#2c7a4b' : data.difference < 0 ? '#dc2626' : '#64748b';
-  const diffText = data.difference > 0 ? `+${data.difference} higher` : data.difference < 0 ? `${data.difference} lower` : '✓ Matches';
   const diffBg = data.difference > 0 ? '#f0fdf4' : data.difference < 0 ? '#fef2f2' : '#f8fafc';
+  const borderColor = data.difference !== 0 ? (data.difference > 0 ? '#2c7a4b' : '#dc2626') : '#e2e8f0';
+  const cardBg = data.difference !== 0 ? (data.difference > 0 ? '#f0fdf4' : '#fef2f2') : '#f8fafc';
   
-  const badge = card.querySelector('.diff-badge');
-  if (badge) {
-    badge.textContent = diffText;
-    badge.style.color = diffColor;
-    badge.style.background = diffBg;
-    badge.style.borderColor = diffColor;
-  }
-  
-  const input = card.querySelector('.stock-take-input');
-  if (input) {
-    input.value = data.counted_stock;
-    const borderColor = data.difference !== 0 ? (data.difference > 0 ? '#2c7a4b' : '#dc2626') : '#10b981';
-    const bgColor = data.difference !== 0 ? (data.difference > 0 ? '#f0fdf4' : '#fef2f2') : '#f0fdf4';
-    input.style.borderColor = borderColor;
-    input.style.background = bgColor;
-  }
-  
-  const hint = card.querySelector('.stock-hint');
-  if (hint) {
-    if (data.difference > 0) {
-      hint.textContent = `📈 Counted ${data.difference} more than system`;
-      hint.style.color = '#2c7a4b';
-    } else if (data.difference < 0) {
-      hint.textContent = `📉 Counted ${Math.abs(data.difference)} less than system`;
-      hint.style.color = '#dc2626';
-    } else {
-      hint.textContent = '✅ Count matches system';
-      hint.style.color = '#2c7a4b';
+  cards.forEach(card => {
+    // Update card border and background
+    card.style.border = `2px solid ${borderColor}`;
+    card.style.background = cardBg;
+    
+    // Update the input field
+    const input = card.querySelector('.stock-take-input');
+    if (input) {
+      input.value = data.counted_stock;
+      input.style.borderColor = borderColor;
+      input.style.background = cardBg;
     }
-  }
-  
-  card.style.border = data.difference !== 0 ? (data.difference > 0 ? '2px solid #2c7a4b' : '2px solid #dc2626') : '1px solid #e2e8f0';
-  card.style.background = data.difference !== 0 ? (data.difference > 0 ? '#f0fdf4' : '#fef2f2') : '#f8fafc';
-  
-  updateStockTakeSummary();
+    
+    // Update all diff badges (both grid and list view)
+    const diffBadges = card.querySelectorAll('.diff-badge');
+    diffBadges.forEach(badge => {
+      let text;
+      if (viewMode === 'grid') {
+        text = data.difference > 0 ? `+${data.difference}` : data.difference < 0 ? `${data.difference}` : '✓';
+      } else {
+        text = data.difference > 0 ? `+${data.difference} higher` : data.difference < 0 ? `${data.difference} lower` : '✓ Matches';
+      }
+      badge.textContent = text;
+      badge.style.color = diffColor;
+      badge.style.background = diffBg;
+      badge.style.borderColor = diffColor;
+    });
+    
+    // Update stock hint
+    const hint = card.querySelector('.stock-hint');
+    if (hint) {
+      let text;
+      if (viewMode === 'grid') {
+        text = data.difference > 0 ? `📈 +${data.difference}` : data.difference < 0 ? `📉 ${data.difference}` : '✅ Matches';
+      } else {
+        text = data.difference > 0 ? `📈 Counted ${data.difference} more than system` : 
+               data.difference < 0 ? `📉 Counted ${Math.abs(data.difference)} less than system` : 
+               '✅ Count matches system';
+      }
+      hint.textContent = text;
+      hint.style.color = diffColor;
+    }
+  });
 }
-
 function updateStockTakeSummary() {
   const totalCounted = Object.keys(stockTakeData).length;
   const diffCount = Object.values(stockTakeData).filter(d => d.difference !== 0).length;
@@ -7856,6 +8055,7 @@ async function loadPendingStockTakeRequests(modal) {
         const items = categoryMap[category];
         const date = items[0]?.timestamp ? new Date(items[0].timestamp).toLocaleString() : 'Unknown';
         const employeeName = items[0]?.employee_name || 'Unknown';
+        const categoryId = `cat_${groupId}_${category.replace(/\s/g, '_')}`;
         
         let tableRowsHtml = '';
         for (const item of items) {
@@ -7868,7 +8068,8 @@ async function loadPendingStockTakeRequests(modal) {
                 <input type="checkbox" class="item-checkbox" 
                        data-request="${item.request_id}" 
                        data-product="${item.product_id}" 
-                       data-group="${groupId}" 
+                       data-group="${groupId}"
+                       data-category="${category}"
                        checked>
               </td>
               <td style="padding:4px 6px; font-weight:500;">${escapeHtml(item.product_name || 'Unknown')}</td>
@@ -7880,7 +8081,7 @@ async function loadPendingStockTakeRequests(modal) {
         }
         
         categorySectionsHtml += `
-          <div style="background:white; border-radius:12px; padding:12px 16px; border:1px solid #e2e8f0; border-left:4px solid #8b5cf6;">
+          <div class="category-section" data-category="${escapeHtml(category)}" data-group="${groupId}" style="background:white; border-radius:12px; padding:12px 16px; border:1px solid #e2e8f0; border-left:4px solid #8b5cf6; margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-weight:600; color:#0f172a;">📂 ${escapeHtml(category)}</span>
@@ -7899,7 +8100,9 @@ async function loadPendingStockTakeRequests(modal) {
                     <th style="text-align:center; padding:4px 6px; width:36px;">
                       <input type="checkbox" class="select-all-category-items" 
                              data-category="${escapeHtml(category)}" 
-                             data-group="${groupId}" checked>
+                             data-group="${groupId}"
+                             data-category-id="${categoryId}"
+                             checked>
                     </th>
                     <th style="text-align:left; padding:4px 6px;">Product</th>
                     <th style="text-align:right; padding:4px 6px;">Current</th>
@@ -7917,7 +8120,7 @@ async function loadPendingStockTakeRequests(modal) {
       }
       
       mainHtml += `
-        <div style="background:#f8fafc; border-radius:16px; padding:16px; margin-bottom:20px; border-left:4px solid #3b82f6;">
+        <div class="store-group" data-group="${groupId}" style="background:#f8fafc; border-radius:16px; padding:16px; margin-bottom:20px; border-left:4px solid #3b82f6;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding-bottom:8px; border-bottom:2px solid #e2e8f0;">
             <div>
               <strong style="font-size:1.3rem;">🏪 ${storeDisplay}</strong>
@@ -7961,62 +8164,96 @@ async function loadPendingStockTakeRequests(modal) {
     
     list.innerHTML = mainHtml;
     
+    // ============================================================
+    // ✅ FIXED: SELECT ALL / DESELECT ALL EVENT HANDLERS
+    // ============================================================
+    
+    // 1. Store-level "Select All" checkbox
     document.querySelectorAll('.select-all-store-items').forEach(selectAll => {
-      selectAll.addEventListener('change', function() {
+      selectAll.addEventListener('change', function(e) {
+        e.stopPropagation();
         const groupId = this.dataset.group;
         const isChecked = this.checked;
+        
+        // Select/deselect ALL checkboxes in this store group
         document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`).forEach(cb => {
           cb.checked = isChecked;
         });
+        
+        // Also update all category-level "Select All" checkboxes
         document.querySelectorAll(`.select-all-category-items[data-group="${groupId}"]`).forEach(cb => {
           cb.checked = isChecked;
         });
+        
         updateStoreGroupCounts(groupId);
       });
     });
     
+    // 2. Category-level "Select All" checkbox - FIXED
     document.querySelectorAll('.select-all-category-items').forEach(selectAll => {
-      selectAll.addEventListener('change', function() {
+      selectAll.addEventListener('change', function(e) {
+        e.stopPropagation();
         const groupId = this.dataset.group;
         const category = this.dataset.category;
         const isChecked = this.checked;
         
-        const categorySection = this.closest('div[data-category]');
+        // ✅ Find the category section using the data attributes
+        const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
+        
         if (categorySection) {
+          // Select/deselect all item checkboxes in this category
           const checkboxes = categorySection.querySelectorAll('.item-checkbox');
           checkboxes.forEach(cb => {
             cb.checked = isChecked;
           });
+        } else {
+          // Fallback: find by closest parent
+          const parentDiv = this.closest('.category-section');
+          if (parentDiv) {
+            const checkboxes = parentDiv.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(cb => {
+              cb.checked = isChecked;
+            });
+          }
         }
+        
+        // Update store-level "Select All" checkbox state
+        updateStoreSelectAllState(groupId);
         updateStoreGroupCounts(groupId);
       });
     });
     
+    // 3. Individual item checkboxes
     document.querySelectorAll('.item-checkbox').forEach(cb => {
-      cb.addEventListener('change', function() {
+      cb.addEventListener('change', function(e) {
+        e.stopPropagation();
         const groupId = this.dataset.group;
-        const categorySection = this.closest('div[data-category]');
+        const category = this.dataset.category;
         
+        // Update category-level "Select All" checkbox
+        const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
         if (categorySection) {
           const allCategoryItems = categorySection.querySelectorAll('.item-checkbox');
           const checkedCategoryItems = categorySection.querySelectorAll('.item-checkbox:checked');
           const selectAllCategory = categorySection.querySelector('.select-all-category-items');
           if (selectAllCategory) {
-            selectAllCategory.checked = allCategoryItems.length === checkedCategoryItems.length;
+            selectAllCategory.checked = allCategoryItems.length > 0 && allCategoryItems.length === checkedCategoryItems.length;
           }
         }
         
-        const allStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
-        const checkedStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]:checked`);
-        const selectAllStore = document.querySelector(`.select-all-store-items[data-group="${groupId}"]`);
-        if (selectAllStore) {
-          selectAllStore.checked = allStoreItems.length === checkedStoreItems.length;
-        }
-        
+        // Update store-level "Select All" checkbox
+        updateStoreSelectAllState(groupId);
         updateStoreGroupCounts(groupId);
       });
     });
     
+    // 4. Store group count updates
+    document.querySelectorAll('.approve-store-group-btn, .reject-store-group-btn').forEach(btn => {
+      const groupId = btn.dataset.group;
+      updateStoreGroupCounts(groupId);
+    });
+    
+    // 5. APPROVE button handler
     document.querySelectorAll('.approve-store-group-btn').forEach(btn => {
       btn.addEventListener('click', function() {
         const groupId = this.dataset.group;
@@ -8024,16 +8261,12 @@ async function loadPendingStockTakeRequests(modal) {
       });
     });
     
+    // 6. REJECT button handler
     document.querySelectorAll('.reject-store-group-btn').forEach(btn => {
       btn.addEventListener('click', function() {
         const groupId = this.dataset.group;
         rejectStoreGroup(groupId, modal);
       });
-    });
-    
-    document.querySelectorAll('.approve-store-group-btn, .reject-store-group-btn').forEach(btn => {
-      const groupId = btn.dataset.group;
-      updateStoreGroupCounts(groupId);
     });
     
   } catch (err) {
@@ -8042,6 +8275,17 @@ async function loadPendingStockTakeRequests(modal) {
   }
 }
 
+// ✅ Helper function to update store-level "Select All" checkbox state
+function updateStoreSelectAllState(groupId) {
+  const allStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
+  const checkedStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]:checked`);
+  const selectAllStore = document.querySelector(`.select-all-store-items[data-group="${groupId}"]`);
+  if (selectAllStore) {
+    selectAllStore.checked = allStoreItems.length > 0 && allStoreItems.length === checkedStoreItems.length;
+  }
+}
+
+// ✅ Updated updateStoreGroupCounts function
 function updateStoreGroupCounts(groupId) {
   const checkedItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]:checked`);
   const totalItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
@@ -8055,11 +8299,47 @@ function updateStoreGroupCounts(groupId) {
     approveBtn.innerHTML = `✅ Approve Selected (${count}/${total})`;
     approveBtn.disabled = count === 0;
     approveBtn.style.opacity = count === 0 ? '0.5' : '1';
+    approveBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
   }
   if (rejectBtn) {
     rejectBtn.innerHTML = `❌ Reject Selected (${count}/${total})`;
     rejectBtn.disabled = count === 0;
     rejectBtn.style.opacity = count === 0 ? '0.5' : '1';
+    rejectBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+  }
+}
+
+// ✅ Helper function to update store-level "Select All" checkbox state
+function updateStoreSelectAllState(groupId) {
+  const allStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
+  const checkedStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]:checked`);
+  const selectAllStore = document.querySelector(`.select-all-store-items[data-group="${groupId}"]`);
+  if (selectAllStore) {
+    selectAllStore.checked = allStoreItems.length > 0 && allStoreItems.length === checkedStoreItems.length;
+  }
+}
+
+// ✅ Updated updateStoreGroupCounts function
+function updateStoreGroupCounts(groupId) {
+  const checkedItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]:checked`);
+  const totalItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
+  const count = checkedItems.length;
+  const total = totalItems.length;
+  
+  const approveBtn = document.querySelector(`.approve-store-group-btn[data-group="${groupId}"]`);
+  const rejectBtn = document.querySelector(`.reject-store-group-btn[data-group="${groupId}"]`);
+  
+  if (approveBtn) {
+    approveBtn.innerHTML = `✅ Approve Selected (${count}/${total})`;
+    approveBtn.disabled = count === 0;
+    approveBtn.style.opacity = count === 0 ? '0.5' : '1';
+    approveBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+  }
+  if (rejectBtn) {
+    rejectBtn.innerHTML = `❌ Reject Selected (${count}/${total})`;
+    rejectBtn.disabled = count === 0;
+    rejectBtn.style.opacity = count === 0 ? '0.5' : '1';
+    rejectBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
   }
 }
 
