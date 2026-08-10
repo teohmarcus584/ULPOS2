@@ -10303,7 +10303,35 @@ async function backgroundSync() {
       return;
     }
     
-    // ... rest of the function
+    const { hash: cachedHash } = JSON.parse(cached);
+    
+    // ✅ FIX: Get all products and calculate hash based on store-specific stock
+    const { data, error } = await supabase
+      .from('products')
+      .select('*');
+    
+    if (error) throw error;
+    
+    const stockColumn = `stock_${store}`;
+    const newHash = JSON.stringify(data.map(p => ({ 
+      id: p.id, 
+      stock: p[stockColumn] 
+    })));
+    
+    if (newHash !== cachedHash) {
+      console.log("Hash mismatch, updating products...");
+      const wasInStockTakeMode = stockTakeMode;
+      await fetchProductsFromSheet(true);
+      if (wasInStockTakeMode && !stockTakeMode) {
+        stockTakeMode = true;
+        renderStockTakeProductGrid();
+      }
+    } else {
+      updateSyncStatus(true, Date.now());
+      if (!stockTakeMode) {
+        renderProductGrid();
+      }
+    }
   } catch (err) {
     console.warn("Background sync failed:", err);
     updateSyncStatus(false);
