@@ -7262,6 +7262,25 @@ function renderStockTakeProductGrid() {
   const searchTerm = searchInput.value.toLowerCase();
   const selectedCategory = categorySelect.value;
   
+  // ✅ SAVE SCROLL POSITION BEFORE RENDERING
+  const scrollContainer = productGridEl.parentElement;
+  const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+  const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+  
+  // ✅ Also save which product IDs were visible (optional, for better UX)
+  const visibleProductIds = [];
+  if (scrollContainer) {
+    const visibleCards = scrollContainer.querySelectorAll('.stock-take-card');
+    visibleCards.forEach(card => {
+      const rect = card.getBoundingClientRect();
+      const containerRect = scrollContainer.getBoundingClientRect();
+      if (rect.top >= containerRect.top - 50 && rect.top <= containerRect.bottom) {
+        const id = card.dataset.id;
+        if (id) visibleProductIds.push(id);
+      }
+    });
+  }
+  
   let filtered = products.slice();
   if (selectedCategory !== 'all') {
     filtered = filtered.filter(p => p.category === selectedCategory);
@@ -7346,14 +7365,34 @@ function renderStockTakeProductGrid() {
   
   html += '</div>';
   
-  const scrollContainer = productGridEl.parentElement;
-  const savedScroll = scrollContainer ? scrollContainer.scrollTop : 0;
-  
+  // ✅ RESTORE SCROLL POSITION
   productGridEl.innerHTML = html;
   productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
   
+  // ✅ Restore scroll position
   if (scrollContainer) {
-    scrollContainer.scrollTop = savedScroll;
+    // Try to restore to exact scroll position first
+    scrollContainer.scrollTop = savedScrollTop;
+    scrollContainer.scrollLeft = savedScrollLeft;
+    
+    // If that doesn't work (e.g., content height changed), try to find the first visible product
+    // and scroll to it after a small delay
+    if (visibleProductIds.length > 0) {
+      setTimeout(() => {
+        // Find the first visible product card that was visible before
+        for (const id of visibleProductIds) {
+          const card = document.querySelector(`.stock-take-card[data-id="${id}"]`);
+          if (card) {
+            card.scrollIntoView({ block: 'center', behavior: 'instant' });
+            break;
+          }
+        }
+        // If none of the previously visible products are found, use the saved scroll position
+        if (scrollContainer.scrollTop === 0 && savedScrollTop > 0) {
+          scrollContainer.scrollTop = savedScrollTop;
+        }
+      }, 50);
+    }
   }
   
   attachStockTakeEvents();
@@ -10242,6 +10281,13 @@ async function backgroundSync() {
   if (syncInProgress) return;
   syncInProgress = true;
   try {
+    // ✅ SKIP BACKGROUND SYNC IF IN STOCK TAKE MODE
+    if (stockTakeMode) {
+      console.log('⏸️ Background sync paused - Stock Take mode active');
+      syncInProgress = false;
+      return;
+    }
+    
     const store = currentStore;
     const cacheKey = `products_${store}`;
     const hashKey = `products_hash_${store}`;
@@ -10257,35 +10303,7 @@ async function backgroundSync() {
       return;
     }
     
-    const { hash: cachedHash } = JSON.parse(cached);
-    
-    // ✅ FIX: Get all products and calculate hash based on store-specific stock
-    const { data, error } = await supabase
-      .from('products')
-      .select('*');
-    
-    if (error) throw error;
-    
-    const stockColumn = `stock_${store}`;
-    const newHash = JSON.stringify(data.map(p => ({ 
-      id: p.id, 
-      stock: p[stockColumn] 
-    })));
-    
-    if (newHash !== cachedHash) {
-      console.log("Hash mismatch, updating products...");
-      const wasInStockTakeMode = stockTakeMode;
-      await fetchProductsFromSheet(true);
-      if (wasInStockTakeMode && !stockTakeMode) {
-        stockTakeMode = true;
-        renderStockTakeProductGrid();
-      }
-    } else {
-      updateSyncStatus(true, Date.now());
-      if (!stockTakeMode) {
-        renderProductGrid();
-      }
-    }
+    // ... rest of the function
   } catch (err) {
     console.warn("Background sync failed:", err);
     updateSyncStatus(false);
@@ -10964,7 +10982,7 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   
   console.log('✅ Settlement check passed. Ready to record:', window._settlementData);
 });
-  // Record Settlement button
+ // Record Settlement button - UPDATED with auto-print
 document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
   if (!window._settlementData) {
     await showAlertModal('Error', 'No settlement data found. Please check again.');
@@ -10997,6 +11015,55 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
         : `Settlement for ${data.store} on ${data.date} has been recorded successfully.`;
       
       await showAlertModal('✅ Settlement Complete', message);
+      
+      // ✅ AUTO-PRINT SETTLEMENT REPORT
+      console.log('🖨️ Auto-printing settlement report...');
+      
+      // Check if printer is connected
+      if (!isPrinterConnected) {
+        const connectNow = await showConfirmModal(
+          '🖨️ Printer Not Connected',
+          'Would you like to connect a printer to print the settlement report?'
+        );
+        if (connectNow) {
+          showLoading('Opening Bluetooth selection...');
+          try {
+            await connectPrinter();
+            hideLoading();
+          } catch (err) {
+            hideLoading();
+            await showAlertModal('Connection Failed', 'Could not connect to printer. You can print later from Settlement History.');
+          }
+        } else {
+          await showAlertModal('📋 Reminder', 'Settlement report was not printed. You can reprint later from Settlement History.');
+        }
+      }
+      
+           // Print the settlement report if printer is connected
+      if (isPrinterConnected) {
+        const printed = await printSettlementReportWithAnimation(
+          data.store,
+          data.date,
+          {
+            cashSystem: data.cashSystem,
+            cardSystem: data.cardSystem,
+            qrSystem: data.qrSystem,
+            alipaySystem: data.alipaySystem,
+            refundSystem: data.refundSystem,
+            cashActual: data.cashActual,
+            cardActual: data.cardActual,
+            qrActual: data.qrActual,
+            alipayActual: data.alipayActual,
+            pettyCash: data.pettyCashFloat
+          }
+        );
+        
+        if (printed) {
+          await showAlertModal('✅ Settlement Printed', 'Settlement report has been printed successfully.');
+        } else {
+          await showAlertModal('⚠️ Print Failed', 'Settlement recorded but print failed. You can reprint later from Settlement History.');
+        }
+      }
       
       // Close modal and refresh
       document.getElementById('settlementModal').style.display = 'none';
@@ -11592,7 +11659,131 @@ async function processPromoBarcode(code) {
     document.getElementById('promoVoucherError').style.display = 'block';
   }
 }
-
+async function printSettlementReportWithAnimation(store, date, totals) {
+  return new Promise(async (resolve) => {
+    if (!isPrinterConnected || !printerCharacteristic) {
+      await showAlertModal('Printer not connected', 'Settlement recorded but could not print report. Please connect printer.');
+      resolve(false);
+      return;
+    }
+    
+    // Show print animation container
+    const printContainer = document.createElement('div');
+    printContainer.className = 'receipt-print-container';
+    printContainer.id = 'settlementPrintContainer';
+    printContainer.innerHTML = `
+      <div class="printer-icon" id="settlementPrintIcon">🖨️</div>
+      <div class="printing-status" id="settlementPrintStatus">🖨️ Printing Settlement Report...</div>
+      <div class="printing-subtitle" id="settlementPrintSubtitle">Please wait, paper is feeding out</div>
+      <div class="paper-animation">
+        <div class="paper-strip" id="settlementPrintPaper">
+          <span class="line center bold">═══ SETTLEMENT REPORT ═══</span>
+          <span class="line center" id="settlementStoreLine">${store}</span>
+          <span class="line center" id="settlementDateLine">${date}</span>
+          <span class="line">Cash: RM ${(totals.cashSystem || 0).toFixed(2)}</span>
+          <span class="line">Card: RM ${(totals.cardSystem || 0).toFixed(2)}</span>
+          <span class="line">QR Pay: RM ${(totals.qrSystem || 0).toFixed(2)}</span>
+          <span class="line total">TOTAL: RM ${((totals.cashActual || 0) + (totals.cardActual || 0) + (totals.qrActual || 0) + (totals.alipayActual || 0)).toFixed(2)}</span>
+          <span class="line center">Thank you!</span>
+        </div>
+        <div class="paper-slot"></div>
+      </div>
+      <div class="progress-wrapper">
+        <div class="progress-bar">
+          <div class="progress-fill" id="settlementPrintProgress"></div>
+        </div>
+        <div class="progress-label">
+          <span id="settlementPrintProgressText">0%</span>
+          <span id="settlementPrintProgressStatus">⏳ Printing...</span>
+        </div>
+      </div>
+      <button class="cancel-print-btn" id="settlementPrintCancel">✕ Cancel</button>
+    `;
+    document.body.appendChild(printContainer);
+    printContainer.style.display = 'flex';
+    
+    let cancelled = false;
+    let progress = 0;
+    
+    document.getElementById('settlementPrintCancel')?.addEventListener('click', () => {
+      cancelled = true;
+      printContainer.style.display = 'none';
+      printContainer.remove();
+      resolve(false);
+    });
+    
+    const paperStrip = document.getElementById('settlementPrintPaper');
+    if (paperStrip) {
+      paperStrip.classList.add('animating');
+    }
+    
+    try {
+      const progressInterval = setInterval(() => {
+        if (cancelled) {
+          clearInterval(progressInterval);
+          return;
+        }
+        progress += Math.random() * 12 + 3;
+        if (progress > 100) progress = 100;
+        document.getElementById('settlementPrintProgress').style.width = progress + '%';
+        document.getElementById('settlementPrintProgressText').textContent = Math.round(progress) + '%';
+        
+        const statusEl = document.getElementById('settlementPrintProgressStatus');
+        if (statusEl) {
+          if (progress < 30) statusEl.textContent = '⏳ Feeding paper...';
+          else if (progress < 60) statusEl.textContent = '📝 Printing content...';
+          else if (progress < 85) statusEl.textContent = '📄 Almost done...';
+          else statusEl.textContent = '✂️ Cutting...';
+        }
+        
+        if (progress >= 100) {
+          clearInterval(progressInterval);
+        }
+      }, 150);
+      
+      const result = await printSettlementReport(store, date, totals);
+      
+      clearInterval(progressInterval);
+      
+      if (!cancelled) {
+        document.getElementById('settlementPrintProgress').style.width = '100%';
+        document.getElementById('settlementPrintProgressText').textContent = '100%';
+        document.getElementById('settlementPrintProgressStatus').textContent = '✅ Done!';
+        
+        const statusEl = document.getElementById('settlementPrintStatus');
+        if (statusEl) {
+          statusEl.textContent = '✅ Settlement Printed!';
+          statusEl.style.color = '#059669';
+        }
+        document.getElementById('settlementPrintSubtitle').textContent = 'Paper has been fully fed out';
+        
+        if (paperStrip) {
+          paperStrip.style.height = '75px';
+          paperStrip.style.opacity = '1';
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        printContainer.style.display = 'none';
+        printContainer.remove();
+        resolve(true);
+      }
+    } catch (err) {
+      console.error('Print error:', err);
+      const statusEl = document.getElementById('settlementPrintStatus');
+      if (statusEl) {
+        statusEl.textContent = '❌ Print Failed';
+        statusEl.style.color = '#ef4444';
+      }
+      document.getElementById('settlementPrintSubtitle').textContent = 'Please check printer connection';
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      printContainer.style.display = 'none';
+      printContainer.remove();
+      resolve(false);
+    }
+  });
+}
 async function printPromoVoucher(description, voucherId, validFrom, validTill) {
   if (!isPrinterConnected || !printerCharacteristic) return false;
 
