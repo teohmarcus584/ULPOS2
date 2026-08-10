@@ -1921,6 +1921,145 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   display: inline-block;
   margin-left: 8px;
 }
+/* ============================================================
+   MOBILE FRIENDLY - STOCK TAKE MODE
+   ============================================================ */
+
+/* Stock Take Mode - Mobile Friendly Font Sizes */
+.stock-take-card .product-name {
+  font-size: 0.9rem !important;
+}
+
+.stock-take-card .product-category {
+  font-size: 0.7rem !important;
+}
+
+.stock-take-card .product-stock {
+  font-size: 0.8rem !important;
+}
+
+.stock-take-card .diff-badge {
+  font-size: 0.75rem !important;
+  padding: 2px 8px !important;
+}
+
+.stock-take-btn {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 1rem !important;
+}
+
+.stock-take-input {
+  width: 60px !important;
+  padding: 6px !important;
+  font-size: 0.85rem !important;
+}
+
+.stock-take-card .stock-hint {
+  font-size: 0.65rem !important;
+}
+
+/* Stock Take Header - Mobile Friendly */
+#stockTakeHeader {
+  font-size: 0.85rem !important;
+  padding: 10px 12px !important;
+}
+
+#stockTakeHeader strong {
+  font-size: 0.95rem !important;
+}
+
+#stockTakeHeader span {
+  font-size: 0.75rem !important;
+}
+
+/* Stock Take Mode Indicator */
+#stockTakeModeIndicator {
+  font-size: 0.85rem !important;
+  padding: 10px !important;
+}
+
+#stockTakeModeIndicator strong {
+  font-size: 0.95rem !important;
+}
+
+#stockTakeModeIndicator span {
+  font-size: 0.8rem !important;
+}
+
+/* Submit Stock Take Button */
+#submitStockTakeBtn {
+  font-size: 0.9rem !important;
+  padding: 10px 20px !important;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 780px) {
+  .stock-take-card {
+    padding: 12px 10px !important;
+  }
+  
+  .stock-take-card .product-name {
+    font-size: 0.85rem !important;
+  }
+  
+  .stock-take-input {
+    width: 50px !important;
+    padding: 4px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  .stock-take-btn {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 0.9rem !important;
+  }
+  
+  #stockTakeHeader {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+  
+  #stockTakeHeader div:last-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    font-size: 0.7rem !important;
+  }
+}
+
+/* Reduce cart font sizes when collapsed */
+.cart-panel.collapsed .cart-handle-icon {
+  font-size: 1.2rem !important;
+}
+
+/* Ensure stock take grid is scrollable */
+#stockTakeGrid {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+/* Product list view in stock take - mobile friendly */
+.product-list .stock-take-card {
+  padding: 10px 14px !important;
+}
+
+.product-list .stock-take-card .product-name {
+  font-size: 0.9rem !important;
+}
+
+.product-list .stock-take-card .product-category {
+  font-size: 0.7rem !important;
+}
+
+.product-list .stock-take-card .product-stock {
+  font-size: 0.8rem !important;
+}
+
+.product-list .stock-take-card .diff-badge {
+  font-size: 0.7rem !important;
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -6074,6 +6213,7 @@ async function refreshSettlementTotals(store, silent = false) {
     return { settled: false, totals: null };
   }
 }
+
 async function getUnsettledTransactionCount(store, date) {
   try {
     console.log(`🔍 Checking unsettled transactions for ${store} on ${date}`);
@@ -7277,156 +7417,34 @@ let stockTakeData = {};
 
 function toggleStockTakeMode() {
   stockTakeMode = !stockTakeMode;
+  const cartPanel = document.querySelector('.cart-panel');
+  const cartHandle = document.getElementById('cartHandle');
+  const iconSpan = cartHandle ? cartHandle.querySelector('.cart-handle-icon') : null;
+  
   if (stockTakeMode) {
     stockTakeData = {};
     document.getElementById('stockTakeModeIndicator').style.display = 'block';
     document.getElementById('submitStockTakeBtn').style.display = 'block';
     renderStockTakeProductGrid();
+    
+    // ✅ COLLAPSE CART WHEN ENTERING STOCK TAKE MODE
+    if (cartPanel && !cartPanel.classList.contains('collapsed')) {
+      cartPanel.classList.add('collapsed');
+      if (iconSpan) iconSpan.textContent = '🛒';
+      localStorage.setItem('cartCollapsed', 'true');
+    }
   } else {
     document.getElementById('stockTakeModeIndicator').style.display = 'none';
     document.getElementById('submitStockTakeBtn').style.display = 'none';
     renderProductGrid();
-  }
-}
-
-function renderStockTakeProductGrid() {
-  const searchTerm = searchInput.value.toLowerCase();
-  const selectedCategory = categorySelect.value;
-  
-  // ✅ SAVE SCROLL POSITION BEFORE RENDERING
-  const scrollContainer = productGridEl.parentElement;
-  const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-  const savedScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
-  
-  // ✅ Also save which product IDs were visible (optional, for better UX)
-  const visibleProductIds = [];
-  if (scrollContainer) {
-    const visibleCards = scrollContainer.querySelectorAll('.stock-take-card');
-    visibleCards.forEach(card => {
-      const rect = card.getBoundingClientRect();
-      const containerRect = scrollContainer.getBoundingClientRect();
-      if (rect.top >= containerRect.top - 50 && rect.top <= containerRect.bottom) {
-        const id = card.dataset.id;
-        if (id) visibleProductIds.push(id);
-      }
-    });
-  }
-  
-  let filtered = products.slice();
-  if (selectedCategory !== 'all') {
-    filtered = filtered.filter(p => p.category === selectedCategory);
-  }
-  if (searchTerm) {
-    filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm));
-  }
-  
-  if (filtered.length === 0) {
-    productGridEl.innerHTML = '<div style="text-align:center; padding:20px;">No products to count.</div>';
-    return;
-  }
-  
-  const countedCount = Object.keys(stockTakeData).length;
-  let diffCount = 0, positiveDiff = 0, negativeDiff = 0;
-  Object.values(stockTakeData).forEach(data => {
-    if (data.difference !== 0) {
-      diffCount++;
-      if (data.difference > 0) positiveDiff++;
-      else if (data.difference < 0) negativeDiff++;
-    }
-  });
-  
-  let html = `
-    <div id="stockTakeHeader" style="margin-bottom:16px; padding:12px 16px; background:#f0fdf4; border-radius:16px; border:1px solid #10b981; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <div>
-        <strong style="font-size:1.1rem;">📋 Stock Take Mode</strong>
-        <span style="font-size:0.9rem; color:#64748b; margin-left:12px;">Products: ${filtered.length} | ✅ Counted: ${countedCount}</span>
-      </div>
-      <div style="display:flex; gap:16px; font-size:0.85rem;">
-        ${diffCount > 0 ? `
-          <span style="color:#2c7a4b;">✅ ${positiveDiff} higher</span>
-          <span style="color:#dc2626;">❌ ${negativeDiff} lower</span>
-          <span style="color:#f59e0b;">📊 ${diffCount} total differences</span>
-        ` : `
-          <span style="color:#94a3b8;">📊 No differences yet</span>
-        `}
-      </div>
-    </div>
-  `;
-  
-  const containerClass = viewMode === 'grid' ? 'product-grid' : 'product-list';
-  html += `<div class="${containerClass}" id="stockTakeGrid">`;
-  
-  filtered.forEach(prod => {
-    const existing = stockTakeData[prod.id];
-    const countedValue = existing ? existing.counted_stock : '';
-    const difference = existing ? existing.difference : 0;
     
-    let diffColor = '', diffText = '', diffBg = '', borderColor = '';
-    if (difference > 0) {
-      diffColor = '#2c7a4b'; diffBg = '#f0fdf4'; borderColor = '2px solid #2c7a4b'; diffText = `+${difference} higher`;
-    } else if (difference < 0) {
-      diffColor = '#dc2626'; diffBg = '#fef2f2'; borderColor = '2px solid #dc2626'; diffText = `${difference} lower`;
-    } else if (existing && difference === 0) {
-      diffColor = '#64748b'; diffBg = '#f8fafc'; borderColor = '1px solid #e2e8f0'; diffText = '✓ Matches';
-    } else {
-      diffColor = '#94a3b8'; diffBg = '#ffffff'; borderColor = '1px solid #e2e8f0'; diffText = 'Not counted';
-    }
-    
-    const cardClass = viewMode === 'grid' ? 'product-card' : 'product-card product-list-card';
-    
-    html += `
-      <div class="${cardClass} stock-take-card" data-id="${prod.id}" style="border: ${borderColor}; background: ${diffBg};">
-        <div class="product-name">${escapeHtml(prod.name)}</div>
-        <div class="product-category">${escapeHtml(prod.category)}</div>
-        <div class="product-stock" style="font-weight:600; color:#0f172a;">📊 System: ${prod.stock}</div>
-        <div class="diff-badge" style="margin: 4px 0 8px 0; font-weight:700; color:${diffColor}; font-size:0.9rem; background:${diffBg}; padding:2px 12px; border-radius:12px; display:inline-block; border:1px solid ${diffColor};">
-          ${diffText}
-        </div>
-        <div style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;">
-          <button type="button" class="stock-take-btn" data-action="dec" data-id="${prod.id}" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:30px; font-weight:bold; font-size:1.2rem; cursor:pointer;">−</button>
-          <input type="number" class="stock-take-input" data-id="${prod.id}" value="${countedValue}" placeholder="${prod.stock}" style="width:80px; padding:8px; border-radius:20px; border:2px solid ${existing ? (difference !== 0 ? (difference > 0 ? '#2c7a4b' : '#dc2626') : '#10b981') : '#cbd5e1'}; text-align:center; font-weight:600; background:${existing ? (difference !== 0 ? (difference > 0 ? '#f0fdf4' : '#fef2f2') : '#f0fdf4') : 'white'};">
-          <button type="button" class="stock-take-btn" data-action="inc" data-id="${prod.id}" style="background:#f1f5f9; border:none; width:32px; height:32px; border-radius:30px; font-weight:bold; font-size:1.2rem; cursor:pointer;">+</button>
-        </div>
-        <div class="stock-hint" style="margin-top:6px; font-size:0.7rem; color:${diffColor};">
-          ${existing && difference !== 0 ? (difference > 0 ? `📈 Counted ${difference} more than system` : `📉 Counted ${Math.abs(difference)} less than system`) : existing && difference === 0 ? '✅ Count matches system' : '⏳ Enter count above'}
-        </div>
-      </div>
-    `;
-  });
-  
-  html += '</div>';
-  
-  // ✅ RESTORE SCROLL POSITION
-  productGridEl.innerHTML = html;
-  productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
-  
-  // ✅ Restore scroll position
-  if (scrollContainer) {
-    // Try to restore to exact scroll position first
-    scrollContainer.scrollTop = savedScrollTop;
-    scrollContainer.scrollLeft = savedScrollLeft;
-    
-    // If that doesn't work (e.g., content height changed), try to find the first visible product
-    // and scroll to it after a small delay
-    if (visibleProductIds.length > 0) {
-      setTimeout(() => {
-        // Find the first visible product card that was visible before
-        for (const id of visibleProductIds) {
-          const card = document.querySelector(`.stock-take-card[data-id="${id}"]`);
-          if (card) {
-            card.scrollIntoView({ block: 'center', behavior: 'instant' });
-            break;
-          }
-        }
-        // If none of the previously visible products are found, use the saved scroll position
-        if (scrollContainer.scrollTop === 0 && savedScrollTop > 0) {
-          scrollContainer.scrollTop = savedScrollTop;
-        }
-      }, 50);
+    // ✅ EXPAND CART WHEN EXITING STOCK TAKE MODE
+    if (cartPanel && cartPanel.classList.contains('collapsed')) {
+      cartPanel.classList.remove('collapsed');
+      if (iconSpan) iconSpan.textContent = '▶';
+      localStorage.setItem('cartCollapsed', 'false');
     }
   }
-  
-  attachStockTakeEvents();
 }
 
 function attachStockTakeEvents() {
