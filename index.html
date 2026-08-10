@@ -2563,7 +2563,7 @@ let notificationsSupported = false;
 let notificationsEnabled = false;
 let alertedOutOfStockProducts = new Set();
 let alertedLowStockProducts = new Set();
-
+let preloadedReportCache = null;
 // ==================== DOM ELEMENTS ====================
 const productGridEl = document.getElementById('productGrid');
 const cartContainer = document.getElementById('cartItemsContainer');
@@ -2623,16 +2623,7 @@ function closeSideMenu() {
 }
 
 // ==================== WRAP MENU ACTION ====================
-function wrapMenuAction(actionFn) {
-    return async (...args) => {
-        if (stockTakeMode) {
-            toggleStockTakeMode();
-        }
-        if (inventoryMode && actionFn !== toggleInventoryMode) toggleInventoryMode();
-        await actionFn(...args);
-        closeSideMenu();
-    };
-}
+
 // Telegram accounts
 let telegramAccounts = localStorage.getItem('telegramAccounts');
 const DEFAULT_TELEGRAM_ACCOUNTS = 
@@ -4037,7 +4028,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
     hideLoading();
 
     if (success) {
-      // ✅ STOCK UPDATE - FIX THIS SECTION
+      // ✅ STOCK UPDATE
       console.log('🔄 Updating stock for items...');
       for (let item of saleItems) {
         const product = products.find(p => p.id == item.id);
@@ -4070,6 +4061,51 @@ async function completeCheckout(paymentMethod, cashReceived) {
       // ✅ Save to Lucky Draw if eligible
       await saveToLuckyDraw(transaction);
 
+      // ✅ CLAIM PRIZE AFTER SALE (if there was a pending prize)
+      if (pendingPrize) {
+        console.log('🎯 Claiming prize after sale...');
+        const claimed = await claimPrizeAfterSale(
+          pendingPrize.receipt, 
+          pendingPrize.value, 
+          totalAmount
+        );
+        if (claimed) {
+          console.log('✅ Prize claimed successfully!');
+          // Show success message
+          await showAlertModal('🎉 Prize Claimed!', 
+            `The prize "${pendingPrize.name}" has been successfully claimed.\n` +
+            `Receipt: ${pendingPrize.receipt}`
+          );
+        } else {
+          console.warn('⚠️ Prize claim failed, but transaction was saved.');
+          await showAlertModal('⚠️ Prize Not Claimed', 
+            `Transaction saved, but the prize could not be claimed.\n` +
+            `Please manually claim the prize using the receipt: ${pendingPrize.receipt}`
+          );
+        }
+        // Clear pending prize
+        pendingPrize = null;
+        claimedReceiptInfo = null;
+      }
+
+      // ✅ UPDATE CUSTOMER POINTS
+      if (selectedCustomer) {
+        try {
+          const pointsEarned = Math.floor(totalAmount / 10);
+          const newPoints = (selectedCustomer.points || 0) + pointsEarned;
+          await supabase
+            .from('customers')
+            .update({ points: newPoints })
+            .eq('phone', selectedCustomer.phone);
+          selectedCustomer.points = newPoints;
+          updateCustomerDisplay();
+          console.log(`✅ Added ${pointsEarned} points to customer`);
+        } catch (err) {
+          console.warn('Failed to update customer points:', err);
+        }
+      }
+
+      // ✅ SAVE TO LOCAL STORAGE
       localStorage.setItem(`products_${currentStore}`, JSON.stringify({
         timestamp: Date.now(),
         products: products
@@ -4078,7 +4114,23 @@ async function completeCheckout(paymentMethod, cashReceived) {
       // ✅ Re-render product grid to show updated stock
       renderProductGrid();
 
-      // ... rest of the code (customer points, pendingPrize, etc.)
+      // ✅ Show success message
+      await showAlertModal('✅ Transaction Complete!', 
+        `Transaction ID: ${transaction.transaction_id}\n` +
+        `Total: RM ${totalAmount.toFixed(2)}\n` +
+        `Payment: ${paymentMethod}\n` +
+        `Items: ${saleItems.length}`
+      );
+
+    } else {
+      // ❌ Transaction failed - save to pending
+      console.warn('⚠️ Transaction failed, saving to pending...');
+      pendingSales.push(transaction);
+      localStorage.setItem('pendingSales', JSON.stringify(pendingSales));
+      await showAlertModal('⚠️ Offline Mode', 
+        'Transaction saved locally and will sync when online.\n' +
+        `Transaction ID: ${transaction.transaction_id}`
+      );
     }
   } catch (err) {
     console.error('Checkout error:', err);
@@ -4090,65 +4142,15 @@ async function completeCheckout(paymentMethod, cashReceived) {
   }
 }
 
-async function getNextIRSInvoiceNumber() {
-  try {
-    console.log('📋 Getting next IRS invoice number...');
-    
-    // ✅ Get ALL invoice numbers - NO LIMIT
-    const { data, error } = await supabase
-      .from('irs_reporting')
-      .select('invoice_no')
-      .not('invoice_no', 'is', null);
-    
-    if (error) {
-      console.error('❌ Error getting invoice numbers:', error);
-      const timestamp = Date.now();
-      return `INV-${timestamp}`;
-    }
-    
-    let highestNum = 0;
-    
-    if (data && data.length > 0) {
-      console.log(`📋 Found ${data.length} existing invoice numbers`);
-      
-      // ✅ Loop through EVERY invoice to find the highest number
-      for (let i = 0; i < data.length; i++) {
-        const invoice = data[i].invoice_no;
-        if (!invoice) continue;
-        
-        // ✅ Only match regular invoices (INV-XXXX), NOT refunds (REF-INV-XXXX)
-        const match = invoice.match(/^INV-(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1]);
-          if (num > highestNum) {
-            highestNum = num;
-          }
-        }
-      }
-      
-      console.log(`📊 HIGHEST invoice number found: ${highestNum}`);
-    } else {
-      console.log('📊 No invoices found, starting at 1');
-    }
-    
-    // ✅ If no invoices found, start from 1
-    if (highestNum === 0) {
-      highestNum = 0;
-    }
-    
-    const nextNum = highestNum + 1;
-    const newInvoice = `INV-${nextNum}`;
-    
-    console.log(`📋 NEW invoice number: ${newInvoice}`);
-    return newInvoice;
-    
-  } catch (err) {
-    console.error('❌ getNextIRSInvoiceNumber error:', err);
-    const timestamp = Date.now();
-    return `INV-${timestamp}`;
-  }
-}
 
+
+function processClaimBarcode() {
+  const code = claimBarcodeBuffer.trim();
+  if (code === '') return;
+  document.getElementById('claimReceiptInput').value = code;
+  checkReceiptForClaim();
+  resetClaimBarcodeBuffer();
+}
 
 // ==================== LUCKY DRAW FUNCTIONS ====================
 
@@ -5847,33 +5849,7 @@ async function checkSettlementStatus(store, date) {
   try {
     console.log(`🔍 Checking settlement for store: ${store}, date: ${date}`);
     
-    // ✅ Get the settlement record
-    const { data, error } = await supabase
-      .from('settlements')
-      .select('*')
-      .eq('store', store)
-      .eq('date', date)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('❌ Settlement check error:', error);
-      return { exists: false, isCollected: false, settlement: null };
-    }
-    
-    if (!data) {
-      console.log('ℹ️ No settlement found for this date');
-      return { exists: false, isCollected: false, settlement: null };
-    }
-    
-    // ✅ Check if collected (this means the settlement is complete)
-    const isCollected = data.collected === true;
-    console.log(`📊 Settlement found: collected = ${isCollected}`);
-    
-    // ✅ Also check if status is 'collected'
-    const isCollectedStatus = data.status === 'collected';
-    
-    // ✅ Check if there are any unsettled transactions for this date
-    // ✅ FIX: Use timestamp range instead of date column
+    // ✅ FIRST: Check if there are ANY unsettled transactions for this date
     const startDate = new Date(date + 'T00:00:00+08:00');
     const endDate = new Date(date + 'T23:59:59+08:00');
     
@@ -5883,22 +5859,68 @@ async function checkSettlementStatus(store, date) {
       .eq('store', store)
       .gte('timestamp', startDate.toISOString())
       .lte('timestamp', endDate.toISOString())
-      .eq('settled', false)
-      .limit(1);
+      .eq('settled', false);
+    
+    if (txError) {
+      console.error('❌ Error checking unsettled transactions:', txError);
+      return { exists: false, isCollected: false, settlement: null, hasUnsettled: false };
+    }
     
     const hasUnsettled = txData && txData.length > 0;
-    console.log(`📊 Has unsettled transactions: ${hasUnsettled}`);
+    console.log(`📊 Has unsettled transactions: ${hasUnsettled} (${txData?.length || 0} found)`);
     
-    return { 
-      exists: true, 
-      isCollected: isCollected || isCollectedStatus,
-      hasUnsettled: hasUnsettled,
-      settlement: data 
+    // ✅ If NO unsettled transactions, treat as fully settled - hide everything
+    if (!hasUnsettled) {
+      console.log('✅ All transactions for this date are settled - no settlement needed');
+      
+      // ✅ Check if a settlement record exists (for display purposes)
+      const { data: settlementData, error: settlementError } = await supabase
+        .from('settlements')
+        .select('*')
+        .eq('store', store)
+        .eq('date', date)
+        .maybeSingle();
+      
+      return {
+        exists: true,
+        isCollected: true,  // Treat as collected/complete
+        hasUnsettled: false,
+        settlement: settlementData || { collected: true, collected_by: 'System', collected_at: new Date().toISOString() }
+      };
+    }
+    
+    // ✅ If there ARE unsettled transactions, check if settlement record exists
+    const { data: settlementData, error: settlementError } = await supabase
+      .from('settlements')
+      .select('*')
+      .eq('store', store)
+      .eq('date', date)
+      .maybeSingle();
+    
+    if (settlementError) {
+      console.error('❌ Settlement check error:', settlementError);
+      return { exists: false, isCollected: false, settlement: null, hasUnsettled: true };
+    }
+    
+    if (!settlementData) {
+      console.log('ℹ️ No settlement found for this date but has unsettled transactions');
+      return { exists: false, isCollected: false, settlement: null, hasUnsettled: true };
+    }
+    
+    // ✅ Check if collected
+    const isCollected = settlementData.collected === true || settlementData.status === 'collected';
+    console.log(`📊 Settlement found: collected = ${isCollected}`);
+    
+    return {
+      exists: true,
+      isCollected: isCollected,
+      hasUnsettled: true,
+      settlement: settlementData
     };
     
   } catch (err) {
     console.error('❌ checkSettlementStatus error:', err);
-    return { exists: false, isCollected: false, settlement: null, error: err.message };
+    return { exists: false, isCollected: false, settlement: null, error: err.message, hasUnsettled: false };
   }
 }
 
@@ -5906,12 +5928,12 @@ async function refreshSettlementTotals(store, silent = false) {
   const todayStr = getLocalDateString(new Date());
   console.log(`Refreshing settlement totals for ${store} on ${todayStr}`);
   
-  // ✅ FIRST: Check if already settled/collected
+  // ✅ Check settlement status (now returns hasUnsettled flag)
   const settlementStatus = await checkSettlementStatus(store, todayStr);
   
-  // ✅ If already collected, show zero and disable everything
-  if (settlementStatus.exists && settlementStatus.isCollected) {
-    console.log('ℹ️ Settlement already collected - showing zero totals');
+  // ✅ If NO unsettled transactions OR already collected - show zero and disable everything
+  if (!settlementStatus.hasUnsettled || settlementStatus.isCollected) {
+    console.log('ℹ️ No unsettled transactions or already settled - showing zero totals');
     
     if (!silent) {
       // Set all totals to ZERO
@@ -5935,11 +5957,15 @@ async function refreshSettlementTotals(store, silent = false) {
         if (el) {
           el.disabled = true;
           el.value = '';
-          el.placeholder = 'Settlement already collected';
+          if (settlementStatus.isCollected) {
+            el.placeholder = 'Settlement already collected';
+          } else {
+            el.placeholder = 'All transactions are settled';
+          }
         }
       });
       
-      // Hide check button
+      // Hide buttons
       const checkBtn = document.getElementById('checkSettlementBtn');
       if (checkBtn) {
         checkBtn.style.display = 'none';
@@ -5951,13 +5977,19 @@ async function refreshSettlementTotals(store, silent = false) {
       // Show message
       const settlementError = document.getElementById('settlementError');
       if (settlementError) {
-        settlementError.innerHTML = `
-          ✅ This store has already been settled for today.<br>
-          <span style="font-size: 0.85rem; color: #64748b;">
-            Collected on: ${new Date(settlementStatus.settlement.collected_at).toLocaleString()}<br>
-            Collected by: ${settlementStatus.settlement.collected_by || 'Unknown'}
-          </span>
-        `;
+        let message = '✅ ';
+        if (settlementStatus.isCollected) {
+          message += 'This store has already been settled for today.';
+          if (settlementStatus.settlement) {
+            message += `<br><span style="font-size: 0.85rem; color: #64748b;">
+              Collected on: ${new Date(settlementStatus.settlement.collected_at).toLocaleString()}<br>
+              Collected by: ${settlementStatus.settlement.collected_by || 'Unknown'}
+            </span>`;
+          }
+        } else {
+          message += 'All transactions are settled. No settlement needed.';
+        }
+        settlementError.innerHTML = message;
         settlementError.style.display = 'block';
         settlementError.style.color = '#2c7a4b';
       }
@@ -5966,15 +5998,14 @@ async function refreshSettlementTotals(store, silent = false) {
     return { settled: true, totals: null };
   }
   
-  // ✅ If NOT settled, fetch and show the actual totals (including refunds)
-  console.log('ℹ️ No settlement yet - showing actual totals');
+  // ✅ If NOT settled and there ARE unsettled transactions, fetch totals
+  console.log('ℹ️ Has unsettled transactions - showing actual totals');
   
   const report = await fetchSalesReport(store, 'all', todayStr, todayStr, false, silent);
   
   console.log('Report from fetchSalesReport:', report);
   
   if (report) {
-    // ✅ Use the net totals from the report (which already includes refunds)
     const cash = report.cashTotal || 0;
     const card = report.cardTotal || 0;
     const qr = report.otherTotal || 0;
@@ -10697,7 +10728,9 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('checkoutBtn').addEventListener('click', startCheckout);
   document.getElementById('claimPrizeBtn').addEventListener('click', showClaimPrizeModal);
   document.getElementById('specialPromoBtn').addEventListener('click', showSpecialPromoModal);
-
+// ✅ Stock History buttons
+  document.getElementById('saveStockHistoryBtn').addEventListener('click', saveStockHistoryToSheet);
+  document.getElementById('clearStockHistoryBtn').addEventListener('click', clearStockHistory);
   // Customer modal
   document.getElementById('customerBtn').addEventListener('click', showCustomerModal);
   document.getElementById('findCustomerBtn').addEventListener('click', findCustomer);
