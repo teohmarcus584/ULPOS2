@@ -7632,35 +7632,61 @@ function showOutOfStockAlert(productName) {
   showAlertModal("⚠️ Out of Stock", `${productName} is now out of stock. Please restock.`);
 }
 
+// Replace the checkAndNotifyOutOfStock function with this:
+
 function checkAndNotifyOutOfStock(productId, productName, newStock) {
   const storeName = currentStore.charAt(0).toUpperCase() + currentStore.slice(1);
   const timestamp = new Date().toLocaleString();
 
-  if (newStock <= 0 && !alertedOutOfStockProducts.has(productId)) {
-    alertedOutOfStockProducts.add(productId);
-    const message = `❌ OUT OF STOCK ❌\nStore: ${storeName}\nProduct: ${productName}\nQuantity: ${newStock}\nTime: ${timestamp}`;
-    if (telegramAccounts) sendTelegramMessage(message);
-    if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
-      new Notification(`❌ Out of Stock`, { body: `${productName} is out of stock (${newStock} left).` });
-    } else if (notificationsEnabled) {
-      showOutOfStockAlert(`${productName} is out of stock (${newStock} left).`);
+  // Create a unique key per product per store
+  const alertKey = `${productId}_${currentStore}`;
+
+  // Check if we already sent a notification for this specific stock level
+  const lastNotifiedStockKey = `last_notified_stock_${alertKey}`;
+  const lastNotifiedStock = parseInt(localStorage.getItem(lastNotifiedStockKey) || '-1');
+
+  if (newStock <= 0 && !alertedOutOfStockProducts.has(alertKey)) {
+    // Only notify if the stock level changed (avoid repeated notifications)
+    if (lastNotifiedStock !== 0) {
+      alertedOutOfStockProducts.add(alertKey);
+      localStorage.setItem(lastNotifiedStockKey, '0');
+      
+      const message = `❌ OUT OF STOCK ❌\nStore: ${storeName}\nProduct: ${productName}\nQuantity: ${newStock}\nTime: ${timestamp}`;
+      if (telegramAccounts) sendTelegramMessage(message);
+      
+      if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
+        new Notification(`❌ Out of Stock`, { body: `${productName} is out of stock.` });
+      } else if (notificationsEnabled) {
+        showOutOfStockAlert(`${productName} is out of stock.`);
+      }
     }
-  } else if (newStock > 0 && newStock <= LOW_STOCK_THRESHOLD && !alertedLowStockProducts.has(productId)) {
-    alertedLowStockProducts.add(productId);
-    const message = `⚠️ LOW STOCK ⚠️\nStore: ${storeName}\nProduct: ${productName}\nQuantity left: ${newStock}\nTime: ${timestamp}`;
-    if (telegramAccounts) sendTelegramMessage(message);
-    if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
-      new Notification(`⚠️ Low Stock`, { body: `${productName} only ${newStock} left.` });
-    } else if (notificationsEnabled) {
-      showOutOfStockAlert(`${productName} only ${newStock} left.`);
+  } else if (newStock > 0 && newStock <= LOW_STOCK_THRESHOLD && !alertedLowStockProducts.has(alertKey)) {
+    // Only notify if the stock level changed
+    if (lastNotifiedStock !== newStock) {
+      alertedLowStockProducts.add(alertKey);
+      localStorage.setItem(lastNotifiedStockKey, String(newStock));
+      
+      const message = `⚠️ LOW STOCK ⚠️\nStore: ${storeName}\nProduct: ${productName}\nQuantity left: ${newStock}\nTime: ${timestamp}`;
+      if (telegramAccounts) sendTelegramMessage(message);
+      
+      if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
+        new Notification(`⚠️ Low Stock`, { body: `${productName} only ${newStock} left.` });
+      } else if (notificationsEnabled) {
+        showOutOfStockAlert(`${productName} only ${newStock} left.`);
+      }
     }
   }
 
-  if (newStock > LOW_STOCK_THRESHOLD && alertedLowStockProducts.has(productId)) {
-    alertedLowStockProducts.delete(productId);
-  }
-  if (newStock > 0 && alertedOutOfStockProducts.has(productId)) {
-    alertedOutOfStockProducts.delete(productId);
+  // Reset alert state when stock is above threshold
+  if (newStock > LOW_STOCK_THRESHOLD) {
+    if (alertedLowStockProducts.has(alertKey)) {
+      alertedLowStockProducts.delete(alertKey);
+      localStorage.removeItem(lastNotifiedStockKey);
+    }
+    if (alertedOutOfStockProducts.has(alertKey)) {
+      alertedOutOfStockProducts.delete(alertKey);
+      localStorage.removeItem(lastNotifiedStockKey);
+    }
   }
 }
 
@@ -7973,7 +7999,32 @@ async function openStockTakeApprovalModal() {
 }
 
 async function loadPendingStockTakeRequests(modal) {
-  const list = modal.querySelector('#stockTakeRequestsList');
+  // Find the list element
+  let list = modal?.querySelector('#stockTakeRequestsList');
+  
+  // If modal is not provided or list not found, try to find the modal
+  if (!list) {
+    // Try to find the approval modal that's currently open
+    const modals = document.querySelectorAll('.modal-overlay');
+    for (const m of modals) {
+      if (m.style.display !== 'none') {
+        const l = m.querySelector('#stockTakeRequestsList');
+        if (l) {
+          list = l;
+          modal = m;
+          break;
+        }
+      }
+    }
+  }
+  
+  // If still no list, create a new modal
+  if (!list) {
+    console.warn('No stock take approval modal found, creating new one...');
+    await openStockTakeApprovalModal();
+    return;
+  }
+  
   if (!list) return;
   
   list.innerHTML = '<div style="text-align:center; padding:20px;">Loading requests...</div>';
@@ -8164,110 +8215,8 @@ async function loadPendingStockTakeRequests(modal) {
     
     list.innerHTML = mainHtml;
     
-    // ============================================================
-    // ✅ FIXED: SELECT ALL / DESELECT ALL EVENT HANDLERS
-    // ============================================================
-    
-    // 1. Store-level "Select All" checkbox
-    document.querySelectorAll('.select-all-store-items').forEach(selectAll => {
-      selectAll.addEventListener('change', function(e) {
-        e.stopPropagation();
-        const groupId = this.dataset.group;
-        const isChecked = this.checked;
-        
-        // Select/deselect ALL checkboxes in this store group
-        document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`).forEach(cb => {
-          cb.checked = isChecked;
-        });
-        
-        // Also update all category-level "Select All" checkboxes
-        document.querySelectorAll(`.select-all-category-items[data-group="${groupId}"]`).forEach(cb => {
-          cb.checked = isChecked;
-        });
-        
-        updateStoreGroupCounts(groupId);
-      });
-    });
-    
-    // 2. Category-level "Select All" checkbox - FIXED
-    document.querySelectorAll('.select-all-category-items').forEach(selectAll => {
-      selectAll.addEventListener('change', function(e) {
-        e.stopPropagation();
-        const groupId = this.dataset.group;
-        const category = this.dataset.category;
-        const isChecked = this.checked;
-        
-        // ✅ Find the category section using the data attributes
-        const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
-        
-        if (categorySection) {
-          // Select/deselect all item checkboxes in this category
-          const checkboxes = categorySection.querySelectorAll('.item-checkbox');
-          checkboxes.forEach(cb => {
-            cb.checked = isChecked;
-          });
-        } else {
-          // Fallback: find by closest parent
-          const parentDiv = this.closest('.category-section');
-          if (parentDiv) {
-            const checkboxes = parentDiv.querySelectorAll('.item-checkbox');
-            checkboxes.forEach(cb => {
-              cb.checked = isChecked;
-            });
-          }
-        }
-        
-        // Update store-level "Select All" checkbox state
-        updateStoreSelectAllState(groupId);
-        updateStoreGroupCounts(groupId);
-      });
-    });
-    
-    // 3. Individual item checkboxes
-    document.querySelectorAll('.item-checkbox').forEach(cb => {
-      cb.addEventListener('change', function(e) {
-        e.stopPropagation();
-        const groupId = this.dataset.group;
-        const category = this.dataset.category;
-        
-        // Update category-level "Select All" checkbox
-        const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
-        if (categorySection) {
-          const allCategoryItems = categorySection.querySelectorAll('.item-checkbox');
-          const checkedCategoryItems = categorySection.querySelectorAll('.item-checkbox:checked');
-          const selectAllCategory = categorySection.querySelector('.select-all-category-items');
-          if (selectAllCategory) {
-            selectAllCategory.checked = allCategoryItems.length > 0 && allCategoryItems.length === checkedCategoryItems.length;
-          }
-        }
-        
-        // Update store-level "Select All" checkbox
-        updateStoreSelectAllState(groupId);
-        updateStoreGroupCounts(groupId);
-      });
-    });
-    
-    // 4. Store group count updates
-    document.querySelectorAll('.approve-store-group-btn, .reject-store-group-btn').forEach(btn => {
-      const groupId = btn.dataset.group;
-      updateStoreGroupCounts(groupId);
-    });
-    
-    // 5. APPROVE button handler
-    document.querySelectorAll('.approve-store-group-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const groupId = this.dataset.group;
-        approveStoreGroup(groupId, modal);
-      });
-    });
-    
-    // 6. REJECT button handler
-    document.querySelectorAll('.reject-store-group-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const groupId = this.dataset.group;
-        rejectStoreGroup(groupId, modal);
-      });
-    });
+    // Re-attach all event listeners
+    attachStockTakeApprovalEvents(modal);
     
   } catch (err) {
     console.error(err);
@@ -8275,6 +8224,120 @@ async function loadPendingStockTakeRequests(modal) {
   }
 }
 
+function attachStockTakeApprovalEvents(modal) {
+  if (!modal) {
+    // Try to find the modal
+    const modals = document.querySelectorAll('.modal-overlay');
+    for (const m of modals) {
+      if (m.style.display !== 'none' && m.querySelector('#stockTakeRequestsList')) {
+        modal = m;
+        break;
+      }
+    }
+    if (!modal) return;
+  }
+  
+  // 1. Store-level "Select All" checkbox
+  document.querySelectorAll('.select-all-store-items').forEach(selectAll => {
+    selectAll.removeEventListener('change', handleStoreSelectAll);
+    selectAll.addEventListener('change', handleStoreSelectAll);
+  });
+  
+  // 2. Category-level "Select All" checkbox
+  document.querySelectorAll('.select-all-category-items').forEach(selectAll => {
+    selectAll.removeEventListener('change', handleCategorySelectAll);
+    selectAll.addEventListener('change', handleCategorySelectAll);
+  });
+  
+  // 3. Individual item checkboxes
+  document.querySelectorAll('.item-checkbox').forEach(cb => {
+    cb.removeEventListener('change', handleItemCheckboxChange);
+    cb.addEventListener('change', handleItemCheckboxChange);
+  });
+  
+  // 4. APPROVE button handler
+  document.querySelectorAll('.approve-store-group-btn').forEach(btn => {
+    btn.removeEventListener('click', handleApprove);
+    btn.addEventListener('click', handleApprove);
+    // Update count
+    const groupId = btn.dataset.group;
+    updateStoreGroupCounts(groupId);
+  });
+  
+  // 5. REJECT button handler
+  document.querySelectorAll('.reject-store-group-btn').forEach(btn => {
+    btn.removeEventListener('click', handleReject);
+    btn.addEventListener('click', handleReject);
+    // Update count
+    const groupId = btn.dataset.group;
+    updateStoreGroupCounts(groupId);
+  });
+}
+
+// Event handler functions
+function handleStoreSelectAll(e) {
+  e.stopPropagation();
+  const groupId = this.dataset.group;
+  const isChecked = this.checked;
+  
+  document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`).forEach(cb => {
+    cb.checked = isChecked;
+  });
+  
+  document.querySelectorAll(`.select-all-category-items[data-group="${groupId}"]`).forEach(cb => {
+    cb.checked = isChecked;
+  });
+  
+  updateStoreGroupCounts(groupId);
+}
+
+function handleCategorySelectAll(e) {
+  e.stopPropagation();
+  const groupId = this.dataset.group;
+  const category = this.dataset.category;
+  const isChecked = this.checked;
+  
+  const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
+  if (categorySection) {
+    categorySection.querySelectorAll('.item-checkbox').forEach(cb => {
+      cb.checked = isChecked;
+    });
+  }
+  
+  updateStoreSelectAllState(groupId);
+  updateStoreGroupCounts(groupId);
+}
+
+function handleItemCheckboxChange(e) {
+  e.stopPropagation();
+  const groupId = this.dataset.group;
+  const category = this.dataset.category;
+  
+  const categorySection = document.querySelector(`.category-section[data-category="${category}"][data-group="${groupId}"]`);
+  if (categorySection) {
+    const allCategoryItems = categorySection.querySelectorAll('.item-checkbox');
+    const checkedCategoryItems = categorySection.querySelectorAll('.item-checkbox:checked');
+    const selectAllCategory = categorySection.querySelector('.select-all-category-items');
+    if (selectAllCategory) {
+      selectAllCategory.checked = allCategoryItems.length > 0 && allCategoryItems.length === checkedCategoryItems.length;
+    }
+  }
+  
+  updateStoreSelectAllState(groupId);
+  updateStoreGroupCounts(groupId);
+}
+
+function handleApprove(e) {
+  const groupId = this.dataset.group;
+  const modal = this.closest('.modal-overlay') || document.querySelector('.modal-overlay:not([style*="display: none"])');
+  approveStoreGroup(groupId, modal);
+}
+
+function handleReject(e) {
+  const groupId = this.dataset.group;
+  const modal = this.closest('.modal-overlay') || document.querySelector('.modal-overlay:not([style*="display: none"])');
+  rejectStoreGroup(groupId, modal);
+}
 // ✅ Helper function to update store-level "Select All" checkbox state
 function updateStoreSelectAllState(groupId) {
   const allStoreItems = document.querySelectorAll(`.item-checkbox[data-group="${groupId}"]`);
@@ -8554,7 +8617,7 @@ async function approveStoreGroup(groupId, modal) {
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
               <span style="font-size:2.5rem;">📋</span>
               <div>
-                <div style="font-weight:600; color:#0f172a; font-size:1.2rem;">Stock Take ${failCount === 0 ? 'Approved' : 'Partially Approved'}</div>
+                <div style="font-weight:600; color:#0f172a; font-size:1.2rem;">${failCount === 0 ? 'Stock Take Approved' : 'Partially Approved'}</div>
                 <div style="font-size:0.9rem; color:#64748b;">Store: ${store}</div>
               </div>
             </div>
@@ -8581,25 +8644,40 @@ async function approveStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ AUTO-REFRESH: Force refresh the stock take list
-        console.log('🔄 Auto-refreshing stock take list after approval...');
+        // ✅ FORCE REFRESH: Reload the stock take approval list
+        console.log('🔄 Refreshing stock take approval list after approval...');
         showLoading('Refreshing stock take list...');
         
-        // ✅ Clear any local cache
+        // Clear caches
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
+        storeReportCache = {};
         
-        // ✅ Refresh the products
+        // Refresh products from Supabase
         await fetchProductsFromSheet(true);
         renderProductGrid();
         
-        // ✅ Reload the pending requests with a fresh fetch
-        await loadPendingStockTakeRequests(modal);
+        // ✅ Find the approval modal and refresh it
+        const approvalModals = document.querySelectorAll('.modal-overlay');
+        let targetModal = null;
+        for (const m of approvalModals) {
+          if (m.style.display !== 'none' && m.querySelector('#stockTakeRequestsList')) {
+            targetModal = m;
+            break;
+          }
+        }
         
-        // ✅ Also refresh the stock take mode view if active
-        if (stockTakeMode) {
-          renderStockTakeProductGrid();
+        if (targetModal) {
+          // Refresh the list in the existing modal
+          await loadPendingStockTakeRequests(targetModal);
+          console.log('✅ Stock take approval list refreshed in existing modal');
+        } else {
+          // If no modal is open, but stock take mode is active, refresh the grid
+          if (stockTakeMode) {
+            renderStockTakeProductGrid();
+          }
+          console.log('ℹ️ No approval modal found, but stock take view refreshed if active');
         }
         
         hideLoading();
@@ -8839,25 +8917,40 @@ async function rejectStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ AUTO-REFRESH: Force refresh the stock take list
-        console.log('🔄 Auto-refreshing stock take list after rejection...');
+        // ✅ FORCE REFRESH: Reload the stock take approval list
+        console.log('🔄 Refreshing stock take approval list after rejection...');
         showLoading('Refreshing stock take list...');
         
-        // ✅ Clear any local cache
+        // Clear caches
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
+        storeReportCache = {};
         
-        // ✅ Refresh the products
+        // Refresh products from Supabase
         await fetchProductsFromSheet(true);
         renderProductGrid();
         
-        // ✅ Reload the pending requests with a fresh fetch
-        await loadPendingStockTakeRequests(modal);
+        // ✅ Find the approval modal and refresh it
+        const approvalModals = document.querySelectorAll('.modal-overlay');
+        let targetModal = null;
+        for (const m of approvalModals) {
+          if (m.style.display !== 'none' && m.querySelector('#stockTakeRequestsList')) {
+            targetModal = m;
+            break;
+          }
+        }
         
-        // ✅ Also refresh the stock take mode view if active
-        if (stockTakeMode) {
-          renderStockTakeProductGrid();
+        if (targetModal) {
+          // Refresh the list in the existing modal
+          await loadPendingStockTakeRequests(targetModal);
+          console.log('✅ Stock take approval list refreshed in existing modal');
+        } else {
+          // If no modal is open, but stock take mode is active, refresh the grid
+          if (stockTakeMode) {
+            renderStockTakeProductGrid();
+          }
+          console.log('ℹ️ No approval modal found, but stock take view refreshed if active');
         }
         
         hideLoading();
