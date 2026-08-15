@@ -3551,31 +3551,118 @@ function renderProductGrid() {
 
 function updateStockForProduct(productId, newStock, delta) {
   const product = products.find(p => p.id == productId);
-  if (!product) return;
+  if (!product) {
+    console.warn('⚠️ Product not found:', productId);
+    return;
+  }
+  
   const oldStock = product.stock;
-  if (newStock === oldStock) return;
+  if (newStock === oldStock) {
+    console.log('ℹ️ No stock change for', product.name);
+    return;
+  }
 
+  // Update local product
   product.stock = newStock;
   
+  // Update store-specific stock column
   const store = currentStore;
   const stockColumn = `stock_${store}`;
   product[stockColumn] = newStock;
 
+  // Update input field if exists
   const inputField = document.querySelector(`.stock-input[data-id="${productId}"]`);
   if (inputField) inputField.value = newStock;
 
+  // Log stock change in history
   logStockChange(productId, product.name, product.category, oldStock, newStock, delta);
   
-  // ✅ FIXED: Removed updated_at
+  // ✅ UPDATE IN SUPABASE IMMEDIATELY
+  console.log(`📦 Updating stock for ${product.name}: ${oldStock} → ${newStock} (Δ${delta})`);
+  
   supabase
     .from('products')
     .update({ [stockColumn]: newStock })
     .eq('id', productId)
     .then(({ error }) => {
-      if (error) console.error('Error updating stock:', error);
+      if (error) {
+        console.error('❌ Error updating stock:', error);
+        // If update fails, revert the local change
+        product.stock = oldStock;
+        product[stockColumn] = oldStock;
+        if (inputField) inputField.value = oldStock;
+        showAlertModal('Stock Update Failed', `Failed to update stock for ${product.name}. Please try again.`);
+      } else {
+        console.log('✅ Stock updated in Supabase for', product.name, 'new stock:', newStock);
+        
+        // ✅ SYNC AFTER SUCCESSFUL STOCK UPDATE - with debounce
+        // Debounce to avoid multiple syncs when updating multiple products quickly
+        if (window._stockSyncTimeout) {
+          clearTimeout(window._stockSyncTimeout);
+        }
+        window._stockSyncTimeout = setTimeout(() => {
+          console.log('🔄 Syncing after stock updates...');
+          backgroundSync(true).catch(err => {
+            console.warn('⚠️ Background sync after stock update failed:', err);
+          });
+          window._stockSyncTimeout = null;
+        }, 1000); // Wait 1 second after last stock change before syncing
+      }
     });
     
+  // Check for out of stock notifications
+  checkAndNotifyOutOfStock(productId, product.name, newStock);
+  
+  // Refresh UI
   refreshCategoryHighlighting();
+  
+  // Update the product card if it's visible
+  updateProductCard(productId);
+}
+
+// ✅ Helper function to update a single product card
+function updateProductCard(productId) {
+  const product = products.find(p => p.id == productId);
+  if (!product) return;
+  
+  // Update grid view cards
+  const gridCards = document.querySelectorAll(`.product-card[data-id="${productId}"]`);
+  gridCards.forEach(card => {
+    const stockElement = card.querySelector('.product-stock');
+    if (stockElement) {
+      stockElement.textContent = `📦 Stock: ${product.stock}`;
+    }
+    
+    // Update out of stock class
+    if (!inventoryMode) {
+      if (product.stock <= 0) {
+        card.classList.add('out-of-stock-card');
+      } else {
+        card.classList.remove('out-of-stock-card');
+      }
+    } else if (inventoryMode && product.stock < LOW_STOCK_THRESHOLD) {
+      card.classList.add('low-stock-card');
+    } else {
+      card.classList.remove('low-stock-card');
+    }
+  });
+  
+  // Update list view cards
+  const listCards = document.querySelectorAll(`.product-list .product-card[data-id="${productId}"]`);
+  listCards.forEach(card => {
+    const stockElement = card.querySelector('.product-stock');
+    if (stockElement) {
+      stockElement.textContent = `📦 Stock: ${product.stock}`;
+    }
+  });
+  
+  // Update inventory mode controls
+  const stockInputs = document.querySelectorAll(`.stock-input[data-id="${productId}"]`);
+  stockInputs.forEach(input => {
+    if (input.value != product.stock) {
+      input.value = product.stock;
+    }
+  });
 }
 
 function updateCategoryDropdown() {
@@ -3724,10 +3811,90 @@ async function clearStockHistory() {
     await showAlertModal('No History', 'There is no stock adjustment history to clear.');
     return;
   }
-  const confirmed = await showConfirmModal('Clear History', `Are you sure you want to permanently delete all stock history for store "${currentStore}"?`);
-  if (!confirmed) return;
-  stockHistory = [];
-  renderStockHistory();
+  
+  // ✅ Show confirmation with options
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-container" style="max-width: 500px;">
+      <div class="modal-title">🗑️ Clear Stock History</div>
+      <div class="modal-message" style="margin: 16px 0;">
+        <p>You have <strong>${stockHistory.length}</strong> stock adjustment records for store "${currentStore}".</p>
+        <p style="margin-top: 12px; color: #64748b; font-size: 0.9rem;">
+          Choose an option:
+        </p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin: 16px 0;">
+        <button id="clearLocalOnly" class="modal-btn modal-btn-secondary" style="width:100%;">
+          📋 Clear Display Only (Keep in Database)
+        </button>
+        <button id="clearPermanent" class="modal-btn" style="width:100%; background: #ef4444; color: white;">
+          🗑️ Permanently Delete from Database
+        </button>
+        <button id="cancelClearHistory" class="modal-btn modal-btn-secondary" style="width:100%;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      modal.remove();
+      resolve();
+    };
+    
+    modal.querySelector('#cancelClearHistory').addEventListener('click', cleanup);
+    
+    // ✅ Clear local only
+    modal.querySelector('#clearLocalOnly').addEventListener('click', async () => {
+      modal.remove();
+      stockHistory = [];
+      renderStockHistory();
+      await showAlertModal('✅ Cleared', 'Stock history display has been cleared. Records remain in the database.');
+      resolve();
+    });
+    
+    // ✅ Permanent delete from database
+    modal.querySelector('#clearPermanent').addEventListener('click', async () => {
+      modal.remove();
+      
+      const confirmPermanent = await showConfirmModal(
+        '⚠️ Confirm Permanent Deletion',
+        `Are you SURE you want to permanently delete ALL stock history for "${currentStore}" from the database?\n\nThis action cannot be undone!`
+      );
+      
+      if (!confirmPermanent) {
+        resolve();
+        return;
+      }
+      
+      showLoading('Deleting stock history...');
+      
+      try {
+        const { error } = await supabase
+          .from('stock_history')
+          .delete()
+          .eq('store', currentStore);
+        
+        if (error) throw error;
+        
+        stockHistory = [];
+        renderStockHistory();
+        
+        await showAlertModal('✅ Deleted', `All stock history for "${currentStore}" has been permanently deleted from the database.`);
+        
+      } catch (err) {
+        console.error('Error deleting stock history:', err);
+        await showAlertModal('Error', 'Failed to delete stock history: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+      resolve();
+    });
+  });
 }
 
 // ==================== CART FUNCTIONS ====================
@@ -4311,6 +4478,22 @@ async function completeCheckout(paymentMethod, cashReceived) {
         }
       }
 
+      // ✅ SAVE TO LOCAL STORAGE
+      localStorage.setItem(`products_${currentStore}`, JSON.stringify({
+        timestamp: Date.now(),
+        products: products
+      }));
+
+      // ✅ SYNC AFTER SUCCESSFUL SALE - THIS IS THE KEY CHANGE
+      console.log('🔄 Syncing data after sale...');
+      try {
+        await backgroundSync(true);
+        console.log('✅ Background sync completed after sale');
+      } catch (syncErr) {
+        console.warn('⚠️ Background sync failed after sale:', syncErr);
+        // Don't block the flow if sync fails
+      }
+
       // ✅ Save to Lucky Draw if eligible
       await saveToLuckyDraw(transaction);
 
@@ -4357,12 +4540,6 @@ async function completeCheckout(paymentMethod, cashReceived) {
           console.warn('Failed to update customer points:', err);
         }
       }
-
-      // ✅ SAVE TO LOCAL STORAGE
-      localStorage.setItem(`products_${currentStore}`, JSON.stringify({
-        timestamp: Date.now(),
-        products: products
-      }));
       
       // ✅ Re-render product grid to show updated stock
       renderProductGrid();
@@ -4380,6 +4557,10 @@ async function completeCheckout(paymentMethod, cashReceived) {
       console.warn('⚠️ Transaction failed, saving to pending...');
       pendingSales.push(transaction);
       localStorage.setItem('pendingSales', JSON.stringify(pendingSales));
+      
+      // ✅ Try to sync pending sales immediately
+      await syncPendingSales();
+      
       await showAlertModal('⚠️ Offline Mode', 
         'Transaction saved locally and will sync when online.\n' +
         `Transaction ID: ${transaction.transaction_id}`
@@ -10423,11 +10604,74 @@ function toggleInventoryMode() {
       if (lowStockBtn) lowStockBtn.classList.remove('active');
       renderProductGrid();
     }
+    
+    // ✅ SYNC when exiting inventory mode (all changes should be saved)
+    if (stockHistory.length > 0) {
+      console.log('🔄 Syncing after exiting inventory mode...');
+      // Debounce to allow final updates to complete
+      setTimeout(() => {
+        backgroundSync(true).catch(err => {
+          console.warn('⚠️ Background sync after inventory mode failed:', err);
+        });
+      }, 500);
+    }
   }
   refreshCategoryHighlighting();
   renderProductGrid();
 }
-
+async function bulkUpdateStock(productUpdates) {
+  // productUpdates: [{ productId, newStock, delta }]
+  if (!productUpdates || productUpdates.length === 0) return;
+  
+  console.log(`📦 Bulk updating ${productUpdates.length} products...`);
+  
+  const store = currentStore;
+  const stockColumn = `stock_${store}`;
+  const updates = [];
+  
+  for (const update of productUpdates) {
+    const product = products.find(p => p.id == update.productId);
+    if (!product) continue;
+    
+    const oldStock = product.stock;
+    const newStock = update.newStock;
+    
+    if (newStock === oldStock) continue;
+    
+    // Update local
+    product.stock = newStock;
+    product[stockColumn] = newStock;
+    
+    // Log
+    logStockChange(product.id, product.name, product.category, oldStock, newStock, update.delta);
+    
+    // Prepare for Supabase
+    updates.push({
+      id: product.id,
+      [stockColumn]: newStock
+    });
+  }
+  
+  if (updates.length === 0) return;
+  
+  // ✅ Bulk update Supabase
+  try {
+    const { error } = await supabase
+      .from('products')
+      .upsert(updates);
+    
+    if (error) throw error;
+    
+    console.log(`✅ Bulk updated ${updates.length} products`);
+    
+    // ✅ SYNC ONCE after bulk update
+    await backgroundSync(true);
+    
+  } catch (err) {
+    console.error('❌ Bulk update failed:', err);
+    await showAlertModal('Stock Update Failed', 'Failed to update multiple products. Please try again.');
+  }
+}
 function showAddProductModal() {
   document.getElementById('newProductName').value = '';
   document.getElementById('newProductPrice').value = '';
@@ -10636,8 +10880,7 @@ async function finishLoginAfterVerification() {
   enableBarcodeScanner();
   refreshCategoryHighlighting();
 
-  if (window.autoSyncInterval) clearInterval(window.autoSyncInterval);
-  window.autoSyncInterval = setInterval(() => backgroundSync(), 60000);
+  
 }
 
 async function loadInitialData() {
@@ -10838,11 +11081,21 @@ async function preloadReport() {
 
 // ==================== BACKGROUND SYNC ====================
 
-async function backgroundSync() {
+async function backgroundSync(force = false) {
+  // ✅ ONLY sync if forced, or if we have pending sales, or if explicitly called
+  if (!force) {
+    // Check if there are pending sales that need syncing
+    const pending = localStorage.getItem('pendingSales');
+    if (!pending || JSON.parse(pending).length === 0) {
+      console.log('⏸️ No pending sales to sync, skipping...');
+      return;
+    }
+    console.log('📤 Found pending sales, syncing...');
+  }
+  
   if (syncInProgress) return;
   syncInProgress = true;
   try {
-    // ✅ SKIP BACKGROUND SYNC IF IN STOCK TAKE MODE
     if (stockTakeMode) {
       console.log('⏸️ Background sync paused - Stock Take mode active');
       syncInProgress = false;
@@ -10866,7 +11119,6 @@ async function backgroundSync() {
     
     const { hash: cachedHash } = JSON.parse(cached);
     
-    // ✅ FIX: Get all products and calculate hash based on store-specific stock
     const { data, error } = await supabase
       .from('products')
       .select('*');
@@ -10930,10 +11182,14 @@ function startReceiptPolling() {
   // ✅ First fetch with current filters
   fetchAndCacheReceipts();
   
-  // ✅ Poll every 30 seconds with current filters
+  // ⚠️ Consider increasing interval or only polling when receipts modal is open
   receiptPollingInterval = setInterval(() => {
-    console.log('🔄 Auto-refresh receipts with saved filters...');
-    fetchAndCacheReceipts();
+    // Only poll if receipts modal is open or if there are pending changes
+    const modal = document.getElementById('receiptsModal');
+    if (modal && modal.style.display === 'flex') {
+      console.log('🔄 Auto-refresh receipts...');
+      fetchAndCacheReceipts();
+    }
   }, 30000);
 }
 
@@ -11243,12 +11499,16 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('gridViewBtn').addEventListener('click', () => setViewMode('grid'));
   document.getElementById('listViewBtn').addEventListener('click', () => setViewMode('list'));
 
-  // Refresh products
   document.getElementById('refreshProductsPanelBtn').addEventListener('click', async () => {
-    localStorage.removeItem(`products_${currentStore}`);
-    await fetchProductsFromSheet(true);
-    renderProductGrid();
-  });
+  localStorage.removeItem(`products_${currentStore}`);
+  await fetchProductsFromSheet(true);
+  renderProductGrid();
+  
+  // ✅ Also sync pending sales
+  await syncPendingSales();
+  
+  await showAlertModal('✅ Synced', 'Products and pending sales synced successfully.');
+});
 
   // Low stock toggle
   document.getElementById('lowStockToggleBtn').addEventListener('click', toggleLowStockFilter);
