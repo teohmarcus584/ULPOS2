@@ -11029,6 +11029,7 @@ function populateEditProductSelect() {
 }
 
 // Update the editProductSelect change event to load store availability
+// Update the editProductSelect change event to load store availability
 document.getElementById('editProductSelect')?.addEventListener('change', function() {
   const productId = this.value;
   if (!productId) {
@@ -11049,7 +11050,7 @@ document.getElementById('editProductSelect')?.addEventListener('change', functio
   document.getElementById('newProductName').value = product.name;
   document.getElementById('newProductPrice').value = product.price;
   
-  // ✅ Load store availability
+  // ✅ Load store availability (convert to boolean properly)
   document.getElementById('availableQueens').checked = product.available_queens !== false;
   document.getElementById('availableSunshine').checked = product.available_sunshine !== false;
   document.getElementById('availableGurney').checked = product.available_gurney_paragon !== false;
@@ -11287,13 +11288,19 @@ async function updateProduct() {
     return;
   }
   
+  // ✅ FIX: Compare ALL fields including availability
+  // Convert boolean values to ensure proper comparison
+  const origQueens = originalProduct.available_queens !== false;
+  const origSunshine = originalProduct.available_sunshine !== false;
+  const origGurney = originalProduct.available_gurney_paragon !== false;
+  
   // Check if anything actually changed
   if (originalProduct.name === name && 
       originalProduct.price === price && 
       originalProduct.category === category &&
-      originalProduct.available_queens === availableQueens &&
-      originalProduct.available_sunshine === availableSunshine &&
-      originalProduct.available_gurney_paragon === availableGurney) {
+      origQueens === availableQueens &&
+      origSunshine === availableSunshine &&
+      origGurney === availableGurney) {
     errorDiv.innerText = 'No changes detected.';
     errorDiv.style.display = 'block';
     return;
@@ -11301,6 +11308,7 @@ async function updateProduct() {
   
   showLoading('Updating product...');
   try {
+    // ✅ FIX: Include availability fields in the update
     const { error } = await supabase
       .from('products')
       .update({
@@ -11315,9 +11323,21 @@ async function updateProduct() {
     
     if (error) throw error;
     
+    // ✅ Update local products array immediately
+    const localProduct = products.find(p => p.id == productId);
+    if (localProduct) {
+      localProduct.name = name;
+      localProduct.price = price;
+      localProduct.category = category;
+      localProduct.available_queens = availableQueens;
+      localProduct.available_sunshine = availableSunshine;
+      localProduct.available_gurney_paragon = availableGurney;
+    }
+    
     closeAddProductModal();
     await showAlertModal('Success', `Product "${name}" updated successfully.`);
     
+    // ✅ Refresh the product list
     await fetchProductsFromSheet(true);
     if (inventoryMode) {
       renderProductGrid();
@@ -11325,6 +11345,7 @@ async function updateProduct() {
     } else {
       renderProductGrid();
     }
+    
   } catch (err) {
     console.error(err);
     errorDiv.innerText = 'Failed to update product: ' + err.message;
