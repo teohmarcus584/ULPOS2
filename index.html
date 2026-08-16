@@ -3477,17 +3477,16 @@ function renderProductGrid() {
   
   // Category View (when no category selected, not in inventory mode, no search)
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
-  // ✅ Apply store filter to categories
-  let categories = [...new Set(products.map(p => p.category))];
-  
-  // Filter categories based on store availability
-  if (storeFilterActive && !showAllProductsInInventory) {
-    const availabilityKey = `available_${currentStore}`;
-    const availableProducts = products.filter(p => p[availabilityKey] !== false);
-    categories = [...new Set(availableProducts.map(p => p.category))];
-  }
-  
-  let filteredCategories = categories;
+    let categories = [...new Set(products.map(p => p.category))];
+    
+    // Apply store filter to categories
+    if (storeFilterActive && !showAllProductsInInventory) {
+      const availabilityKey = `available_${currentStore}`;
+      const availableProducts = products.filter(p => p[availabilityKey] !== false);
+      categories = [...new Set(availableProducts.map(p => p.category))];
+    }
+    
+    let filteredCategories = categories;
     
     if (searchTerm) {
       filteredCategories = filteredCategories.filter(cat =>
@@ -3538,7 +3537,7 @@ function renderProductGrid() {
     backBtn.style.display = (selectedCategory !== 'all' && !inventoryMode) ? 'inline-flex' : 'none';
   }
   
-  // ✅ Apply ALL filters
+  // Apply ALL filters
   let filtered = products.slice();
   
   // 1. Store filter (only in normal mode, not when "Show All" is active)
@@ -3596,21 +3595,21 @@ function renderProductGrid() {
   let html = '';
   
   // ✅ Show store filter indicator - ONLY in inventory mode
-if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
-  const storeNames = {
-    queens: '🏬 Queens',
-    sunshine: '☀️ Sunshine',
-    gurney_paragon: '🏙️ Gurney Paragon'
-  };
-  const productCount = filtered.length;
-  html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
-    📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
-  </div>`;
-}
+  if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
+    const storeNames = {
+      queens: '🏬 Queens',
+      sunshine: '☀️ Sunshine',
+      gurney_paragon: '🏙️ Gurney Paragon'
+    };
+    const productCount = filtered.length;
+    html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
+      📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
+    </div>`;
+  }
   
   // ✅ Inventory Mode or Normal Mode
   if (inventoryMode) {
-    // Inventory Mode - shows stock controls
+    // Inventory Mode - shows stock controls AND badges
     filtered.forEach(prod => {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
@@ -3631,18 +3630,18 @@ if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
       </div>`;
     });
   } else {
-    // Normal Mode - click to add to cart
+    // ✅ NORMAL SALES MODE - NO BADGES, clean display
     filtered.forEach(prod => {
       let additionalClass = '';
       if (prod.stock <= 0) {
         additionalClass = 'out-of-stock-card';
       }
       
-      const availabilityBadge = getStoreAvailabilityBadge(prod);
+      // ✅ No availability badge in sales mode
       const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
       
       html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
-        <div class="product-name">${escapeHtml(prod.name)} ${availabilityBadge}</div>
+        <div class="product-name">${escapeHtml(prod.name)}</div>
         <div class="product-category">${escapeHtml(prod.category)}</div>
         <div class="product-price">RM ${prod.price.toFixed(2)}</div>
         <div class="product-stock">${stockStatus}</div>
@@ -3653,7 +3652,7 @@ if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
   productGridEl.innerHTML = html;
   productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
   
-  // ✅ Attach event listeners
+  // Attach event listeners
   if (inventoryMode) {
     // Inventory mode event listeners
     document.querySelectorAll('.dec-stock').forEach(btn => {
@@ -3704,7 +3703,6 @@ if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
       const product = products.find(p => p.id == productId);
       if (product) {
         card.addEventListener('click', (e) => {
-          // Only add to cart if not in inventory mode
           if (!inventoryMode) {
             addToCart(product);
           }
