@@ -3476,16 +3476,17 @@ function renderProductGrid() {
   
   // Category View (when no category selected, not in inventory mode, no search)
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
-    let categories = [...new Set(products.map(p => p.category))];
-    
-    // ✅ Apply store filter to categories
-    if (storeFilterActive && !showAllProductsInInventory) {
-      const availabilityKey = `available_${currentStore}`;
-      const availableProducts = products.filter(p => p[availabilityKey] !== false);
-      categories = [...new Set(availableProducts.map(p => p.category))];
-    }
-    
-    let filteredCategories = categories;
+  // ✅ Apply store filter to categories
+  let categories = [...new Set(products.map(p => p.category))];
+  
+  // Filter categories based on store availability
+  if (storeFilterActive && !showAllProductsInInventory) {
+    const availabilityKey = `available_${currentStore}`;
+    const availableProducts = products.filter(p => p[availabilityKey] !== false);
+    categories = [...new Set(availableProducts.map(p => p.category))];
+  }
+  
+  let filteredCategories = categories;
     
     if (searchTerm) {
       filteredCategories = filteredCategories.filter(cat =>
