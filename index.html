@@ -11028,6 +11028,7 @@ function populateEditProductSelect() {
   select.innerHTML = html;
 }
 
+// This should be in your DOMContentLoaded event listener
 document.getElementById('editProductSelect')?.addEventListener('change', function() {
   const productId = this.value;
   const errorDiv = document.getElementById('addProductError');
@@ -11044,49 +11045,31 @@ document.getElementById('editProductSelect')?.addEventListener('change', functio
     return;
   }
   
-  // ✅ Find the product
   const product = products.find(p => p.id == productId);
   if (!product) {
     console.warn('⚠️ Product not found:', productId);
-    // Try refreshing products
-    fetchProductsFromSheet(true).then(() => {
-      const refreshed = products.find(p => p.id == productId);
-      if (refreshed) {
-        loadProductIntoForm(refreshed);
-      }
-    });
     return;
   }
   
-  loadProductIntoForm(product);
-});
-
-// ✅ Helper function to load product into form
-function loadProductIntoForm(product) {
-  console.log('📋 Loading product into form:', product);
-  
+  // Populate form
   document.getElementById('newProductName').value = product.name || '';
   document.getElementById('newProductPrice').value = product.price || 0;
   
-  // ✅ Load availability with strict boolean conversion
-  const availQueens = product.available_queens === true;
-  const availSunshine = product.available_sunshine === true;
-  const availGurney = product.available_gurney_paragon === true;
+  // ✅ Load availability (handle null/undefined)
+  document.getElementById('availableQueens').checked = product.available_queens !== false;
+  document.getElementById('availableSunshine').checked = product.available_sunshine !== false;
+  document.getElementById('availableGurney').checked = product.available_gurney_paragon !== false;
   
-  document.getElementById('availableQueens').checked = availQueens;
-  document.getElementById('availableSunshine').checked = availSunshine;
-  document.getElementById('availableGurney').checked = availGurney;
-  
-  console.log('✅ Availability loaded:', {
-    queens: availQueens,
-    sunshine: availSunshine,
-    gurney: availGurney
+  console.log('📋 Loaded product:', {
+    name: product.name,
+    queens: document.getElementById('availableQueens').checked,
+    sunshine: document.getElementById('availableSunshine').checked,
+    gurney: document.getElementById('availableGurney').checked
   });
   
   // Set category
   const categorySelect = document.getElementById('newProductCategorySelect');
   if (categorySelect && product.category) {
-    // Check if category exists in dropdown
     let categoryExists = false;
     for (let i = 0; i < categorySelect.options.length; i++) {
       if (categorySelect.options[i].value === product.category) {
@@ -11097,7 +11080,6 @@ function loadProductIntoForm(product) {
     if (categoryExists) {
       categorySelect.value = product.category;
     } else {
-      // Add new category
       const option = document.createElement('option');
       option.value = product.category;
       option.textContent = product.category;
@@ -11105,11 +11087,7 @@ function loadProductIntoForm(product) {
       categorySelect.value = product.category;
     }
   }
-  
-  // Clear any previous errors
-  const errorDiv = document.getElementById('addProductError');
-  if (errorDiv) errorDiv.style.display = 'none';
-}
+});
 
 // Add this to your DOMContentLoaded event listener
 document.getElementById('storeFilterToggleBtn').addEventListener('click', function() {
@@ -11458,15 +11436,37 @@ async function updateProduct() {
     return;
   }
   
-  const name = document.getElementById('newProductName').value.trim();
-  const price = parseFloat(document.getElementById('newProductPrice').value);
-  const select = document.getElementById('newProductCategorySelect');
-  let category = select.value;
+  // ✅ Get ALL form values directly
+  const nameInput = document.getElementById('newProductName');
+  const priceInput = document.getElementById('newProductPrice');
+  const categorySelect = document.getElementById('newProductCategorySelect');
+  const queensCheckbox = document.getElementById('availableQueens');
+  const sunshineCheckbox = document.getElementById('availableSunshine');
+  const gurneyCheckbox = document.getElementById('availableGurney');
   const errorDiv = document.getElementById('addProductError');
   
-  // Validate category
+  // ✅ Get values
+  const name = nameInput ? nameInput.value.trim() : '';
+  const price = parseFloat(priceInput ? priceInput.value : 0);
+  const availableQueens = queensCheckbox ? queensCheckbox.checked === true : false;
+  const availableSunshine = sunshineCheckbox ? sunshineCheckbox.checked === true : false;
+  const availableGurney = gurneyCheckbox ? gurneyCheckbox.checked === true : false;
+  
+  // ✅ Log current checkbox states
+  console.log('📋 CHECKBOX STATES:', {
+    queensCheckbox: queensCheckbox ? queensCheckbox.checked : 'NOT FOUND',
+    sunshineCheckbox: sunshineCheckbox ? sunshineCheckbox.checked : 'NOT FOUND',
+    gurneyCheckbox: gurneyCheckbox ? gurneyCheckbox.checked : 'NOT FOUND',
+    availableQueens: availableQueens,
+    availableSunshine: availableSunshine,
+    availableGurney: availableGurney
+  });
+  
+  // Get category
+  let category = categorySelect ? categorySelect.value : '';
   if (category === "__NEW__") {
-    const newCat = document.getElementById('newProductCategoryText').value.trim();
+    const newCatInput = document.getElementById('newProductCategoryText');
+    const newCat = newCatInput ? newCatInput.value.trim() : '';
     if (!newCat) {
       errorDiv.innerText = 'Please enter a new category name.';
       errorDiv.style.display = 'block';
@@ -11479,7 +11479,7 @@ async function updateProduct() {
     return;
   }
   
-  // Validate name and price
+  // ✅ Validate name and price
   if (!name) {
     errorDiv.innerText = 'Product name is required.';
     errorDiv.style.display = 'block';
@@ -11491,7 +11491,14 @@ async function updateProduct() {
     return;
   }
   
-  // Find original product
+  // ✅ Check if at least one store is selected
+  if (!availableQueens && !availableSunshine && !availableGurney) {
+    errorDiv.innerText = 'Please select at least one store where this product is available.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // ✅ Find original product
   const originalProduct = products.find(p => p.id == productId);
   if (!originalProduct) {
     errorDiv.innerText = 'Product not found.';
@@ -11499,55 +11506,115 @@ async function updateProduct() {
     return;
   }
   
-  // Check if anything actually changed
-  if (originalProduct.name === name && 
-      originalProduct.price === price && 
-      originalProduct.category === category) {
-    errorDiv.innerText = 'No changes detected.';
+  // ✅ Log original product
+  console.log('🔍 ORIGINAL PRODUCT:', originalProduct);
+  console.log('🔍 ORIGINAL AVAILABILITY:', {
+    queens: originalProduct.available_queens,
+    sunshine: originalProduct.available_sunshine,
+    gurney: originalProduct.available_gurney_paragon
+  });
+  
+  // ✅ Compare ALL fields (direct comparison)
+  const nameChanged = originalProduct.name !== name;
+  const priceChanged = Math.abs(originalProduct.price - price) > 0.001;
+  const categoryChanged = originalProduct.category !== category;
+  const queensChanged = originalProduct.available_queens !== availableQueens;
+  const sunshineChanged = originalProduct.available_sunshine !== availableSunshine;
+  const gurneyChanged = originalProduct.available_gurney_paragon !== availableGurney;
+  
+  console.log('🔄 CHANGE DETECTION:', {
+    nameChanged: `${originalProduct.name} → ${name} = ${nameChanged}`,
+    priceChanged: `${originalProduct.price} → ${price} = ${priceChanged}`,
+    categoryChanged: `${originalProduct.category} → ${category} = ${categoryChanged}`,
+    queensChanged: `${originalProduct.available_queens} → ${availableQueens} = ${queensChanged}`,
+    sunshineChanged: `${originalProduct.available_sunshine} → ${availableSunshine} = ${sunshineChanged}`,
+    gurneyChanged: `${originalProduct.available_gurney_paragon} → ${availableGurney} = ${gurneyChanged}`
+  });
+  
+  // ✅ If NO changes detected
+  if (!nameChanged && !priceChanged && !categoryChanged && 
+      !queensChanged && !sunshineChanged && !gurneyChanged) {
+    errorDiv.innerText = `No changes detected. (Queens: ${availableQueens}, Sunshine: ${availableSunshine}, Gurney: ${availableGurney})`;
     errorDiv.style.display = 'block';
+    console.warn('⚠️ No changes detected - update cancelled');
     return;
   }
   
+  // ✅ Build update data
+  const updateData = {
+    name: name,
+    price: price,
+    category: category,
+    available_queens: availableQueens,
+    available_sunshine: availableSunshine,
+    available_gurney_paragon: availableGurney
+  };
+  
+  console.log('📤 SENDING TO SUPABASE:', updateData);
+  
   showLoading('Updating product...');
+  
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('products')
-      .update({
-        name: name,
-        price: price,
-        category: category
-      })
-      .eq('id', productId);
+      .update(updateData)
+      .eq('id', productId)
+      .select();
     
-    if (error) throw error;
-    
-    closeAddProductModal();
-    await showAlertModal('Success', `Product "${name}" updated successfully.`);
-    
-    await fetchProductsFromSheet(true);
-    if (inventoryMode) {
-      renderProductGrid();
-      refreshCategoryHighlighting();
-    } else {
-      renderProductGrid();
+    if (error) {
+      console.error('❌ Supabase error:', error);
+      throw error;
     }
+    
+    console.log('✅ SUPABASE RESPONSE:', data);
+    
+    // ✅ Update local products array
+    const localProduct = products.find(p => p.id == productId);
+    if (localProduct) {
+      localProduct.name = name;
+      localProduct.price = price;
+      localProduct.category = category;
+      localProduct.available_queens = availableQueens;
+      localProduct.available_sunshine = availableSunshine;
+      localProduct.available_gurney_paragon = availableGurney;
+      console.log('✅ Local product updated:', localProduct);
+    }
+    
+    // Close modal
+    closeAddProductModal();
+    
+    // ✅ Build change summary
+    let changes = [];
+    if (nameChanged) changes.push(`📝 Name: "${originalProduct.name}" → "${name}"`);
+    if (priceChanged) changes.push(`💰 Price: RM${originalProduct.price.toFixed(2)} → RM${price.toFixed(2)}`);
+    if (categoryChanged) changes.push(`📂 Category: "${originalProduct.category}" → "${category}"`);
+    if (queensChanged) changes.push(`🏬 Queens: ${originalProduct.available_queens ? '✅' : '❌'} → ${availableQueens ? '✅' : '❌'}`);
+    if (sunshineChanged) changes.push(`☀️ Sunshine: ${originalProduct.available_sunshine ? '✅' : '❌'} → ${availableSunshine ? '✅' : '❌'}`);
+    if (gurneyChanged) changes.push(`🏙️ Gurney: ${originalProduct.available_gurney_paragon ? '✅' : '❌'} → ${availableGurney ? '✅' : '❌'}`);
+    
+    await showAlertModal('✅ Product Updated', 
+      `Product "${name}" updated successfully!\n\n` +
+      `Changes:\n${changes.map(c => `• ${c}`).join('\n')}`
+    );
+    
+    // ✅ Refresh everything
+    await fetchProductsFromSheet(true);
+    renderProductGrid();
+    if (inventoryMode) {
+      refreshCategoryHighlighting();
+    }
+    
+    // ✅ Re-populate the edit select with updated data
+    populateEditProductSelect();
+    
   } catch (err) {
-    console.error(err);
+    console.error('❌ Update error:', err);
     errorDiv.innerText = 'Failed to update product: ' + err.message;
     errorDiv.style.display = 'block';
   } finally {
     hideLoading();
   }
 }
-
-// Update the confirm button to handle both add and edit
-document.getElementById('confirmAddProductBtn')?.addEventListener('click', function() {
-  if (productEditMode) {
-    updateProduct();
-  } else {
-    addNewProduct();
-  }
-});
 
 async function loadStockHistoryFromSheet() {
   showLoading('Loading saved stock history...');
