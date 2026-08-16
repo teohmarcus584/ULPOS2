@@ -3344,6 +3344,7 @@ function toggleStoreFilter() {
   storeFilterActive = !storeFilterActive;
   const btn = document.getElementById('storeFilterToggleBtn');
   if (btn) {
+    // ✅ Only show the button text, no indicator in sales mode
     btn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
     btn.classList.toggle('active', storeFilterActive);
   }
@@ -3594,18 +3595,18 @@ function renderProductGrid() {
   // Build product cards
   let html = '';
   
-  // ✅ Show store filter indicator (only in normal mode)
-  if (!inventoryMode && storeFilterActive && !showAllProductsInInventory) {
-    const storeNames = {
-      queens: '🏬 Queens',
-      sunshine: '☀️ Sunshine',
-      gurney_paragon: '🏙️ Gurney Paragon'
-    };
-    const productCount = filtered.length;
-    html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
-      📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
-    </div>`;
-  }
+  // ✅ Show store filter indicator - ONLY in inventory mode
+if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
+  const storeNames = {
+    queens: '🏬 Queens',
+    sunshine: '☀️ Sunshine',
+    gurney_paragon: '🏙️ Gurney Paragon'
+  };
+  const productCount = filtered.length;
+  html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
+    📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
+  </div>`;
+}
   
   // ✅ Inventory Mode or Normal Mode
   if (inventoryMode) {
@@ -10793,12 +10794,11 @@ function toggleInventoryMode() {
     if (lowStockBtn) lowStockBtn.style.display = 'inline-flex';
     if (storeFilterBtn) {
       storeFilterBtn.style.display = 'inline-flex';
-      // ✅ In inventory mode, default to showing ALL products
+      // In inventory mode, default to showing ALL products
       showAllProductsInInventory = true;
       storeFilterBtn.textContent = '📋 Show All Products';
       storeFilterBtn.classList.add('active');
     }
-    loadStockHistoryFromSheet();
   } else {
     cartNormalContent.style.display = 'block';
     stockHistoryContainerDiv.style.display = 'none';
@@ -10806,8 +10806,7 @@ function toggleInventoryMode() {
     if (editProductBtn) editProductBtn.style.display = 'none';
     if (lowStockBtn) lowStockBtn.style.display = 'none';
     if (storeFilterBtn) {
-      storeFilterBtn.style.display = 'none';
-      // ✅ Exit inventory mode: restore store filter
+      storeFilterBtn.style.display = 'none';  // ✅ HIDDEN in sales mode
       showAllProductsInInventory = false;
       storeFilterBtn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
     }
