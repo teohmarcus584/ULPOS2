@@ -3594,7 +3594,7 @@ function renderProductGrid() {
   // Build product cards
   let html = '';
   
-  // ✅ Show store filter indicator - ONLY in inventory mode
+  // Show store filter indicator - ONLY in inventory mode
   if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
     const storeNames = {
       queens: '🏬 Queens',
@@ -3607,111 +3607,306 @@ function renderProductGrid() {
     </div>`;
   }
   
-  // ✅ Inventory Mode or Normal Mode
+  // ============================================================
+  // INVENTORY MODE - Checkbox style store availability
+  // ============================================================
   if (inventoryMode) {
-    // Inventory Mode - shows stock controls AND badges
     filtered.forEach(prod => {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
-      const availabilityBadge = getStoreAvailabilityBadge(prod);
       
-      html += `<div class="product-card ${lowStockClass}" data-id="${prod.id}">
-        <div class="product-name">${escapeHtml(prod.name)} ${availabilityBadge}</div>
-        <div class="product-category">${escapeHtml(prod.category)}</div>
-        <div class="product-price">RM ${prod.price.toFixed(2)}</div>
-        <div class="inventory-controls">
-          <button class="inventory-btn dec-stock" data-id="${prod.id}">−</button>
-          <input type="number" class="stock-input" data-id="${prod.id}" value="${prod.stock}" step="1" min="0" style="width:70px; text-align:center; border-radius:20px; border:1px solid #cbd5e1; padding:6px;">
-          <button class="inventory-btn inc-stock" data-id="${prod.id}">+</button>
+      // Determine if any store is available
+      const hasQueens = prod.available_queens !== false;
+      const hasSunshine = prod.available_sunshine !== false;
+      const hasGurney = prod.available_gurney_paragon !== false;
+      const anyStoreAvailable = hasQueens || hasSunshine || hasGurney;
+      
+      html += `<div class="product-card ${lowStockClass}" data-id="${prod.id}" style="padding: 16px; ${!anyStoreAvailable ? 'opacity: 0.6; border-color: #ef4444;' : ''}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 150px;">
+            <div class="product-name" style="font-weight: 600; font-size: 1rem;">${escapeHtml(prod.name)} ${!anyStoreAvailable ? '🚫' : ''}</div>
+            <div class="product-category" style="font-size: 0.8rem; color: #64748b;">${escapeHtml(prod.category)}</div>
+            <div class="product-price" style="font-size: 1.1rem; color: #2c7a4b; font-weight: 700;">RM ${prod.price.toFixed(2)}</div>
+            <div style="font-size: 0.8rem; margin-top: 4px;">
+              📦 Stock: <strong>${prod.stock}</strong>
+              ${prod.stock <= 0 ? ' 🔴 OUT OF STOCK' : prod.stock < 5 ? ' ⚠️ Low Stock' : ''}
+            </div>
+            ${!anyStoreAvailable ? '<div style="font-size:0.75rem; color:#ef4444; margin-top:4px;">⚠️ Not available at any store</div>' : ''}
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; background: #f8fafc; padding: 8px 12px; border-radius: 12px; border: 1px solid #e2e8f0; min-width: 140px;">
+            <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasQueens ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
+              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="queens" ${hasQueens ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+              <span>🏬 Queens</span>
+              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasQueens ? '#2c7a4b' : '#ef4444'};">${hasQueens ? '✅' : '❌'}</span>
+            </label>
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasSunshine ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
+              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="sunshine" ${hasSunshine ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+              <span>☀️ Sunshine</span>
+              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasSunshine ? '#2c7a4b' : '#ef4444'};">${hasSunshine ? '✅' : '❌'}</span>
+            </label>
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasGurney ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
+              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="gurney_paragon" ${hasGurney ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+              <span>🏙️ Gurney</span>
+              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasGurney ? '#2c7a4b' : '#ef4444'};">${hasGurney ? '✅' : '❌'}</span>
+            </label>
+          </div>
         </div>
-        <div style="font-size:0.65rem; color:#64748b; margin-top:4px;">
-          ${getStoreAvailabilityText(prod)}
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button class="inventory-btn dec-stock" data-id="${prod.id}" style="background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; cursor: pointer; touch-action: manipulation;">−</button>
+            <input type="number" class="stock-input" data-id="${prod.id}" value="${prod.stock}" step="1" min="0" style="width: 60px; text-align: center; border-radius: 20px; border: 1px solid #cbd5e1; padding: 4px 6px; font-size: 0.9rem; font-weight: 600;">
+            <button class="inventory-btn inc-stock" data-id="${prod.id}" style="background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; cursor: pointer; touch-action: manipulation;">+</button>
+          </div>
+          <span style="font-size: 0.7rem; color: #94a3b8;">Click checkboxes to toggle store availability</span>
         </div>
       </div>`;
     });
-  } else {
-    // ✅ NORMAL SALES MODE - NO BADGES, clean display
-    filtered.forEach(prod => {
-      let additionalClass = '';
-      if (prod.stock <= 0) {
-        additionalClass = 'out-of-stock-card';
-      }
-      
-      // ✅ No availability badge in sales mode
-      const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
-      
-      html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
-        <div class="product-name">${escapeHtml(prod.name)}</div>
-        <div class="product-category">${escapeHtml(prod.category)}</div>
-        <div class="product-price">RM ${prod.price.toFixed(2)}</div>
-        <div class="product-stock">${stockStatus}</div>
-      </div>`;
-    });
+    
+    productGridEl.innerHTML = html;
+    productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
+    
+    // ✅ Attach inventory mode event listeners
+    attachInventoryEvents();
+    
+    // ✅ Attach store availability checkbox events
+    attachStoreAvailabilityEvents();
+    
+    return;
   }
+  
+  // ============================================================
+  // NORMAL SALES MODE - Clean display, NO badges
+  // ============================================================
+  filtered.forEach(prod => {
+    let additionalClass = '';
+    if (prod.stock <= 0) {
+      additionalClass = 'out-of-stock-card';
+    }
+    
+    // No availability badge in sales mode
+    const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
+    
+    html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
+      <div class="product-name">${escapeHtml(prod.name)}</div>
+      <div class="product-category">${escapeHtml(prod.category)}</div>
+      <div class="product-price">RM ${prod.price.toFixed(2)}</div>
+      <div class="product-stock">${stockStatus}</div>
+    </div>`;
+  });
   
   productGridEl.innerHTML = html;
   productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
   
-  // Attach event listeners
-  if (inventoryMode) {
-    // Inventory mode event listeners
-    document.querySelectorAll('.dec-stock').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = btn.dataset.id;
-        const input = document.querySelector(`.stock-input[data-id="${id}"]`);
-        if (input) {
-          let newVal = parseInt(input.value) - 1;
-          if (isNaN(newVal)) newVal = 0;
-          if (newVal < 0) newVal = 0;
-          updateStockForProduct(id, newVal, -1);
+  // Attach normal mode event listeners (click to add to cart)
+  document.querySelectorAll('.product-card').forEach(card => {
+    const productId = card.dataset.id;
+    const product = products.find(p => p.id == productId);
+    if (product) {
+      card.addEventListener('click', (e) => {
+        if (!inventoryMode) {
+          addToCart(product);
         }
-        e.stopPropagation();
       });
-    });
-    
-    document.querySelectorAll('.inc-stock').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = btn.dataset.id;
-        const input = document.querySelector(`.stock-input[data-id="${id}"]`);
-        if (input) {
-          let newVal = parseInt(input.value) + 1;
-          if (isNaN(newVal)) newVal = 0;
-          updateStockForProduct(id, newVal, 1);
-        }
-        e.stopPropagation();
-      });
-    });
-    
-    document.querySelectorAll('.stock-input').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const id = input.dataset.id;
-        let newVal = parseInt(input.value);
-        if (isNaN(newVal)) newVal = 0;
-        if (newVal < 0) newVal = 0;
-        const product = products.find(p => p.id == id);
-        if (product) {
-          const delta = newVal - product.stock;
-          updateStockForProduct(id, newVal, delta);
-        }
-        e.stopPropagation();
-      });
-    });
-  } else {
-    // Normal mode: click on product card adds to cart
-    document.querySelectorAll('.product-card').forEach(card => {
-      const productId = card.dataset.id;
-      const product = products.find(p => p.id == productId);
-      if (product) {
-        card.addEventListener('click', (e) => {
-          if (!inventoryMode) {
-            addToCart(product);
-          }
-        });
-      }
-    });
-  }
+    }
+  });
+}
+// ============================================================
+// HELPER FUNCTIONS FOR INVENTORY MODE
+// ============================================================
+
+function attachInventoryEvents() {
+  // Stock decrement buttons
+  document.querySelectorAll('.dec-stock').forEach(btn => {
+    btn.removeEventListener('click', handleDecStock);
+    btn.addEventListener('click', handleDecStock);
+  });
+  
+  // Stock increment buttons
+  document.querySelectorAll('.inc-stock').forEach(btn => {
+    btn.removeEventListener('click', handleIncStock);
+    btn.addEventListener('click', handleIncStock);
+  });
+  
+  // Stock input change
+  document.querySelectorAll('.stock-input').forEach(input => {
+    input.removeEventListener('change', handleStockInputChange);
+    input.addEventListener('change', handleStockInputChange);
+  });
 }
 
+function handleDecStock(e) {
+  const id = this.dataset.id;
+  const input = document.querySelector(`.stock-input[data-id="${id}"]`);
+  if (input) {
+    let newVal = parseInt(input.value) - 1;
+    if (isNaN(newVal)) newVal = 0;
+    if (newVal < 0) newVal = 0;
+    updateStockForProduct(id, newVal, -1);
+  }
+  e.stopPropagation();
+}
+
+function handleIncStock(e) {
+  const id = this.dataset.id;
+  const input = document.querySelector(`.stock-input[data-id="${id}"]`);
+  if (input) {
+    let newVal = parseInt(input.value) + 1;
+    if (isNaN(newVal)) newVal = 0;
+    updateStockForProduct(id, newVal, 1);
+  }
+  e.stopPropagation();
+}
+
+function handleStockInputChange(e) {
+  const id = this.dataset.id;
+  let newVal = parseInt(this.value);
+  if (isNaN(newVal)) newVal = 0;
+  if (newVal < 0) newVal = 0;
+  const product = products.find(p => p.id == id);
+  if (product) {
+    const delta = newVal - product.stock;
+    updateStockForProduct(id, newVal, delta);
+  }
+  e.stopPropagation();
+}
+
+function attachStoreAvailabilityEvents() {
+  document.querySelectorAll('.store-availability-checkbox').forEach(cb => {
+    cb.removeEventListener('change', handleAvailabilityChange);
+    cb.addEventListener('change', handleAvailabilityChange);
+  });
+}
+
+async function handleAvailabilityChange(e) {
+  e.stopPropagation();
+  const cb = this;
+  const productId = cb.dataset.product;
+  const store = cb.dataset.store;
+  const isChecked = cb.checked;
+  
+  // Find the product
+  const product = products.find(p => p.id == productId);
+  if (!product) return;
+  
+  // Map store to database field
+  const fieldMap = {
+    'queens': 'available_queens',
+    'sunshine': 'available_sunshine',
+    'gurney_paragon': 'available_gurney_paragon'
+  };
+  
+  const field = fieldMap[store];
+  if (!field) return;
+  
+  // Update the product object locally first (optimistic update)
+  product[field] = isChecked;
+  
+  // Update the status indicator
+  const label = cb.closest('label');
+  const statusSpan = label ? label.querySelector('span:last-child') : null;
+  if (statusSpan) {
+    statusSpan.textContent = isChecked ? '✅' : '❌';
+    statusSpan.style.color = isChecked ? '#2c7a4b' : '#ef4444';
+  }
+  if (label) {
+    label.style.background = isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+  }
+  
+  // Show loading indicator
+  cb.disabled = true;
+  cb.style.opacity = '0.5';
+  
+  try {
+    // ✅ Update Supabase
+    const updateData = {};
+    updateData[field] = isChecked;
+    
+    const { error } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', productId);
+    
+    if (error) {
+      console.error('❌ Error updating store availability:', error);
+      // Revert the checkbox
+      cb.checked = !isChecked;
+      product[field] = !isChecked;
+      if (statusSpan) {
+        statusSpan.textContent = !isChecked ? '✅' : '❌';
+        statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
+      }
+      if (label) {
+        label.style.background = !isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+      }
+      await showAlertModal('Error', 'Failed to update store availability: ' + error.message);
+    } else {
+      console.log(`✅ Store ${store} availability updated to ${isChecked} for product ${product.name}`);
+      
+      // Update the card appearance
+      const card = cb.closest('.product-card');
+      if (card) {
+        // Check if any store is available
+        const hasQueens = product.available_queens !== false;
+        const hasSunshine = product.available_sunshine !== false;
+        const hasGurney = product.available_gurney_paragon !== false;
+        const anyStoreAvailable = hasQueens || hasSunshine || hasGurney;
+        
+        card.style.opacity = anyStoreAvailable ? '1' : '0.6';
+        card.style.borderColor = anyStoreAvailable ? '' : '#ef4444';
+        
+        // Update the product name badge
+        const nameDiv = card.querySelector('.product-name');
+        if (nameDiv) {
+          const currentText = nameDiv.textContent;
+          if (!anyStoreAvailable) {
+            if (!currentText.includes('🚫')) {
+              nameDiv.textContent = currentText.replace('🚫', '').trim() + ' 🚫';
+            }
+          } else {
+            nameDiv.textContent = currentText.replace('🚫', '').trim();
+          }
+        }
+        
+        // Update or remove the "not available" warning
+        let warningDiv = card.querySelector('.no-store-warning');
+        if (!anyStoreAvailable) {
+          if (!warningDiv) {
+            const priceDiv = card.querySelector('.product-price');
+            if (priceDiv) {
+              warningDiv = document.createElement('div');
+              warningDiv.className = 'no-store-warning';
+              warningDiv.style.cssText = 'font-size:0.75rem; color:#ef4444; margin-top:4px;';
+              warningDiv.textContent = '⚠️ Not available at any store';
+              priceDiv.parentNode.insertBefore(warningDiv, priceDiv.nextSibling);
+            }
+          }
+        } else {
+          if (warningDiv) {
+            warningDiv.remove();
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('❌ Error:', err);
+    cb.checked = !isChecked;
+    product[field] = !isChecked;
+    if (statusSpan) {
+      statusSpan.textContent = !isChecked ? '✅' : '❌';
+      statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
+    }
+    if (label) {
+      label.style.background = !isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+    }
+  } finally {
+    cb.disabled = false;
+    cb.style.opacity = '1';
+  }
+}
 // ==================== HELPER FUNCTIONS FOR STORE AVAILABILITY ====================
 
 function getStoreAvailabilityBadge(product) {
