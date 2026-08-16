@@ -2060,6 +2060,38 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 .product-list .stock-take-card .diff-badge {
   font-size: 0.7rem !important;
 }
+/* Store filter toggle button */
+#storeFilterToggleBtn {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 40px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+#storeFilterToggleBtn:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#storeFilterToggleBtn.active {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 4px rgba(59,130,246,0.3);
+}
+
+#storeFilterToggleBtn.active:hover {
+  background: #2563eb;
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2107,7 +2139,7 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
       </div>
     </div>
     <div class="pos-header-right">
-	 <button id="addProductHeaderBtn" class="cart-header-btn" style="display: none;">➕ Add Product</button>
+	 <button id="editProductHeaderBtn" class="cart-header-btn" style="display: none;">✏️ Edit Product</button>
       <span class="cashier-info" id="employeeNameHeader"></span>
 	   <button id="promoVoucherBtn" class="cart-header-btn" title="Print Promo Voucher">🎟️ Promo Voucher</button>
       <span id="barcodeStatus" class="cashier-info" style="background:#e8f5e9; color:#2c7a4b;">📷 Barcode ready</span>
@@ -2117,17 +2149,23 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   </div>
   <div class="pos-dashboard">
    <div class="products-panel">
-  <div class="filter-bar">
-    <select id="categorySelect">...</select>
-    <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search product...">
-    <button id="refreshProductsPanelBtn" class="refresh-btn">🔄 Sync now</button>
-    <button id="lowStockToggleBtn" class="low-stock-toggle">⚠️ Low Stock</button>
-    <div class="view-toggle">
-      <button id="backToCategoriesBtn" style="display:none;" class="refresh-btn">← Categories</button>
-      <button id="gridViewBtn" title="Grid view">⊞</button>
-      <button id="listViewBtn" class="active" title="List view">≡</button>
-    </div>
+ <div class="filter-bar">
+  <select id="categorySelect">...</select>
+  <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search product...">
+  <button id="refreshProductsPanelBtn" class="refresh-btn">🔄 Sync now</button>
+  <button id="lowStockToggleBtn" class="low-stock-toggle">⚠️ Low Stock</button>
+  
+  <!-- ✅ ADD THIS BUTTON - Store Filter Toggle -->
+  <button id="storeFilterToggleBtn" class="low-stock-toggle" style="display: none;">
+    🏪 Store Filter: ON
+  </button>
+  
+  <div class="view-toggle">
+    <button id="backToCategoriesBtn" style="display:none;" class="refresh-btn">← Categories</button>
+    <button id="gridViewBtn" title="Grid view">⊞</button>
+    <button id="listViewBtn" class="active" title="List view">≡</button>
   </div>
+</div>
   
   <!-- ✅ ADD STOCK TAKE MODE INDICATOR HERE (BEFORE productGrid) -->
   <div id="stockTakeModeIndicator" style="display:none; background:#f0fdf4; border:2px solid #10b981; border-radius:12px; padding:12px; margin:8px 0; text-align:center;">
@@ -2593,28 +2631,73 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <div id="telegramStatus" style="margin-top: 12px; font-size: 0.9rem; color: #2c7a4b;"></div>
   </div>
 </div>
-<!-- Add Product Modal (for Inventory Mode) -->
+<!-- Enhanced Add/Edit Product Modal with Store Availability -->
 <div id="addProductModal" class="modal-overlay">
-  <div class="modal-container" style="max-width: 500px;">
+  <div class="modal-container" style="max-width: 650px;">
     <span class="close-modal" id="closeAddProductModal">×</span>
-    <div class="modal-title">➕ Add New Product</div>
-    <div class="filter-group">
-      <label>Product Name</label>
-      <input type="text" id="newProductName" class="modal-input" placeholder="e.g., Luxury Perfume">
+    <div class="modal-title" id="addProductModalTitle">➕ Add New Product</div>
+    
+    <!-- Mode Selection Tabs -->
+    <div style="display: flex; gap: 12px; margin-bottom: 20px; background: #f1f5f9; border-radius: 12px; padding: 4px;">
+      <button id="addProductModeBtn" class="modal-btn" style="flex:1; border-radius: 8px; background: #2c7a4b; color: white; padding: 10px;">➕ Add New</button>
+      <button id="editProductModeBtn" class="modal-btn" style="flex:1; border-radius: 8px; background: transparent; color: #475569; padding: 10px;">✏️ Edit Existing</button>
     </div>
-    <div class="filter-group">
-      <label>Selling Price (RM)</label>
-      <input type="number" id="newProductPrice" class="modal-input" step="0.01" min="0" placeholder="0.00">
+    
+    <!-- Product Selection (for Edit mode) -->
+    <div id="editProductSelection" style="display: none; margin-bottom: 20px;">
+      <div class="filter-group">
+        <label>Select Product to Edit</label>
+        <select id="editProductSelect" class="modal-input" style="width:100%; padding: 12px;">
+          <option value="">-- Select a product --</option>
+        </select>
+      </div>
     </div>
-    <div class="filter-group">
-  <label>Category</label>
-  <select id="newProductCategorySelect" class="modal-input">
-    <option value="">-- Select or create category --</option>
-  </select>
-  <div id="newCategoryInputGroup" style="display: none; margin-top: 8px;">
-    <input type="text" id="newProductCategoryText" class="modal-input" placeholder="Enter new category name">
-  </div>
-</div>
+    
+    <!-- Product Details Form -->
+    <div id="productFormFields">
+      <div class="filter-group">
+        <label>Product Name</label>
+        <input type="text" id="newProductName" class="modal-input" placeholder="e.g., Luxury Perfume">
+      </div>
+      <div class="filter-group">
+        <label>Selling Price (RM)</label>
+        <input type="number" id="newProductPrice" class="modal-input" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="filter-group">
+        <label>Category</label>
+        <select id="newProductCategorySelect" class="modal-input">
+          <option value="">-- Select or create category --</option>
+        </select>
+        <div id="newCategoryInputGroup" style="display: none; margin-top: 8px;">
+          <input type="text" id="newProductCategoryText" class="modal-input" placeholder="Enter new category name">
+        </div>
+      </div>
+      
+      <!-- Store Availability Section -->
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 2px solid #e2e8f0;">
+        <label style="font-weight: 600; font-size: 1rem; color: #0f172a; display: block; margin-bottom: 12px;">
+          🏪 Available at Stores
+          <span style="font-size: 0.8rem; font-weight: 400; color: #64748b; display: block; margin-top: 2px;">
+            Uncheck stores where this product should NOT be sold
+          </span>
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <input type="checkbox" id="availableQueens" checked style="width: 20px; height: 20px; cursor: pointer;">
+            <span style="font-weight: 500;">🏬 Queens</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <input type="checkbox" id="availableSunshine" checked style="width: 20px; height: 20px; cursor: pointer;">
+            <span style="font-weight: 500;">☀️ Sunshine</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 16px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <input type="checkbox" id="availableGurney" checked style="width: 20px; height: 20px; cursor: pointer;">
+            <span style="font-weight: 500;">🏙️ Gurney Paragon</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    
     <div id="addProductError" style="color:#ef4444; margin-top: 12px; display: none;"></div>
     <div class="modal-buttons">
       <button id="confirmAddProductBtn" class="modal-btn modal-btn-primary">➕ Add Product</button>
@@ -3237,7 +3320,11 @@ async function fetchProductsFromSheet(force = false) {
       category: p.category || "Uncategorized",
       stock_queens: parseInt(p.stock_queens) || 0,
       stock_sunshine: parseInt(p.stock_sunshine) || 0,
-      stock_gurney_paragon: parseInt(p.stock_gurney_paragon) || 0
+      stock_gurney_paragon: parseInt(p.stock_gurney_paragon) || 0,
+      // ✅ Store availability
+      available_queens: p.available_queens !== false,
+      available_sunshine: p.available_sunshine !== false,
+      available_gurney_paragon: p.available_gurney_paragon !== false
     }));
     
     updateCategoryDropdown();
@@ -3249,6 +3336,18 @@ async function fetchProductsFromSheet(force = false) {
     await showAlertModal('Error', 'Failed to load products.');
     return false;
   }
+}
+let storeFilterActive = true; // Default: ON (show only store-specific products)
+let showAllProductsInInventory = false; // Override in inventory mode
+
+function toggleStoreFilter() {
+  storeFilterActive = !storeFilterActive;
+  const btn = document.getElementById('storeFilterToggleBtn');
+  if (btn) {
+    btn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
+    btn.classList.toggle('active', storeFilterActive);
+  }
+  renderProductGrid();
 }
 // ==================== STOCK TAKE RENDER FUNCTION ====================
 
@@ -3369,27 +3468,37 @@ function renderProductGrid() {
   const searchTerm = searchInput.value.toLowerCase();
   const selectedCategory = categorySelect.value;
   
+  // Stock Take Mode
   if (stockTakeMode) {
     renderStockTakeProductGrid();
     return;
   }
   
+  // Category View (when no category selected, not in inventory mode, no search)
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
-    const categories = [...new Set(products.map(p => p.category))];
+    let categories = [...new Set(products.map(p => p.category))];
+    
+    // ✅ Apply store filter to categories
+    if (storeFilterActive && !showAllProductsInInventory) {
+      const availabilityKey = `available_${currentStore}`;
+      const availableProducts = products.filter(p => p[availabilityKey] !== false);
+      categories = [...new Set(availableProducts.map(p => p.category))];
+    }
+    
     let filteredCategories = categories;
-
+    
     if (searchTerm) {
       filteredCategories = filteredCategories.filter(cat =>
         cat.toLowerCase().includes(searchTerm)
       );
     }
-
+    
     if (filteredCategories.length === 0) {
       productGridEl.innerHTML = '<div style="text-align:center; padding:20px;">No categories match your search.</div>';
       productGridEl.className = 'product-grid';
       return;
     }
-
+    
     let html = '';
     filteredCategories.forEach(cat => {
       const productCount = products.filter(p => p.category === cat).length;
@@ -3404,10 +3513,10 @@ function renderProductGrid() {
         </div>
       `;
     });
-
+    
     productGridEl.innerHTML = html;
     productGridEl.className = 'product-grid';
-
+    
     document.querySelectorAll('.category-card').forEach(card => {
       card.addEventListener('click', () => {
         const category = card.dataset.category;
@@ -3415,28 +3524,43 @@ function renderProductGrid() {
         renderProductGrid();
       });
     });
-
+    
     const backBtn = document.getElementById('backToCategoriesBtn');
     if (backBtn) backBtn.style.display = 'none';
     return;
   }
-
+  
+  // Product List/Grid View
   const backBtn = document.getElementById('backToCategoriesBtn');
   if (backBtn) {
     backBtn.style.display = (selectedCategory !== 'all' && !inventoryMode) ? 'inline-flex' : 'none';
   }
-
+  
+  // ✅ Apply ALL filters
   let filtered = products.slice();
+  
+  // 1. Store filter (only in normal mode, not when "Show All" is active)
+  if (storeFilterActive && !showAllProductsInInventory && !inventoryMode) {
+    const availabilityKey = `available_${currentStore}`;
+    filtered = filtered.filter(p => p[availabilityKey] !== false);
+  }
+  
+  // 2. Category filter
   if (selectedCategory !== 'all') {
     filtered = filtered.filter(p => p.category === selectedCategory);
   }
+  
+  // 3. Search filter
   if (searchTerm) {
     filtered = filtered.filter(p => p.name.toLowerCase().includes(searchTerm));
   }
+  
+  // 4. Low stock filter
   if (lowStockFilterActive) {
     filtered = filtered.filter(p => p.stock < LOW_STOCK_THRESHOLD);
   }
-
+  
+  // Check if products are loaded
   if (products.length === 0) {
     productGridEl.innerHTML = `
       <div style="text-align:center; padding:20px;">
@@ -3449,21 +3573,49 @@ function renderProductGrid() {
     productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
     return;
   }
-
+  
+  // No products match filters
   if (filtered.length === 0) {
-    productGridEl.innerHTML = '<div style="text-align:center; padding:20px;">No products match your filters.</div>';
+    let message = 'No products match your filters.';
+    if (storeFilterActive && !inventoryMode && !showAllProductsInInventory) {
+      const storeNames = {
+        queens: 'Queens',
+        sunshine: 'Sunshine',
+        gurney_paragon: 'Gurney Paragon'
+      };
+      message = `No products available at ${storeNames[currentStore] || currentStore}. Try turning off the store filter.`;
+    }
+    productGridEl.innerHTML = `<div style="text-align:center; padding:20px;">${message}</div>`;
     productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
     return;
   }
-
+  
+  // Build product cards
   let html = '';
-  filtered.forEach(prod => {
-    const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
-    const lowStockClass = (inventoryMode && isLowStock) ? 'low-stock-card' : '';
-
-    if (inventoryMode) {
-      html += `<div class="product-card ${lowStockClass}">
-        <div class="product-name">${escapeHtml(prod.name)}</div>
+  
+  // ✅ Show store filter indicator (only in normal mode)
+  if (!inventoryMode && storeFilterActive && !showAllProductsInInventory) {
+    const storeNames = {
+      queens: '🏬 Queens',
+      sunshine: '☀️ Sunshine',
+      gurney_paragon: '🏙️ Gurney Paragon'
+    };
+    const productCount = filtered.length;
+    html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
+      📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
+    </div>`;
+  }
+  
+  // ✅ Inventory Mode or Normal Mode
+  if (inventoryMode) {
+    // Inventory Mode - shows stock controls
+    filtered.forEach(prod => {
+      const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
+      const lowStockClass = isLowStock ? 'low-stock-card' : '';
+      const availabilityBadge = getStoreAvailabilityBadge(prod);
+      
+      html += `<div class="product-card ${lowStockClass}" data-id="${prod.id}">
+        <div class="product-name">${escapeHtml(prod.name)} ${availabilityBadge}</div>
         <div class="product-category">${escapeHtml(prod.category)}</div>
         <div class="product-price">RM ${prod.price.toFixed(2)}</div>
         <div class="inventory-controls">
@@ -3471,27 +3623,35 @@ function renderProductGrid() {
           <input type="number" class="stock-input" data-id="${prod.id}" value="${prod.stock}" step="1" min="0" style="width:70px; text-align:center; border-radius:20px; border:1px solid #cbd5e1; padding:6px;">
           <button class="inventory-btn inc-stock" data-id="${prod.id}">+</button>
         </div>
+        <div style="font-size:0.65rem; color:#64748b; margin-top:4px;">
+          ${getStoreAvailabilityText(prod)}
+        </div>
       </div>`;
-    } else {
+    });
+  } else {
+    // Normal Mode - click to add to cart
+    filtered.forEach(prod => {
       let additionalClass = '';
-      if (!inventoryMode && prod.stock <= 0) {
+      if (prod.stock <= 0) {
         additionalClass = 'out-of-stock-card';
-      } else if (inventoryMode && prod.stock < LOW_STOCK_THRESHOLD) {
-        additionalClass = 'low-stock-card';
       }
-      const stockStatus = `📦 Stock: ${prod.stock}`;
+      
+      const availabilityBadge = getStoreAvailabilityBadge(prod);
+      const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
+      
       html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
-        <div class="product-name">${escapeHtml(prod.name)}</div>
+        <div class="product-name">${escapeHtml(prod.name)} ${availabilityBadge}</div>
         <div class="product-category">${escapeHtml(prod.category)}</div>
         <div class="product-price">RM ${prod.price.toFixed(2)}</div>
         <div class="product-stock">${stockStatus}</div>
       </div>`;
-    }
-  });
-
+    });
+  }
+  
   productGridEl.innerHTML = html;
   productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
-
+  
+  // ✅ Attach event listeners
   if (inventoryMode) {
     // Inventory mode event listeners
     document.querySelectorAll('.dec-stock').forEach(btn => {
@@ -3507,7 +3667,7 @@ function renderProductGrid() {
         e.stopPropagation();
       });
     });
-
+    
     document.querySelectorAll('.inc-stock').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = btn.dataset.id;
@@ -3520,7 +3680,7 @@ function renderProductGrid() {
         e.stopPropagation();
       });
     });
-
+    
     document.querySelectorAll('.stock-input').forEach(input => {
       input.addEventListener('change', (e) => {
         const id = input.dataset.id;
@@ -3542,11 +3702,48 @@ function renderProductGrid() {
       const product = products.find(p => p.id == productId);
       if (product) {
         card.addEventListener('click', (e) => {
-          addToCart(product);
+          // Only add to cart if not in inventory mode
+          if (!inventoryMode) {
+            addToCart(product);
+          }
         });
       }
     });
   }
+}
+
+// ==================== HELPER FUNCTIONS FOR STORE AVAILABILITY ====================
+
+function getStoreAvailabilityBadge(product) {
+  if (!product) return '';
+  
+  const stores = [];
+  if (product.available_queens) stores.push('Q');
+  if (product.available_sunshine) stores.push('S');
+  if (product.available_gurney_paragon) stores.push('G');
+  
+  if (stores.length === 0) return '🚫';
+  if (stores.length === 3) return '🌍';
+  return `📍${stores.join('')}`;
+}
+
+function getStoreAvailabilityText(product) {
+  if (!product) return '';
+  
+  const storeNames = {
+    queens: '🏬 Queens',
+    sunshine: '☀️ Sunshine',
+    gurney_paragon: '🏙️ Gurney Paragon'
+  };
+  
+  const available = [];
+  if (product.available_queens) available.push(storeNames.queens);
+  if (product.available_sunshine) available.push(storeNames.sunshine);
+  if (product.available_gurney_paragon) available.push(storeNames.gurney_paragon);
+  
+  if (available.length === 0) return '🚫 Not available at any store';
+  if (available.length === 3) return '🌍 Available at all stores';
+  return `📍 Available at: ${available.join(', ')}`;
 }
 
 function updateStockForProduct(productId, newStock, delta) {
@@ -10584,31 +10781,44 @@ function hidePaymentRowsForNonAdmin() {
 function toggleInventoryMode() {
   inventoryMode = !inventoryMode;
   const lowStockBtn = document.getElementById('lowStockToggleBtn');
-  const addProductBtn = document.getElementById('addProductHeaderBtn');
+  const editProductBtn = document.getElementById('editProductHeaderBtn');
+  const storeFilterBtn = document.getElementById('storeFilterToggleBtn');
 
   if (inventoryMode) {
     cartNormalContent.style.display = 'none';
     stockHistoryContainerDiv.style.display = 'flex';
     cartTitleElement.innerText = '📦 Inventory Mode';
-    if (addProductBtn) addProductBtn.style.display = 'inline-flex';
+    if (editProductBtn) editProductBtn.style.display = 'inline-flex';
     if (lowStockBtn) lowStockBtn.style.display = 'inline-flex';
+    if (storeFilterBtn) {
+      storeFilterBtn.style.display = 'inline-flex';
+      // ✅ In inventory mode, default to showing ALL products
+      showAllProductsInInventory = true;
+      storeFilterBtn.textContent = '📋 Show All Products';
+      storeFilterBtn.classList.add('active');
+    }
     loadStockHistoryFromSheet();
   } else {
     cartNormalContent.style.display = 'block';
     stockHistoryContainerDiv.style.display = 'none';
     cartTitleElement.innerText = '🧾 Current Sale';
-    if (addProductBtn) addProductBtn.style.display = 'none';
+    if (editProductBtn) editProductBtn.style.display = 'none';
     if (lowStockBtn) lowStockBtn.style.display = 'none';
+    if (storeFilterBtn) {
+      storeFilterBtn.style.display = 'none';
+      // ✅ Exit inventory mode: restore store filter
+      showAllProductsInInventory = false;
+      storeFilterBtn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
+    }
     if (lowStockFilterActive) {
       lowStockFilterActive = false;
       if (lowStockBtn) lowStockBtn.classList.remove('active');
       renderProductGrid();
     }
     
-    // ✅ SYNC when exiting inventory mode (all changes should be saved)
+    // ✅ SYNC when exiting inventory mode
     if (stockHistory.length > 0) {
       console.log('🔄 Syncing after exiting inventory mode...');
-      // Debounce to allow final updates to complete
       setTimeout(() => {
         backgroundSync(true).catch(err => {
           console.warn('⚠️ Background sync after inventory mode failed:', err);
@@ -10672,19 +10882,221 @@ async function bulkUpdateStock(productUpdates) {
     await showAlertModal('Stock Update Failed', 'Failed to update multiple products. Please try again.');
   }
 }
+// ==================== EDIT/ADD PRODUCT FUNCTIONS ====================
+
+// ==================== EDIT/ADD PRODUCT FUNCTIONS ====================
+
+let productEditMode = false; // false = Add mode, true = Edit mode
+
 function showAddProductModal() {
+  // Reset form
   document.getElementById('newProductName').value = '';
   document.getElementById('newProductPrice').value = '';
   document.getElementById('newProductCategoryText').value = '';
   document.getElementById('addProductError').style.display = 'none';
+  document.getElementById('newCategoryInputGroup').style.display = 'none';
+  
+  // Set mode to Add
+  productEditMode = false;
+  document.getElementById('addProductModalTitle').innerText = '➕ Add New Product';
+  document.getElementById('confirmAddProductBtn').innerHTML = '➕ Add Product';
+  document.getElementById('editProductSelection').style.display = 'none';
+  document.getElementById('productFormFields').style.display = 'block';
+  
+  // Reset button styles
+  document.getElementById('addProductModeBtn').style.background = '#2c7a4b';
+  document.getElementById('addProductModeBtn').style.color = 'white';
+  document.getElementById('editProductModeBtn').style.background = 'transparent';
+  document.getElementById('editProductModeBtn').style.color = '#475569';
   
   populateCategorySelect();
-  
-  document.getElementById('newCategoryInputGroup').style.display = 'none';
-  document.getElementById('newProductCategorySelect').value = '';
-  
   document.getElementById('addProductModal').style.display = 'flex';
 }
+
+function showEditProductModal() {
+  // Reset form
+  document.getElementById('newProductName').value = '';
+  document.getElementById('newProductPrice').value = '';
+  document.getElementById('newProductCategoryText').value = '';
+  document.getElementById('addProductError').style.display = 'none';
+  document.getElementById('newCategoryInputGroup').style.display = 'none';
+  
+  // ✅ Reset store checkboxes
+  document.getElementById('availableQueens').checked = true;
+  document.getElementById('availableSunshine').checked = true;
+  document.getElementById('availableGurney').checked = true;
+  
+  // Set mode to Edit
+  productEditMode = true;
+  document.getElementById('addProductModalTitle').innerText = '✏️ Edit Product';
+  document.getElementById('confirmAddProductBtn').innerHTML = '💾 Update Product';
+  document.getElementById('editProductSelection').style.display = 'block';
+  document.getElementById('productFormFields').style.display = 'block';
+  
+  // Populate product dropdown with category grouping
+  populateEditProductSelect();
+  
+  // Reset button styles
+  document.getElementById('editProductModeBtn').style.background = '#2c7a4b';
+  document.getElementById('editProductModeBtn').style.color = 'white';
+  document.getElementById('addProductModeBtn').style.background = 'transparent';
+  document.getElementById('addProductModeBtn').style.color = '#475569';
+  
+  populateCategorySelect();
+  document.getElementById('addProductModal').style.display = 'flex';
+}
+
+function showAddProductModal() {
+  // Reset form
+  document.getElementById('newProductName').value = '';
+  document.getElementById('newProductPrice').value = '';
+  document.getElementById('newProductCategoryText').value = '';
+  document.getElementById('addProductError').style.display = 'none';
+  document.getElementById('newCategoryInputGroup').style.display = 'none';
+  
+  // ✅ Reset store checkboxes (all checked by default)
+  document.getElementById('availableQueens').checked = true;
+  document.getElementById('availableSunshine').checked = true;
+  document.getElementById('availableGurney').checked = true;
+  
+  // Set mode to Add
+  productEditMode = false;
+  document.getElementById('addProductModalTitle').innerText = '➕ Add New Product';
+  document.getElementById('confirmAddProductBtn').innerHTML = '➕ Add Product';
+  document.getElementById('editProductSelection').style.display = 'none';
+  document.getElementById('productFormFields').style.display = 'block';
+  
+  // Reset button styles
+  document.getElementById('addProductModeBtn').style.background = '#2c7a4b';
+  document.getElementById('addProductModeBtn').style.color = 'white';
+  document.getElementById('editProductModeBtn').style.background = 'transparent';
+  document.getElementById('editProductModeBtn').style.color = '#475569';
+  
+  populateCategorySelect();
+  document.getElementById('addProductModal').style.display = 'flex';
+}
+
+function populateEditProductSelect() {
+  const select = document.getElementById('editProductSelect');
+  if (!select) return;
+  
+  // Group products by category
+  const groupedProducts = {};
+  const sortedProducts = [...products].sort((a, b) => a.name.localeCompare(b.name));
+  
+  sortedProducts.forEach(product => {
+    const category = product.category || 'Uncategorized';
+    if (!groupedProducts[category]) {
+      groupedProducts[category] = [];
+    }
+    groupedProducts[category].push(product);
+  });
+  
+  // Build the options with category headers
+  let html = '<option value="">-- Select a product --</option>';
+  
+  // Sort categories alphabetically
+  const sortedCategories = Object.keys(groupedProducts).sort();
+  
+  sortedCategories.forEach(category => {
+    const productsInCategory = groupedProducts[category];
+    
+    // Add category header with product count
+    html += `<optgroup label="━━━ 📂 ${category} (${productsInCategory.length}) ━━━" style="font-weight:700; color:#0f172a; background:#f1f5f9;">`;
+    
+    // Add products in this category (sorted by name)
+    productsInCategory.forEach(product => {
+      // ✅ Show store availability
+      const stores = [];
+      if (product.available_queens) stores.push('🏬Q');
+      if (product.available_sunshine) stores.push('☀️S');
+      if (product.available_gurney_paragon) stores.push('🏙️G');
+      const storeBadge = stores.length > 0 ? ` [${stores.join(' ')}]` : ' [🚫 No stores]';
+      
+      const stockStatus = product.stock <= 0 ? '🔴 Out of Stock' : 
+                          product.stock < 5 ? `🟡 ${product.stock} left` : 
+                          `📦 ${product.stock}`;
+      html += `<option value="${product.id}" style="padding-left:20px; ${product.stock <= 0 ? 'color:#ef4444;' : ''}">
+        ${product.name} - RM ${product.price.toFixed(2)} ${storeBadge} (${stockStatus})
+      </option>`;
+    });
+    
+    html += `</optgroup>`;
+  });
+  
+  select.innerHTML = html;
+}
+
+// Update the editProductSelect change event to load store availability
+document.getElementById('editProductSelect')?.addEventListener('change', function() {
+  const productId = this.value;
+  if (!productId) {
+    // Clear form
+    document.getElementById('newProductName').value = '';
+    document.getElementById('newProductPrice').value = '';
+    document.getElementById('newProductCategorySelect').value = '';
+    document.getElementById('availableQueens').checked = true;
+    document.getElementById('availableSunshine').checked = true;
+    document.getElementById('availableGurney').checked = true;
+    return;
+  }
+  
+  const product = products.find(p => p.id == productId);
+  if (!product) return;
+  
+  // Populate form with product data
+  document.getElementById('newProductName').value = product.name;
+  document.getElementById('newProductPrice').value = product.price;
+  
+  // ✅ Load store availability
+  document.getElementById('availableQueens').checked = product.available_queens !== false;
+  document.getElementById('availableSunshine').checked = product.available_sunshine !== false;
+  document.getElementById('availableGurney').checked = product.available_gurney_paragon !== false;
+  
+  // Set category
+  const categorySelect = document.getElementById('newProductCategorySelect');
+  if (categorySelect) {
+    // Check if category exists in dropdown
+    let categoryExists = false;
+    for (let i = 0; i < categorySelect.options.length; i++) {
+      if (categorySelect.options[i].value === product.category) {
+        categoryExists = true;
+        break;
+      }
+    }
+    if (categoryExists) {
+      categorySelect.value = product.category;
+    } else {
+      // If category doesn't exist in dropdown, add it
+      const option = document.createElement('option');
+      option.value = product.category;
+      option.textContent = product.category;
+      categorySelect.appendChild(option);
+      categorySelect.value = product.category;
+    }
+  }
+});
+// Add this to your DOMContentLoaded event listener
+document.getElementById('storeFilterToggleBtn').addEventListener('click', function() {
+  if (inventoryMode) {
+    // In inventory mode: toggle between "Show All" and "Show Store Only"
+    showAllProductsInInventory = !showAllProductsInInventory;
+    this.textContent = showAllProductsInInventory ? '📋 Show All Products' : '🏪 Store Filter: ON';
+    this.classList.toggle('active', showAllProductsInInventory);
+    renderProductGrid();
+  } else {
+    // In normal mode: toggle store filter
+    toggleStoreFilter();
+  }
+});
+// Mode toggle buttons
+document.getElementById('addProductModeBtn')?.addEventListener('click', function() {
+  showAddProductModal();
+});
+
+document.getElementById('editProductModeBtn')?.addEventListener('click', function() {
+  showEditProductModal();
+});
 
 function closeAddProductModal() {
   document.getElementById('addProductModal').style.display = 'none';
@@ -10693,6 +11105,9 @@ function closeAddProductModal() {
 function populateCategorySelect() {
   const select = document.getElementById('newProductCategorySelect');
   if (!select) return;
+  
+  // Get current value to preserve selection
+  const currentValue = select.value;
   
   const categories = [...new Set(products.map(p => p.category))].sort();
   
@@ -10707,6 +11122,11 @@ function populateCategorySelect() {
   newOption.value = "__NEW__";
   newOption.textContent = "➕ New Category";
   select.appendChild(newOption);
+  
+  // Restore previous selection if it still exists
+  if (currentValue && categories.includes(currentValue)) {
+    select.value = currentValue;
+  }
 }
 
 function toggleNewCategoryInput() {
@@ -10727,6 +11147,12 @@ async function addNewProduct() {
   let category = select.value;
   const errorDiv = document.getElementById('addProductError');
   
+  // ✅ Get store availability
+  const availableQueens = document.getElementById('availableQueens').checked;
+  const availableSunshine = document.getElementById('availableSunshine').checked;
+  const availableGurney = document.getElementById('availableGurney').checked;
+  
+  // Validate category
   if (category === "__NEW__") {
     const newCat = document.getElementById('newProductCategoryText').value.trim();
     if (!newCat) {
@@ -10741,6 +11167,7 @@ async function addNewProduct() {
     return;
   }
   
+  // Validate name and price
   if (!name) {
     errorDiv.innerText = 'Product name is required.';
     errorDiv.style.display = 'block';
@@ -10748,6 +11175,13 @@ async function addNewProduct() {
   }
   if (isNaN(price) || price <= 0) {
     errorDiv.innerText = 'Please enter a valid selling price (greater than 0).';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // ✅ Check if at least one store is selected
+  if (!availableQueens && !availableSunshine && !availableGurney) {
+    errorDiv.innerText = 'Please select at least one store where this product is available.';
     errorDiv.style.display = 'block';
     return;
   }
@@ -10763,7 +11197,11 @@ async function addNewProduct() {
         category: category,
         stock_queens: 0,
         stock_sunshine: 0,
-        stock_gurney_paragon: 0
+        stock_gurney_paragon: 0,
+        // ✅ Store availability
+        available_queens: availableQueens,
+        available_sunshine: availableSunshine,
+        available_gurney_paragon: availableGurney
       }]);
     
     if (error) throw error;
@@ -10786,6 +11224,213 @@ async function addNewProduct() {
     hideLoading();
   }
 }
+
+async function updateProduct() {
+  const productId = document.getElementById('editProductSelect').value;
+  if (!productId) {
+    document.getElementById('addProductError').innerText = 'Please select a product to edit.';
+    document.getElementById('addProductError').style.display = 'block';
+    return;
+  }
+  
+  const name = document.getElementById('newProductName').value.trim();
+  const price = parseFloat(document.getElementById('newProductPrice').value);
+  const select = document.getElementById('newProductCategorySelect');
+  let category = select.value;
+  const errorDiv = document.getElementById('addProductError');
+  
+  // ✅ Get store availability
+  const availableQueens = document.getElementById('availableQueens').checked;
+  const availableSunshine = document.getElementById('availableSunshine').checked;
+  const availableGurney = document.getElementById('availableGurney').checked;
+  
+  // Validate category
+  if (category === "__NEW__") {
+    const newCat = document.getElementById('newProductCategoryText').value.trim();
+    if (!newCat) {
+      errorDiv.innerText = 'Please enter a new category name.';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    category = newCat;
+  } else if (!category) {
+    errorDiv.innerText = 'Please select or create a category.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Validate name and price
+  if (!name) {
+    errorDiv.innerText = 'Product name is required.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  if (isNaN(price) || price <= 0) {
+    errorDiv.innerText = 'Please enter a valid selling price (greater than 0).';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // ✅ Check if at least one store is selected
+  if (!availableQueens && !availableSunshine && !availableGurney) {
+    errorDiv.innerText = 'Please select at least one store where this product is available.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Find original product
+  const originalProduct = products.find(p => p.id == productId);
+  if (!originalProduct) {
+    errorDiv.innerText = 'Product not found.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Check if anything actually changed
+  if (originalProduct.name === name && 
+      originalProduct.price === price && 
+      originalProduct.category === category &&
+      originalProduct.available_queens === availableQueens &&
+      originalProduct.available_sunshine === availableSunshine &&
+      originalProduct.available_gurney_paragon === availableGurney) {
+    errorDiv.innerText = 'No changes detected.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  showLoading('Updating product...');
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: name,
+        price: price,
+        category: category,
+        available_queens: availableQueens,
+        available_sunshine: availableSunshine,
+        available_gurney_paragon: availableGurney
+      })
+      .eq('id', productId);
+    
+    if (error) throw error;
+    
+    closeAddProductModal();
+    await showAlertModal('Success', `Product "${name}" updated successfully.`);
+    
+    await fetchProductsFromSheet(true);
+    if (inventoryMode) {
+      renderProductGrid();
+      refreshCategoryHighlighting();
+    } else {
+      renderProductGrid();
+    }
+  } catch (err) {
+    console.error(err);
+    errorDiv.innerText = 'Failed to update product: ' + err.message;
+    errorDiv.style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+}
+
+async function updateProduct() {
+  const productId = document.getElementById('editProductSelect').value;
+  if (!productId) {
+    document.getElementById('addProductError').innerText = 'Please select a product to edit.';
+    document.getElementById('addProductError').style.display = 'block';
+    return;
+  }
+  
+  const name = document.getElementById('newProductName').value.trim();
+  const price = parseFloat(document.getElementById('newProductPrice').value);
+  const select = document.getElementById('newProductCategorySelect');
+  let category = select.value;
+  const errorDiv = document.getElementById('addProductError');
+  
+  // Validate category
+  if (category === "__NEW__") {
+    const newCat = document.getElementById('newProductCategoryText').value.trim();
+    if (!newCat) {
+      errorDiv.innerText = 'Please enter a new category name.';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    category = newCat;
+  } else if (!category) {
+    errorDiv.innerText = 'Please select or create a category.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Validate name and price
+  if (!name) {
+    errorDiv.innerText = 'Product name is required.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  if (isNaN(price) || price <= 0) {
+    errorDiv.innerText = 'Please enter a valid selling price (greater than 0).';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Find original product
+  const originalProduct = products.find(p => p.id == productId);
+  if (!originalProduct) {
+    errorDiv.innerText = 'Product not found.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  // Check if anything actually changed
+  if (originalProduct.name === name && 
+      originalProduct.price === price && 
+      originalProduct.category === category) {
+    errorDiv.innerText = 'No changes detected.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  showLoading('Updating product...');
+  try {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: name,
+        price: price,
+        category: category
+      })
+      .eq('id', productId);
+    
+    if (error) throw error;
+    
+    closeAddProductModal();
+    await showAlertModal('Success', `Product "${name}" updated successfully.`);
+    
+    await fetchProductsFromSheet(true);
+    if (inventoryMode) {
+      renderProductGrid();
+      refreshCategoryHighlighting();
+    } else {
+      renderProductGrid();
+    }
+  } catch (err) {
+    console.error(err);
+    errorDiv.innerText = 'Failed to update product: ' + err.message;
+    errorDiv.style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+}
+
+// Update the confirm button to handle both add and edit
+document.getElementById('confirmAddProductBtn')?.addEventListener('click', function() {
+  if (productEditMode) {
+    updateProduct();
+  } else {
+    addNewProduct();
+  }
+});
 
 async function loadStockHistoryFromSheet() {
   showLoading('Loading saved stock history...');
@@ -11554,8 +12199,19 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('promoStaffPurchase').addEventListener('click', applyStaffDiscount);
 
   // Add product
-  document.getElementById('addProductHeaderBtn').addEventListener('click', showAddProductModal);
-  document.getElementById('confirmAddProductBtn').addEventListener('click', addNewProduct);
+  // REPLACE the old line with this:
+document.getElementById('editProductHeaderBtn').addEventListener('click', function() {
+  // Default to Add mode when clicking from header
+  showAddProductModal();
+});
+  // Update the confirm button to handle both add and edit
+document.getElementById('confirmAddProductBtn').addEventListener('click', function() {
+  if (productEditMode) {
+    updateProduct();
+  } else {
+    addNewProduct();
+  }
+});
   document.getElementById('cancelAddProductBtn').addEventListener('click', closeAddProductModal);
   document.getElementById('closeAddProductModal').addEventListener('click', closeAddProductModal);
   document.getElementById('newProductCategorySelect').addEventListener('change', toggleNewCategoryInput);
