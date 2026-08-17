@@ -3441,7 +3441,16 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
 async function fetchProductsFromSheet(force = false) {
   try {
     const store = currentStore;
-    const stockColumn = `stock_${store}`;
+    
+    // Find the store to get its slot number
+    const currentStoreObj = stores.find(s => s.store_id === store);
+    let stockColumn = `stock_${store}`; // Fallback
+    
+    if (currentStoreObj && currentStoreObj.slot_number) {
+      const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
+      stockColumn = `stock_store_${slotNumStr}`;
+      console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+    }
     
     const { data, error } = await supabase
       .from('products')
@@ -3450,7 +3459,7 @@ async function fetchProductsFromSheet(force = false) {
     
     if (error) throw error;
     
-    // ✅ Build product objects dynamically for all stores
+    // Build product objects with slot-based fields
     products = data.map(p => {
       const product = {
         id: p.id,
@@ -3460,12 +3469,15 @@ async function fetchProductsFromSheet(force = false) {
         category: p.category || "Uncategorized"
       };
       
-      // ✅ Dynamically add all store-specific fields
+      // Add slot-based fields for all stores
       stores.forEach(s => {
-        const storeId = s.store_id;
-        product[`stock_${storeId}`] = parseInt(p[`stock_${storeId}`]) || 0;
-        // Availability defaults to true if not set (for backward compatibility)
-        product[`available_${storeId}`] = p[`available_${storeId}`] !== false;
+        if (s.slot_number) {
+          const slotNumStr = String(s.slot_number).padStart(2, '0');
+          const availabilityKey = `available_store_${slotNumStr}`;
+          const stockKey = `stock_store_${slotNumStr}`;
+          product[availabilityKey] = p[availabilityKey] !== false;
+          product[stockKey] = parseInt(p[stockKey]) || 0;
+        }
       });
       
       return product;
@@ -14007,18 +14019,34 @@ function renderStoreList() {
   }
   
   let html = '';
-  stores.forEach(store => {
+  // Sort by slot number
+  const sortedStores = [...stores].sort((a, b) => (a.slot_number || 999) - (b.slot_number || 999));
+  
+  sortedStores.forEach(store => {
     const isCurrent = currentStore === store.store_id;
-    const productCount = products.filter(p => p[`available_${store.store_id}`] !== false).length;
+    let productCount = 0;
+    
+    if (store.slot_number) {
+      const slotNumStr = String(store.slot_number).padStart(2, '0');
+      const availabilityKey = `available_store_${slotNumStr}`;
+      productCount = products.filter(p => p[availabilityKey] !== false).length;
+    }
+    
+    const slotDisplay = store.slot_number ? `#${String(store.slot_number).padStart(2, '0')}` : 'No slot';
+    const isActive = store.is_active !== false;
+    const statusText = isActive ? '✅ Active' : '⏸️ Inactive';
+    const statusColor = isActive ? '#2c7a4b' : '#ef4444';
     
     html += `
       <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid ${isCurrent ? '#3b82f6' : '#e2e8f0'}; ${isCurrent ? 'border-left: 4px solid #3b82f6;' : ''}">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
           <div style="flex: 1;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <strong style="font-size: 1.1rem;">${escapeHtml(store.name)}</strong>
-              ${isCurrent ? '<span style="background: #3b82f6; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">CURRENT</span>' : ''}
-              <span style="font-size: 0.75rem; color: #64748b;">ID: ${escapeHtml(store.store_id)}</span>
+              <span style="background: #f1f5f9; color: #475569; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">Slot ${slotDisplay}</span>
+              <span style="background: ${isCurrent ? '#3b82f6' : '#f1f5f9'}; color: ${isCurrent ? 'white' : '#475569'}; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">
+                ${isCurrent ? '⭐ CURRENT' : statusText}
+              </span>
             </div>
             <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">${escapeHtml(store.address || 'No address')}</div>
             <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
@@ -14224,6 +14252,32 @@ function renderAllDynamicStoreContent() {
   // Update all dropdowns
   populateStoreDropdowns();
 }
+
+// ============================================================
+// STORE SLOT MANAGEMENT
+// ============================================================
+
+async function getNextAvailableSlot() {
+  const { data, error } = await supabase
+    .from('stores')
+    .select('slot_number')
+    .not('slot_number', 'is', null);
+  
+  if (error) {
+    console.error('Error getting used slots:', error);
+    return 1;
+  }
+  
+  const usedSlots = data.map(s => s.slot_number).filter(n => n !== null);
+  
+  for (let i = 1; i <= 20; i++) {
+    if (!usedSlots.includes(i)) {
+      return i;
+    }
+  }
+  
+  return null; // All slots used
+}
 // ============================================================
 // STORE CRUD OPERATIONS
 // ============================================================
@@ -14252,7 +14306,24 @@ async function addStore() {
   showLoading('Adding store...');
   
   try {
-    // 1. Add the store to stores table
+    // 🔥 GET NEXT AVAILABLE SLOT
+    const slotNumber = await getNextAvailableSlot();
+    
+    if (!slotNumber) {
+      await showAlertModal('⚠️ All Slots Used', 
+        'All 20 store slots are used. Please contact the admin to add more slots.'
+      );
+      hideLoading();
+      return;
+    }
+    
+    const slotNumStr = String(slotNumber).padStart(2, '0');
+    const availabilityField = `available_store_${slotNumStr}`;
+    const stockField = `stock_store_${slotNumStr}`;
+    
+    console.log(`📌 Assigned slot ${slotNumber} (${availabilityField}) to store "${name}"`);
+    
+    // 1. Add the store with slot number
     const { data, error } = await supabase
       .from('stores')
       .insert([{
@@ -14262,7 +14333,8 @@ async function addStore() {
         latitude: lat || null,
         longitude: lng || null,
         is_active: true,
-        prefix: storeId.substring(0, 3).toUpperCase() + String(Math.floor(Math.random() * 90 + 10))
+        prefix: storeId.substring(0, 3).toUpperCase() + String(Math.floor(Math.random() * 90 + 10)),
+        slot_number: slotNumber  // ✅ Store which slot this store uses
       }])
       .select();
     
@@ -14270,132 +14342,31 @@ async function addStore() {
     
     console.log('✅ Store added:', data);
     
-    // 2. 🔥 FETCH ALL PRODUCTS and update them one by one
-    const availabilityField = `available_${storeId}`;
-    const stockField = `stock_${storeId}`;
-    
-    console.log(`📝 Adding columns for store "${storeId}" to products table...`);
-    
-    // Get all products
+    // 2. Update all products with the new store columns (set default values)
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, name');
+      .select('id');
     
-    if (productsError) {
-      console.warn('Could not fetch products:', productsError);
-    } else if (products && products.length > 0) {
-      console.log(`📦 Found ${products.length} products to update`);
-      
-      // Update each product with the new store fields
-      // This will fail gracefully if columns don't exist
-      let successCount = 0;
-      let failCount = 0;
-      
-      // Process in batches to avoid rate limits
-      const chunkSize = 20;
+    if (products && products.length > 0) {
+      const chunkSize = 30;
       for (let i = 0; i < products.length; i += chunkSize) {
         const chunk = products.slice(i, i + chunkSize);
+        const ids = chunk.map(p => p.id);
         
-        // Update each product in the chunk
-        for (const product of chunk) {
-          try {
-            const updateData = {
-              [availabilityField]: true,
-              [stockField]: 0
-            };
-            
-            const { error: updateError } = await supabase
-              .from('products')
-              .update(updateData)
-              .eq('id', product.id);
-            
-            if (updateError) {
-              // If the error is about missing columns, we need to add them
-              if (updateError.code === 'PGRST204') {
-                console.warn(`⚠️ Columns don't exist for product ${product.id}, trying to add them...`);
-                
-                // Try to add columns using ALTER TABLE via Supabase's /rest/v1/pg/exec endpoint
-                // This uses the direct PostgreSQL endpoint
-                const sql = `
-                  ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;
-                  ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;
-                `;
-                
-                // Use the /rest/v1/pg endpoint (if available)
-                const pgResponse = await fetch(`${SUPABASE_URL}/rest/v1/pg`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                  },
-                  body: JSON.stringify({ query: sql })
-                });
-                
-                if (!pgResponse.ok) {
-                  // If it fails, we need to show manual instructions
-                  const errorMsg = await pgResponse.text();
-                  console.error('❌ Failed to add columns:', errorMsg);
-                  
-                  // Show manual SQL instructions
-                  await showAlertModal('⚠️ Manual Action Required', 
-                    `Store "${name}" has been added but the product columns could not be created automatically.\n\n` +
-                    `Please run this SQL in the Supabase SQL Editor:\n\n` +
-                    `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;\n` +
-                    `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;\n\n` +
-                    `After adding the columns, refresh the page to see the store.`
-                  );
-                  
-                  // Store was added, but columns weren't created
-                  // Refresh UI to show the store
-                  await fetchStores(true);
-                  renderStoreList();
-                  populateStoreDropdowns();
-                  renderAllDynamicStoreContent();
-                  
-                  hideLoading();
-                  return;
-                } else {
-                  // Columns added successfully!
-                  console.log('✅ Columns added via /rest/v1/pg');
-                  
-                  // Try the update again
-                  const { error: retryError } = await supabase
-                    .from('products')
-                    .update({
-                      [availabilityField]: true,
-                      [stockField]: 0
-                    })
-                    .eq('id', product.id);
-                  
-                  if (retryError) {
-                    console.error('Retry failed:', retryError);
-                  } else {
-                    successCount++;
-                  }
-                }
-              } else {
-                // Other error
-                console.error(`Error updating product ${product.id}:`, updateError);
-                failCount++;
-              }
-            } else {
-              successCount++;
-            }
-            
-            // Small delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 50));
-            
-          } catch (err) {
-            console.error(`Failed to update product ${product.id}:`, err);
-            failCount++;
-          }
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            [availabilityField]: true,
+            [stockField]: 0
+          })
+          .in('id', ids);
+        
+        if (updateError) {
+          console.warn(`Error updating chunk ${i / chunkSize + 1}:`, updateError);
+        } else {
+          console.log(`✅ Updated chunk ${i / chunkSize + 1}`);
         }
-        
-        console.log(`✅ Processed chunk ${i / chunkSize + 1}: ${successCount} successes, ${failCount} failures`);
       }
-      
-      console.log(`📊 Summary: ${successCount} products updated, ${failCount} failed`);
     }
     
     // Clear form
@@ -14417,7 +14388,9 @@ async function addStore() {
     
     await showAlertModal('✅ Store Added', 
       `Store "${name}" has been added successfully!\n\n` +
-      `You can now assign products to this store in Inventory Mode.`
+      `📌 Assigned Slot: ${slotNumber}/20\n` +
+      `📦 All products are now available at this store with 0 stock.\n\n` +
+      `You can adjust stock and availability in Inventory Mode.`
     );
     
   } catch (err) {
@@ -14511,11 +14484,22 @@ async function deleteStore(storeId) {
   }
   
   const store = stores.find(s => s.store_id === storeId);
-  if (!store) return;
+  if (!store) {
+    await showAlertModal('Error', 'Store not found.');
+    return;
+  }
   
   // Check if store has products
-  const productCount = products.filter(p => p[`available_${storeId}`] !== false).length;
-  let warningMsg = `Are you sure you want to delete store "${store.name}"?`;
+  let productCount = 0;
+  if (store.slot_number) {
+    const slotNumStr = String(store.slot_number).padStart(2, '0');
+    const availabilityKey = `available_store_${slotNumStr}`;
+    productCount = products.filter(p => p[availabilityKey] !== false).length;
+  }
+  
+  let warningMsg = `Are you sure you want to permanently delete store "${store.name}"?`;
+  warningMsg += `\n\n📌 Slot ${store.slot_number || 'N/A'} will be released.`;
+  
   if (productCount > 0) {
     warningMsg += `\n\n⚠️ This store has ${productCount} products assigned to it. They will still exist but won't be visible for this store.`;
   }
@@ -14526,26 +14510,68 @@ async function deleteStore(storeId) {
   showLoading('Deleting store...');
   
   try {
-    // ✅ SOFT DELETE - Mark as inactive
-    const { error } = await supabase
+    // ✅ STEP 1: Release the slot number first
+    if (store.slot_number) {
+      const { error: releaseError } = await supabase
+        .from('stores')
+        .update({ slot_number: null })
+        .eq('store_id', storeId);
+      
+      if (releaseError) {
+        console.warn('Failed to release slot:', releaseError);
+        // Continue anyway
+      } else {
+        console.log(`✅ Slot ${store.slot_number} released from store "${store.name}"`);
+      }
+    }
+    
+    // ✅ STEP 2: Actually DELETE the store from the table
+    const { error: deleteError } = await supabase
       .from('stores')
-      .update({ is_active: false })
+      .delete()
       .eq('store_id', storeId);
     
-    if (error) throw error;
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      
+      // If delete fails, try soft delete as fallback
+      console.log('⚠️ Hard delete failed, trying soft delete...');
+      const { error: softError } = await supabase
+        .from('stores')
+        .update({ 
+          is_active: false,
+          slot_number: null
+        })
+        .eq('store_id', storeId);
+      
+      if (softError) throw softError;
+      
+      await showAlertModal('⚠️ Store Deactivated', 
+        `Store "${store.name}" has been deactivated (soft delete).\n\n` +
+        `The store will no longer appear in the list.\n` +
+        `Slot ${store.slot_number} has been released.`
+      );
+    } else {
+      await showAlertModal('✅ Store Deleted', 
+        `Store "${store.name}" has been permanently deleted.\n\n` +
+        `📌 Slot ${store.slot_number || 'N/A'} has been released and is now available for reuse.`
+      );
+    }
     
-    await showAlertModal('✅ Store Deleted', `Store "${store.name}" has been deactivated and will no longer appear in the list.`);
-    
-    // Refresh stores and UI
+    // ✅ STEP 3: Refresh everything
     await fetchStores(true);
     renderStoreList();
     populateStoreDropdowns();
     renderAllDynamicStoreContent();
     
-    // If the deleted store was the current store, switch to first available
+    // ✅ STEP 4: If the deleted store was the current store, switch to first available
     if (currentStore === storeId && stores.length > 0) {
       await switchStore(stores[0].store_id);
     }
+    
+    // ✅ STEP 5: Refresh products
+    await fetchProductsFromSheet(true);
+    renderProductGrid();
     
   } catch (err) {
     console.error('Error deleting store:', err);
