@@ -6494,74 +6494,105 @@ async function processRefund(transactionId, store) {
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
 
-// In processRefund function, after saving the refund
-if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
-  console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
-  
-  let retryCount = 0;
-  const maxRetries = 3;
-  let saved = false;
-  
-  while (!saved && retryCount < maxRetries) {
-    try {
-      const invoiceNo = await getNextIRSInvoiceNumber();
-      const refundInvoiceNo = `REF-${invoiceNo}`;
+    // ✅ IRS Reporting for refunds (Card and Alipay)
+    if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
+      console.log(`📋 Saving refund to IRS report for ${transaction.payment_method}`);
       
-      const { error: irsError } = await supabase
-        .from('irs_reporting')
-        .insert([{
-          invoice_no: refundInvoiceNo,
-          transaction_id: refundId,
-          timestamp: new Date().toISOString(),
-          items: JSON.stringify(refundItems),
-          total: refundTotal,
-          store: store,
-          employee_id: currentEmployee.id,
-          employee_name: currentEmployee.name
-        }]);
+      let retryCount = 0;
+      const maxRetries = 3;
+      let saved = false;
       
-      if (irsError) {
-        if (irsError.code === '23505') {
-          console.warn(`⚠️ Duplicate refund invoice number, retrying... (${retryCount + 1}/${maxRetries})`);
+      while (!saved && retryCount < maxRetries) {
+        try {
+          const invoiceNo = await getNextIRSInvoiceNumber();
+          const refundInvoiceNo = `REF-${invoiceNo}`;
+          
+          const { error: irsError } = await supabase
+            .from('irs_reporting')
+            .insert([{
+              invoice_no: refundInvoiceNo,
+              transaction_id: refundId,
+              timestamp: new Date().toISOString(),
+              items: JSON.stringify(refundItems),
+              total: refundTotal,
+              store: store,
+              employee_id: currentEmployee.id,
+              employee_name: currentEmployee.name
+            }]);
+          
+          if (irsError) {
+            if (irsError.code === '23505') {
+              console.warn(`⚠️ Duplicate refund invoice number, retrying... (${retryCount + 1}/${maxRetries})`);
+              retryCount++;
+              await new Promise(resolve => setTimeout(resolve, 200));
+              continue;
+            }
+            console.error('❌ IRS refund report error:', irsError);
+            break;
+          } else {
+            console.log(`✅ IRS refund report saved: ${refundInvoiceNo}`);
+            saved = true;
+            break;
+          }
+        } catch (irsErr) {
+          console.error('❌ IRS refund reporting failed:', irsErr);
           retryCount++;
           await new Promise(resolve => setTimeout(resolve, 200));
-          continue;
         }
-        console.error('❌ IRS refund report error:', irsError);
-        break;
-      } else {
-        console.log(`✅ IRS refund report saved: ${refundInvoiceNo}`);
-        saved = true;
-        break;
       }
-    } catch (irsErr) {
-      console.error('❌ IRS refund reporting failed:', irsErr);
-      retryCount++;
-      await new Promise(resolve => setTimeout(resolve, 200));
     }
-  }
-}
 
-    // Restore stock
+    // ✅ RESTORE STOCK - USING SLOT-BASED COLUMNS
+    console.log('🔄 Restoring stock for refund...');
+    
+    // Find the store's slot number
+    const storeObj = stores.find(s => s.store_id === store);
+    let stockColumn = `stock_${store}`; // Fallback for old stores
+    
+    if (storeObj && storeObj.slot_number) {
+      const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+      stockColumn = `stock_store_${slotNumStr}`;
+      console.log(`📦 Using slot-based stock column for refund: ${stockColumn}`);
+    } else {
+      console.log(`📦 Using fallback stock column for refund: ${stockColumn}`);
+    }
+    
     for (const item of transaction.items) {
       if (item.quantity > 0) {
+        // Get current stock from Supabase
         const { data: product, error: pError } = await supabase
           .from('products')
-          .select('stock')
+          .select(stockColumn)
           .eq('id', item.id)
           .single();
         
         if (product && !pError) {
-          const newStock = (product.stock || 0) + item.quantity;
-          await supabase
+          const currentStock = parseInt(product[stockColumn]) || 0;
+          const newStock = currentStock + item.quantity;
+          
+          // Update stock in Supabase
+          const updateData = {};
+          updateData[stockColumn] = newStock;
+          
+          const { error: updateError } = await supabase
             .from('products')
-            .update({ stock: newStock })
+            .update(updateData)
             .eq('id', item.id);
           
+          if (updateError) {
+            console.error(`❌ Error restoring stock for ${item.name}:`, updateError);
+          } else {
+            console.log(`✅ Stock restored for ${item.name}: ${currentStock} → ${newStock}`);
+          }
+          
+          // Update local product
           const localProduct = products.find(p => p.id == item.id);
           if (localProduct) {
             localProduct.stock = newStock;
+            localProduct[stockColumn] = newStock;
           }
+        } else {
+          console.warn(`⚠️ Could not find product ${item.id} or no stock column`);
         }
       }
     }
@@ -6586,7 +6617,7 @@ if (transaction.payment_method === 'Card' || transaction.payment_method === 'Ali
 
     // Update local data
     updateReceipts();
-    localStorage.removeItem(`products_${currentStore}`);
+    localStorage.removeItem(`products_${store}`);
     await fetchProductsFromSheet();
     invalidateAllReportCaches();
 
@@ -10297,9 +10328,17 @@ function renderProductDetails(productsData) {
   tbody.innerHTML = html;
 }
 
-function updateStoreCard(storeName, salesReport, empData) {
-  const card = document.querySelector(`.store-summary-card[data-store="${storeName}"]`);
+function updateStoreCard(storeId, salesReport, empData) {
+  // ✅ Find the card by store ID
+  const card = document.querySelector(`.store-summary-card[data-store="${storeId}"]`);
   if (!card || !salesReport) return;
+  
+  // ✅ Get the store name dynamically
+  const store = stores.find(s => s.store_id === storeId);
+  const storeName = store ? store.name : storeId;
+  const emoji = getStoreEmoji(storeId);
+  
+  card.querySelector('.store-name').innerHTML = `${emoji} ${escapeHtml(storeName)}`;
   card.querySelector('.store-total').innerHTML = `Total Sales: RM ${salesReport.totalSales.toFixed(2)}`;
   card.querySelector('.store-cash').innerHTML = `💵 Cash: RM ${salesReport.cashTotal.toFixed(2)}`;
   card.querySelector('.store-card').innerHTML = `💳 Card: RM ${salesReport.cardTotal.toFixed(2)}`;
@@ -10557,17 +10596,20 @@ async function updateAdminReport(forceRefresh = false) {
   const storeBreakdownDiv = document.getElementById('storeBreakdownContainer');
   if (currentEmployee.isAdmin) {
     storeBreakdownDiv.style.display = 'block';
-    const stores = storeOrder.length > 0 ? storeOrder : stores.map(s => s.store_id);
+    
+    // ✅ DYNAMIC: Get all active stores
+    const activeStores = stores.filter(s => s.is_active !== false);
+    const storeIds = activeStores.map(s => s.store_id);
 
     let needFetch = forceRefresh;
-    for (const storeName of stores) {
-      const cached = await getCachedStoreReport(storeName, from, to);
+    for (const storeId of storeIds) {
+      const cached = await getCachedStoreReport(storeId, from, to);
       if (!cached) needFetch = true;
     }
 
     if (needFetch) {
-      stores.forEach(storeName => {
-        const card = document.querySelector(`.store-summary-card[data-store="${storeName}"]`);
+      storeIds.forEach(storeId => {
+        const card = document.querySelector(`.store-summary-card[data-store="${storeId}"]`);
         if (card) {
           card.querySelector('.store-total').innerHTML = '<span class="report-loading-spinner" style="width:16px;height:16px;"></span> Loading...';
           card.querySelector('.store-cash').innerHTML = '💵 Loading...';
@@ -10582,26 +10624,27 @@ async function updateAdminReport(forceRefresh = false) {
         }
       });
     } else {
-      for (const storeName of stores) {
-        const cached = await getCachedStoreReport(storeName, from, to);
+      for (const storeId of storeIds) {
+        const cached = await getCachedStoreReport(storeId, from, to);
         if (cached) {
-          updateStoreCard(storeName, cached.salesReport, cached.employeeData);
+          updateStoreCard(storeId, cached.salesReport, cached.employeeData);
         }
       }
     }
 
-    const fetchStoreData = async (storeName) => {
+    // Fetch data for all stores in parallel
+    const fetchStoreData = async (storeId) => {
       const [salesReport, empData] = await Promise.all([
-        fetchSalesReport(storeName, 'all', from, to, false, true),
-        fetchEmployeeSalesData(storeName, from, to)
+        fetchSalesReport(storeId, 'all', from, to, false, true),
+        fetchEmployeeSalesData(storeId, from, to)
       ]);
-      return { storeName, salesReport, empData };
+      return { storeId, salesReport, empData };
     };
 
-    const results = await Promise.all(stores.map(fetchStoreData));
-    for (const { storeName, salesReport, empData } of results) {
-      updateStoreCard(storeName, salesReport, empData);
-      setCachedStoreReport(storeName, from, to, { salesReport, employeeData: empData });
+    const results = await Promise.all(storeIds.map(fetchStoreData));
+    for (const { storeId, salesReport, empData } of results) {
+      updateStoreCard(storeId, salesReport, empData);
+      setCachedStoreReport(storeId, from, to, { salesReport, employeeData: empData });
     }
     attachStoreCardClickListeners();
   } else {
@@ -10640,24 +10683,42 @@ async function openReportsModal() {
 
     const allStatItems = document.querySelectorAll('#adminReportModal .stat-item');
     allStatItems.forEach(item => item.style.display = 'flex');
- } else {
-  if (storeBreakdownDiv) storeBreakdownDiv.style.display = 'none';
-  if (reportFiltersDiv) reportFiltersDiv.style.display = 'none';
-  const nonAdminCardsDiv = document.getElementById('nonAdminStatsCards');
-  if (nonAdminCardsDiv) nonAdminCardsDiv.style.display = 'block';
-  if (productToggle) productToggle.style.display = 'block';
-  if (nonAdminDateRangeDiv) nonAdminDateRangeDiv.style.display = 'block';
-
-  hidePaymentRowsForNonAdmin();
-
-  // ✅ Change the label for non-admin
-  const totalSalesStatItem = document.querySelector('#adminReportModal .stat-item:first-child');
-  if (totalSalesStatItem) {
-    const labelSpan = totalSalesStatItem.querySelector('span:first-child');
-    if (labelSpan) {
-      labelSpan.innerText = '👤 My Sales (All Stores):';
+    
+    // ✅ DYNAMIC: Populate store dropdown with all active stores
+    const adminReportStoreSelect = document.getElementById('adminReportStoreSelect');
+    if (adminReportStoreSelect) {
+      const currentValue = adminReportStoreSelect.value;
+      adminReportStoreSelect.innerHTML = '<option value="all">All Stores</option>';
+      const activeStores = stores.filter(s => s.is_active !== false);
+      activeStores.forEach(store => {
+        const option = document.createElement('option');
+        option.value = store.store_id;
+        option.textContent = store.name;
+        adminReportStoreSelect.appendChild(option);
+      });
+      // Restore selection if possible
+      if (currentValue && Array.from(adminReportStoreSelect.options).some(opt => opt.value === currentValue)) {
+        adminReportStoreSelect.value = currentValue;
+      }
     }
-  }
+  } else {
+    if (storeBreakdownDiv) storeBreakdownDiv.style.display = 'none';
+    if (reportFiltersDiv) reportFiltersDiv.style.display = 'none';
+    const nonAdminCardsDiv = document.getElementById('nonAdminStatsCards');
+    if (nonAdminCardsDiv) nonAdminCardsDiv.style.display = 'block';
+    if (productToggle) productToggle.style.display = 'block';
+    if (nonAdminDateRangeDiv) nonAdminDateRangeDiv.style.display = 'block';
+
+    hidePaymentRowsForNonAdmin();
+
+    // ✅ Change the label for non-admin
+    const totalSalesStatItem = document.querySelector('#adminReportModal .stat-item:first-child');
+    if (totalSalesStatItem) {
+      const labelSpan = totalSalesStatItem.querySelector('span:first-child');
+      if (labelSpan) {
+        labelSpan.innerText = '👤 My Sales (All Stores):';
+      }
+    }
 
     const rangeSelect = document.getElementById('nonAdminDateRangeSelect');
     const customDiv = document.getElementById('nonAdminCustomDateRange');
@@ -10717,35 +10778,60 @@ async function openReportsModal() {
     hidePaymentRowsForNonAdmin();
   }
 
+  // ✅ DYNAMIC: Render store summary cards for all active stores
   if (currentEmployee.isAdmin) {
-    if (preloadedReportCache && preloadedReportCache.from === todayStr) {
-      const totals = preloadedReportCache.totals;
-      document.getElementById('adminReportTotalSales').innerText = `RM ${totals.totalSales.toFixed(2)}`;
-      document.getElementById('adminReportCashTotal').innerText = `RM ${totals.cashTotal.toFixed(2)}`;
-      document.getElementById('adminReportCardTotal').innerText = `RM ${totals.cardTotal.toFixed(2)}`;
-      document.getElementById('adminReportQRTotal').innerText = `RM ${totals.otherTotal.toFixed(2)}`;
-      document.getElementById('adminReportAlipayTotal').innerText = `RM ${totals.alipayTotal.toFixed(2)}`;
-      document.getElementById('adminReportRefundTotal').innerText = `RM ${Math.abs(totals.refundTotal).toFixed(2)}`;
-      document.getElementById('adminReportRefundedBills').innerText = totals.refundedTransactionCount || 0;
-      document.getElementById('adminReportTransactionCount').innerText = totals.transactionCount || 0;
-      document.getElementById('adminReportTotalItems').innerText = totals.totalItems || 0;
+    const storeBreakdownContainer = document.getElementById('storeBreakdownContainer');
+    if (storeBreakdownContainer) {
+      // Get the div that contains the store cards
+      const cardsContainer = storeBreakdownContainer.querySelector('div[style*="display: flex; flex-wrap: wrap;"]');
+      if (cardsContainer) {
+        // Clear existing cards and render new ones
+        cardsContainer.innerHTML = '';
+        const activeStores = stores.filter(s => s.is_active !== false);
+        activeStores.forEach(store => {
+          const emoji = getStoreEmoji(store.store_id);
+          const card = document.createElement('div');
+          card.className = 'store-summary-card';
+          card.dataset.store = store.store_id;
+          card.innerHTML = `
+            <div class="store-name">${emoji} ${escapeHtml(store.name)}</div>
+            <div class="store-total">Total Sales: RM 0.00</div>
+            <div class="store-cash">💵 Cash: RM 0.00</div>
+            <div class="store-card">💳 Card: RM 0.00</div>
+            <div class="store-qr">📱 QR Pay: RM 0.00</div>
+            <div class="store-alipay">💸 Alipay: RM 0.00</div>
+            <div class="store-refund">❌ Refunds: RM 0.00</div>
+            <div class="store-refunded-bills">📄 Refunded Bills: 0</div>
+            <div class="store-transactions">Transactions: 0</div>
+            <div class="store-items-sold">Items Sold: 0</div>
+            <div class="store-employee-sales">
+              <h4>👥 Employee Sales</h4>
+              <div class="employee-list"></div>
+            </div>
+          `;
+          cardsContainer.appendChild(card);
+        });
+      }
     }
   }
 
+  // Preload report data for all stores
   if (currentEmployee.isAdmin) {
     const todayUTC = new Date();
     todayUTC.setUTCHours(0, 0, 0, 0);
     const from = getUTCDateString(todayUTC);
     const to = from;
-    const stores = ['queens', 'sunshine', 'gurney_paragon'];
+    
+    const activeStores = stores.filter(s => s.is_active !== false);
     let anyMissing = false;
-    for (const storeName of stores) {
-      const cached = await getCachedStoreReport(storeName, from, to);
+    
+    for (const store of activeStores) {
+      const cached = await getCachedStoreReport(store.store_id, from, to);
       if (cached) {
-        updateStoreCard(storeName, cached.salesReport, cached.employeeData);
+        updateStoreCard(store.store_id, cached.salesReport, cached.employeeData);
       } else {
         anyMissing = true;
-        const card = document.querySelector(`.store-summary-card[data-store="${storeName}"]`);
+        const card = document.querySelector(`.store-summary-card[data-store="${store.store_id}"]`);
         if (card) {
           card.querySelector('.store-total').innerHTML = '<span class="report-loading-spinner"></span> Loading...';
           card.querySelector('.store-cash').innerHTML = '💵 Loading...';
@@ -10760,6 +10846,7 @@ async function openReportsModal() {
         }
       }
     }
+    
     if (!anyMissing) {
       const loadingMsgElem = document.getElementById('adminReportLoadingMsg');
       if (loadingMsgElem) loadingMsgElem.style.display = 'none';
@@ -10790,6 +10877,7 @@ async function openReportsModal() {
     }, 500);
   }
 
+  // ✅ Populate employee dropdowns
   if (currentEmployee.isAdmin) {
     const employees = await fetchEmployees();
     const adminReportEmpSelect = document.getElementById('adminReportEmployeeSelect');
@@ -14198,20 +14286,22 @@ function renderStoreList() {
 // ============================================================
 // DYNAMIC STORE RENDER FUNCTIONS - ADD AFTER renderStoreList()
 // ============================================================
-
 function renderStoreSummaryCards(container) {
   if (!container) {
     console.warn('⚠️ Container for store summary cards not found');
     return;
   }
   
-  if (!stores || stores.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No stores available</div>';
+  // ✅ DYNAMIC: Get all active stores
+  const activeStores = stores.filter(s => s.is_active !== false);
+  
+  if (activeStores.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No active stores available</div>';
     return;
   }
   
   let html = '';
-  stores.forEach(store => {
+  activeStores.forEach(store => {
     const emoji = getStoreEmoji(store.store_id);
     html += `
       <div class="store-summary-card" data-store="${store.store_id}">
