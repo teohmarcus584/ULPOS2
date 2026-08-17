@@ -3652,9 +3652,17 @@ function renderProductGrid() {
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
     let categories = [...new Set(products.map(p => p.category))];
     
-    // Apply store filter to categories
+    // Apply store filter to categories - ✅ FIXED for both old and new stores
     if (storeFilterActive && !showAllProductsInInventory) {
-      const availabilityKey = `available_${currentStore}`;
+      const storeObj = stores.find(s => s.store_id === currentStore);
+      let availabilityKey = `available_${currentStore}`; // Default for old stores
+      
+      // If store has a slot, use slot-based field
+      if (storeObj && storeObj.slot_number) {
+        const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+        availabilityKey = `available_store_${slotNumStr}`;
+      }
+      
       const availableProducts = products.filter(p => p[availabilityKey] !== false);
       categories = [...new Set(availableProducts.map(p => p.category))];
     }
@@ -3714,8 +3722,17 @@ function renderProductGrid() {
   let filtered = products.slice();
   
   // 1. Store filter (only in normal mode, not when "Show All" is active)
+  // ✅ FIXED for both old and new stores
   if (storeFilterActive && !showAllProductsInInventory && !inventoryMode) {
-    const availabilityKey = `available_${currentStore}`;
+    const storeObj = stores.find(s => s.store_id === currentStore);
+    let availabilityKey = `available_${currentStore}`; // Default for old stores
+    
+    // If store has a slot, use slot-based field
+    if (storeObj && storeObj.slot_number) {
+      const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+      availabilityKey = `available_store_${slotNumStr}`;
+    }
+    
     filtered = filtered.filter(p => p[availabilityKey] !== false);
   }
   
@@ -3779,7 +3796,7 @@ function renderProductGrid() {
   }
   
   // ============================================================
-  // INVENTORY MODE - Checkbox style store availability (like your previous code)
+  // INVENTORY MODE - Checkbox style store availability
   // ============================================================
   if (inventoryMode) {
     filtered.forEach(prod => {
@@ -11785,7 +11802,6 @@ document.getElementById('editProductSelect')?.addEventListener('change', functio
   }
 });
 
-// Add this to your DOMContentLoaded event listener
 document.getElementById('storeFilterToggleBtn').addEventListener('click', function() {
   if (inventoryMode) {
     // In inventory mode: toggle between "Show All" and "Show Store Only"
@@ -11798,6 +11814,17 @@ document.getElementById('storeFilterToggleBtn').addEventListener('click', functi
     toggleStoreFilter();
   }
 });
+
+// ✅ Update toggleStoreFilter() function:
+function toggleStoreFilter() {
+  storeFilterActive = !storeFilterActive;
+  const btn = document.getElementById('storeFilterToggleBtn');
+  if (btn) {
+    btn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
+    btn.classList.toggle('active', storeFilterActive);
+  }
+  renderProductGrid();
+}
 // Mode toggle buttons
 document.getElementById('addProductModeBtn')?.addEventListener('click', function() {
   showAddProductModal();
