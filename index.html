@@ -13979,7 +13979,7 @@ function populateStoreDropdowns() {
       select.appendChild(allOpt);
     }
     
-    // Add dynamic stores
+    // ✅ Add dynamic stores (only active ones)
     stores.forEach(store => {
       const option = document.createElement('option');
       option.value = store.store_id;
@@ -13993,7 +13993,6 @@ function populateStoreDropdowns() {
     }
   });
 }
-
 // ============================================================
 // RENDER STORE LIST (for management modal)
 // ============================================================
@@ -14406,7 +14405,7 @@ async function deleteStore(storeId) {
   showLoading('Deleting store...');
   
   try {
-    // Soft delete - just mark as inactive
+    // ✅ SOFT DELETE - Mark as inactive
     const { error } = await supabase
       .from('stores')
       .update({ is_active: false })
@@ -14414,10 +14413,18 @@ async function deleteStore(storeId) {
     
     if (error) throw error;
     
-    await showAlertModal('✅ Store Deleted', `Store "${store.name}" has been deleted.`);
+    await showAlertModal('✅ Store Deleted', `Store "${store.name}" has been deactivated and will no longer appear in the list.`);
+    
+    // Refresh stores and UI
     await fetchStores(true);
     renderStoreList();
     populateStoreDropdowns();
+    renderAllDynamicStoreContent();
+    
+    // If the deleted store was the current store, switch to first available
+    if (currentStore === storeId && stores.length > 0) {
+      await switchStore(stores[0].store_id);
+    }
     
   } catch (err) {
     console.error('Error deleting store:', err);
