@@ -12085,7 +12085,54 @@ async function scheduleStockUpdate(productId, newStock) {
     updateStockOnServer(productId, newStock);
   }, 500);
 }
+// ============================================================
+// GET STORE PREFIX FOR TRANSACTION NUMBERS
+// ============================================================
 
+async function getStorePrefix(storeId) {
+  try {
+    // Find the store in the stores array
+    const store = stores.find(s => s.store_id === storeId);
+    
+    if (store && store.prefix) {
+      console.log(`📋 Using store prefix: ${store.prefix} for ${storeId}`);
+      return store.prefix;
+    }
+    
+    // If store not found or no prefix, generate one based on store ID
+    console.log(`⚠️ No prefix found for ${storeId}, generating one...`);
+    
+    // Generate a prefix from store ID (first 3 letters + 2 digits)
+    const base = storeId.substring(0, 3).toUpperCase();
+    const hash = storeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const num = String(hash % 90 + 10).padStart(2, '0');
+    const prefix = `${base}${num}`;
+    
+    // If the store exists but has no prefix, update it in the database
+    if (store) {
+      const { error } = await supabase
+        .from('stores')
+        .update({ prefix: prefix })
+        .eq('store_id', storeId);
+      
+      if (error) {
+        console.warn('Failed to update store prefix:', error);
+      } else {
+        console.log(`✅ Generated and saved prefix: ${prefix} for ${storeId}`);
+        // Update the local store object
+        store.prefix = prefix;
+      }
+    }
+    
+    return prefix;
+  } catch (err) {
+    console.error('Error getting store prefix:', err);
+    // Fallback: use store ID first 3 letters + random number
+    const fallbackPrefix = storeId.substring(0, 3).toUpperCase() + String(Math.floor(Math.random() * 90 + 10));
+    console.log(`⚠️ Using fallback prefix: ${fallbackPrefix}`);
+    return fallbackPrefix;
+  }
+}
 async function updateStockOnServer(productId, newStock) {
   try {
     // Find the current store's slot number
@@ -13961,7 +14008,7 @@ async function fetchStores(forceRefresh = false) {
     // ✅ Ensure stores is an array
     stores = data || [];
     
-    // If any store doesn't have a prefix, generate one and update
+    // ✅ Generate prefixes for stores that don't have them
     let needsUpdate = false;
     for (const store of stores) {
       if (!store.prefix) {
@@ -13976,10 +14023,12 @@ async function fetchStores(forceRefresh = false) {
     // If we generated prefixes, update them in the database
     if (needsUpdate) {
       for (const store of stores) {
-        await supabase
-          .from('stores')
-          .update({ prefix: store.prefix })
-          .eq('store_id', store.store_id);
+        if (store.prefix) {
+          await supabase
+            .from('stores')
+            .update({ prefix: store.prefix })
+            .eq('store_id', store.store_id);
+        }
       }
     }
     
@@ -14355,7 +14404,7 @@ async function addStore() {
   showLoading('Adding store...');
   
   try {
-    // 🔥 GET NEXT AVAILABLE SLOT (NO COLUMN CREATION NEEDED!)
+    // 🔥 GET NEXT AVAILABLE SLOT
     const slotNumber = await getNextAvailableSlot();
     
     if (!slotNumber) {
@@ -14370,9 +14419,16 @@ async function addStore() {
     const availabilityField = `available_store_${slotNumStr}`;
     const stockField = `stock_store_${slotNumStr}`;
     
-    console.log(`📌 Assigned slot ${slotNumber} (${availabilityField}) to store "${name}"`);
+    // ✅ Generate a prefix for the store
+    const base = storeId.substring(0, 3).toUpperCase();
+    const hash = storeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const num = String(hash % 90 + 10).padStart(2, '0');
+    const prefix = `${base}${num}`;
     
-    // 1. Add the store with slot number
+    console.log(`📌 Assigned slot ${slotNumber} (${availabilityField}) to store "${name}"`);
+    console.log(`📌 Generated prefix: ${prefix}`);
+    
+    // 1. Add the store with slot number AND prefix
     const { data, error } = await supabase
       .from('stores')
       .insert([{
@@ -14382,8 +14438,8 @@ async function addStore() {
         latitude: lat || null,
         longitude: lng || null,
         is_active: true,
-        prefix: storeId.substring(0, 3).toUpperCase() + String(Math.floor(Math.random() * 90 + 10)),
-        slot_number: slotNumber  // ✅ Store which slot this store uses
+        prefix: prefix,  // ✅ Add prefix
+        slot_number: slotNumber
       }])
       .select();
     
@@ -14392,7 +14448,6 @@ async function addStore() {
     console.log('✅ Store added:', data);
     
     // 2. Update all products with the new store columns (set default values)
-    // ✅ THESE COLUMNS ALREADY EXIST (from the initial slot setup)
     console.log('🔄 Setting default availability for all products...');
     
     const { data: products, error: productsError } = await supabase
@@ -14424,15 +14479,6 @@ async function addStore() {
       }
     }
     
-    // 3. Also update local products array
-    for (const product of products || []) {
-      const localProduct = products.find(p => p.id === product.id);
-      if (localProduct) {
-        localProduct[availabilityField] = true;
-        localProduct[stockField] = 0;
-      }
-    }
-    
     // Clear form
     document.getElementById('newStoreId').value = '';
     document.getElementById('newStoreName').value = '';
@@ -14453,6 +14499,7 @@ async function addStore() {
     await showAlertModal('✅ Store Added', 
       `Store "${name}" has been added successfully!\n\n` +
       `📌 Assigned Slot: ${slotNumber}/20\n` +
+      `📌 Transaction Prefix: ${prefix}\n` +
       `📦 All products are now available at this store with 0 stock.\n\n` +
       `You can adjust stock and availability in Inventory Mode.`
     );
