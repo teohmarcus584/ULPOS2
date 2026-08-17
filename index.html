@@ -3444,12 +3444,14 @@ async function fetchProductsFromSheet(force = false) {
     
     // Find the store to get its slot number
     const currentStoreObj = stores.find(s => s.store_id === store);
-    let stockColumn = `stock_${store}`; // Fallback
+    let stockColumn = `stock_${store}`; // Fallback for old stores
     
     if (currentStoreObj && currentStoreObj.slot_number) {
       const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
       stockColumn = `stock_store_${slotNumStr}`;
       console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+    } else {
+      console.log(`📦 Using fallback stock column: ${stockColumn}`);
     }
     
     const { data, error } = await supabase
@@ -4119,12 +4121,14 @@ function updateStockForProduct(productId, newStock, delta) {
 
   // ✅ Find the current store's slot number
   const currentStoreObj = stores.find(s => s.store_id === currentStore);
-  let stockColumn = `stock_${currentStore}`; // Fallback
+  let stockColumn = `stock_${currentStore}`; // Fallback for old stores
   
   if (currentStoreObj && currentStoreObj.slot_number) {
     const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
     stockColumn = `stock_store_${slotNumStr}`;
     console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+  } else {
+    console.log(`📦 Using fallback stock column: ${stockColumn}`);
   }
 
   // Update local product
@@ -4138,12 +4142,16 @@ function updateStockForProduct(productId, newStock, delta) {
   // Log stock change in history
   logStockChange(productId, product.name, product.category, oldStock, newStock, delta);
   
-  // ✅ UPDATE IN SUPABASE USING SLOT COLUMN
+  // ✅ UPDATE IN SUPABASE USING THE CORRECT COLUMN
   console.log(`📦 Updating stock for ${product.name}: ${oldStock} → ${newStock} (Δ${delta})`);
+  console.log(`📦 Using column: ${stockColumn}`);
+  
+  const updateData = {};
+  updateData[stockColumn] = newStock;
   
   supabase
     .from('products')
-    .update({ [stockColumn]: newStock })  // ← Uses stock_store_01 instead of stock_light
+    .update(updateData)
     .eq('id', productId)
     .then(({ error }) => {
       if (error) {
@@ -11244,7 +11252,17 @@ async function bulkUpdateStock(productUpdates) {
   console.log(`📦 Bulk updating ${productUpdates.length} products...`);
   
   const store = currentStore;
-  const stockColumn = `stock_${store}`;
+  
+  // Find the current store's slot number
+  const currentStoreObj = stores.find(s => s.store_id === store);
+  let stockColumn = `stock_${store}`; // Fallback for old stores
+  
+  if (currentStoreObj && currentStoreObj.slot_number) {
+    const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
+    stockColumn = `stock_store_${slotNumStr}`;
+    console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+  }
+  
   const updates = [];
   
   for (const update of productUpdates) {
@@ -11264,9 +11282,11 @@ async function bulkUpdateStock(productUpdates) {
     logStockChange(product.id, product.name, product.category, oldStock, newStock, update.delta);
     
     // Prepare for Supabase
+    const updateData = {};
+    updateData[stockColumn] = newStock;
     updates.push({
       id: product.id,
-      [stockColumn]: newStock
+      ...updateData
     });
   }
   
@@ -12068,9 +12088,21 @@ async function scheduleStockUpdate(productId, newStock) {
 
 async function updateStockOnServer(productId, newStock) {
   try {
+    // Find the current store's slot number
+    const currentStoreObj = stores.find(s => s.store_id === currentStore);
+    let stockColumn = `stock_${currentStore}`; // Fallback for old stores
+    
+    if (currentStoreObj && currentStoreObj.slot_number) {
+      const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
+      stockColumn = `stock_store_${slotNumStr}`;
+    }
+    
+    const updateData = {};
+    updateData[stockColumn] = newStock;
+    
     const { error } = await supabase
       .from('products')
-      .update({ stock: newStock })
+      .update(updateData)
       .eq('id', productId);
     
     if (error) throw error;
