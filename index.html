@@ -3450,20 +3450,26 @@ async function fetchProductsFromSheet(force = false) {
     
     if (error) throw error;
     
-    products = data.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: parseFloat(p.price),
-      stock: parseInt(p[stockColumn]) || 0,
-      category: p.category || "Uncategorized",
-      stock_queens: parseInt(p.stock_queens) || 0,
-      stock_sunshine: parseInt(p.stock_sunshine) || 0,
-      stock_gurney_paragon: parseInt(p.stock_gurney_paragon) || 0,
-      // ✅ Store availability
-      available_queens: p.available_queens !== false,
-      available_sunshine: p.available_sunshine !== false,
-      available_gurney_paragon: p.available_gurney_paragon !== false
-    }));
+    // ✅ Build product objects dynamically for all stores
+    products = data.map(p => {
+      const product = {
+        id: p.id,
+        name: p.name,
+        price: parseFloat(p.price),
+        stock: parseInt(p[stockColumn]) || 0,
+        category: p.category || "Uncategorized"
+      };
+      
+      // ✅ Dynamically add all store-specific fields
+      stores.forEach(s => {
+        const storeId = s.store_id;
+        product[`stock_${storeId}`] = parseInt(p[`stock_${storeId}`]) || 0;
+        // Availability defaults to true if not set (for backward compatibility)
+        product[`available_${storeId}`] = p[`available_${storeId}`] !== false;
+      });
+      
+      return product;
+    });
     
     updateCategoryDropdown();
     refreshCategoryHighlighting();
@@ -3717,11 +3723,10 @@ function renderProductGrid() {
   if (filtered.length === 0) {
     let message = 'No products match your filters.';
     if (storeFilterActive && !inventoryMode && !showAllProductsInInventory) {
-     // Dynamic store names from Supabase
-const storeNames = {};
-stores.forEach(s => {
-  storeNames[s.store_id] = s.name;
-});
+      const storeNames = {};
+      stores.forEach(s => {
+        storeNames[s.store_id] = s.name;
+      });
       message = `No products available at ${storeNames[currentStore] || currentStore}. Try turning off the store filter.`;
     }
     productGridEl.innerHTML = `<div style="text-align:center; padding:20px;">${message}</div>`;
@@ -3734,11 +3739,10 @@ stores.forEach(s => {
   
   // Show store filter indicator - ONLY in inventory mode
   if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
-    // Dynamic store names from Supabase
-const storeNames = {};
-stores.forEach(s => {
-  storeNames[s.store_id] = s.name;
-});
+    const storeNames = {};
+    stores.forEach(s => {
+      storeNames[s.store_id] = s.name;
+    });
     const productCount = filtered.length;
     html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
       📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
@@ -3746,18 +3750,27 @@ stores.forEach(s => {
   }
   
   // ============================================================
-  // INVENTORY MODE - Checkbox style store availability
+  // INVENTORY MODE - DYNAMIC STORE CHECKBOXES
   // ============================================================
   if (inventoryMode) {
+    // ✅ Get all store IDs dynamically
+    const storeIds = stores.map(s => s.store_id);
+    const storeNames = {};
+    stores.forEach(s => {
+      storeNames[s.store_id] = s.name;
+    });
+    
     filtered.forEach(prod => {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
       
       // Determine if any store is available
-      const hasQueens = prod.available_queens !== false;
-      const hasSunshine = prod.available_sunshine !== false;
-      const hasGurney = prod.available_gurney_paragon !== false;
-      const anyStoreAvailable = hasQueens || hasSunshine || hasGurney;
+      let anyStoreAvailable = false;
+      storeIds.forEach(storeId => {
+        if (prod[`available_${storeId}`] !== false) {
+          anyStoreAvailable = true;
+        }
+      });
       
       html += `<div class="product-card ${lowStockClass}" data-id="${prod.id}" style="padding: 16px; ${!anyStoreAvailable ? 'opacity: 0.6; border-color: #ef4444;' : ''}">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
@@ -3774,23 +3787,23 @@ stores.forEach(s => {
           <div style="display: flex; flex-direction: column; gap: 6px; background: #f8fafc; padding: 8px 12px; border-radius: 12px; border: 1px solid #e2e8f0; min-width: 140px;">
             <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
             
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasQueens ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
-              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="queens" ${hasQueens ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
-              <span>🏬 Queens</span>
-              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasQueens ? '#2c7a4b' : '#ef4444'};">${hasQueens ? '✅' : '❌'}</span>
-            </label>
-            
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasSunshine ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
-              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="sunshine" ${hasSunshine ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
-              <span>☀️ Sunshine</span>
-              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasSunshine ? '#2c7a4b' : '#ef4444'};">${hasSunshine ? '✅' : '❌'}</span>
-            </label>
-            
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${hasGurney ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
-              <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="gurney_paragon" ${hasGurney ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
-              <span>🏙️ Gurney</span>
-              <span style="margin-left: auto; font-size: 0.7rem; color: ${hasGurney ? '#2c7a4b' : '#ef4444'};">${hasGurney ? '✅' : '❌'}</span>
-            </label>
+            ${storeIds.map(storeId => {
+              const isAvailable = prod[`available_${storeId}`] !== false;
+              const storeName = storeNames[storeId] || storeId;
+              // Get emoji for store
+              let emoji = '🏪';
+              if (storeId === 'queens') emoji = '🏬';
+              else if (storeId === 'sunshine') emoji = '☀️';
+              else if (storeId === 'gurney_paragon') emoji = '🏙️';
+              
+              return `
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${isAvailable ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
+                  <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="${storeId}" ${isAvailable ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+                  <span>${emoji} ${escapeHtml(storeName)}</span>
+                  <span style="margin-left: auto; font-size: 0.7rem; color: ${isAvailable ? '#2c7a4b' : '#ef4444'};">${isAvailable ? '✅' : '❌'}</span>
+                </label>
+              `;
+            }).join('')}
           </div>
         </div>
         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -14240,6 +14253,7 @@ async function addStore() {
   showLoading('Adding store...');
   
   try {
+    // 1. Add the store to stores table
     const { data, error } = await supabase
       .from('stores')
       .insert([{
@@ -14248,16 +14262,56 @@ async function addStore() {
         address: address || '',
         latitude: lat || null,
         longitude: lng || null,
-        is_active: true
+        is_active: true,
+        // Generate a prefix for transaction numbers
+        prefix: storeId.substring(0, 3).toUpperCase() + String(Math.floor(Math.random() * 90 + 10))
       }])
       .select();
     
     if (error) throw error;
     
-    // ✅ Also add availability columns to products that need it
-    // We'll handle this dynamically when fetching products
+    // 2. ✅ ADD AVAILABILITY COLUMN FOR ALL EXISTING PRODUCTS
+    console.log(`📦 Adding availability column for store "${storeId}" to all products...`);
     
-    await showAlertModal('✅ Store Added', `Store "${name}" has been added successfully!`);
+    // Get all products
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id');
+    
+    if (productsError) {
+      console.warn('Could not fetch products for availability update:', productsError);
+    } else if (products && products.length > 0) {
+      // Update each product to be available at the new store (default: true)
+      const availabilityField = `available_${storeId}`;
+      const stockField = `stock_${storeId}`;
+      
+      // Batch update in chunks to avoid timeouts
+      const chunkSize = 50;
+      for (let i = 0; i < products.length; i += chunkSize) {
+        const chunk = products.slice(i, i + chunkSize);
+        const updates = chunk.map(p => ({
+          id: p.id,
+          [availabilityField]: true,
+          [stockField]: 0
+        }));
+        
+        const { error: updateError } = await supabase
+          .from('products')
+          .upsert(updates);
+        
+        if (updateError) {
+          console.error(`Error updating chunk ${i / chunkSize + 1}:`, updateError);
+        } else {
+          console.log(`✅ Updated ${chunk.length} products for store "${storeId}"`);
+        }
+      }
+    }
+    
+    await showAlertModal('✅ Store Added', 
+      `Store "${name}" has been added successfully!\n\n` +
+      `All ${products?.length || 0} products are now available at this store with 0 stock.\n` +
+      `You can adjust stock and availability in Inventory Mode.`
+    );
     
     // Clear form
     document.getElementById('newStoreId').value = '';
@@ -14271,8 +14325,14 @@ async function addStore() {
     renderStoreList();
     populateStoreDropdowns();
     
+    // ✅ Also update the renderAllDynamicStoreContent to show the new store
+    renderAllDynamicStoreContent();
+    
     // Refresh products to show new store availability
     await fetchProductsFromSheet(true);
+    
+    // Re-render product grid
+    renderProductGrid();
     
   } catch (err) {
     console.error('Error adding store:', err);
