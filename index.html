@@ -4182,7 +4182,8 @@ function refreshInventoryCheckboxes() {
       label.style.background = isAvailable ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
     }
     
-    console.log(`📋 ${product.name} - ${store}: ${availabilityField} = ${isAvailable} (checkbox: ${cb.checked})`);
+    // ✅ REMOVE OR COMMENT OUT THIS LINE:
+    // console.log(`📋 ${product.name} - ${store}: ${availabilityField} = ${isAvailable} (checkbox: ${cb.checked})`);
   });
 }
 
