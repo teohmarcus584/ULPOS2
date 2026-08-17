@@ -4885,7 +4885,9 @@ async function saveTransactionToSheet(transaction) {
       }
     }
     
-    // ✅ Also update stock in Supabase here as a backup
+    // ✅ REMOVE THIS SECTION - It's causing the error!
+    // The stock is already updated in completeCheckout()
+    /*
     console.log('📦 Updating stock in Supabase...');
     for (const item of transaction.items || []) {
       const product = products.find(p => p.id == item.id);
@@ -4905,6 +4907,7 @@ async function saveTransactionToSheet(transaction) {
         }
       }
     }
+    */
     
     return true;
     
