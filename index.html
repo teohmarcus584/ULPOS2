@@ -3461,7 +3461,7 @@ async function fetchProductsFromSheet(force = false) {
     
     if (error) throw error;
     
-    // Build product objects with slot-based fields
+    // ✅ Build product objects with slot-based fields
     products = data.map(p => {
       const product = {
         id: p.id,
@@ -3471,12 +3471,16 @@ async function fetchProductsFromSheet(force = false) {
         category: p.category || "Uncategorized"
       };
       
-      // Add slot-based fields for all stores
+      // ✅ IMPORTANT: Add slot-based fields for ALL stores
+      // This ensures the checkbox states are loaded correctly
       stores.forEach(s => {
         if (s.slot_number) {
           const slotNumStr = String(s.slot_number).padStart(2, '0');
           const availabilityKey = `available_store_${slotNumStr}`;
           const stockKey = `stock_store_${slotNumStr}`;
+          
+          // ✅ Correctly set the availability based on the database value
+          // If the column doesn't exist or is null, default to true
           product[availabilityKey] = p[availabilityKey] !== false;
           product[stockKey] = parseInt(p[stockKey]) || 0;
         }
@@ -3484,6 +3488,18 @@ async function fetchProductsFromSheet(force = false) {
       
       return product;
     });
+    
+    // ✅ Log for debugging
+    console.log('✅ Products loaded:', products.length);
+    if (products.length > 0) {
+      console.log('📋 First product availability:', {
+        name: products[0].name,
+        available_store_01: products[0].available_store_01,
+        available_store_02: products[0].available_store_02,
+        available_store_03: products[0].available_store_03,
+        available_store_04: products[0].available_store_04
+      });
+    }
     
     updateCategoryDropdown();
     refreshCategoryHighlighting();
@@ -3494,19 +3510,6 @@ async function fetchProductsFromSheet(force = false) {
     await showAlertModal('Error', 'Failed to load products.');
     return false;
   }
-}
-let storeFilterActive = true; // Default: ON (show only store-specific products)
-let showAllProductsInInventory = false; // Override in inventory mode
-
-function toggleStoreFilter() {
-  storeFilterActive = !storeFilterActive;
-  const btn = document.getElementById('storeFilterToggleBtn');
-  if (btn) {
-    // ✅ Only show the button text, no indicator in sales mode
-    btn.textContent = storeFilterActive ? '🏪 Store Filter: ON' : '🏪 Store Filter: OFF';
-    btn.classList.toggle('active', storeFilterActive);
-  }
-  renderProductGrid();
 }
 // ==================== STOCK TAKE RENDER FUNCTION ====================
 
@@ -3975,16 +3978,19 @@ async function handleAvailabilityChange(e) {
   const productId = cb.dataset.product;
   const store = cb.dataset.store;
   
-  // ✅ Get the current checked state BEFORE any changes
+  // ✅ Get the current checked state
   const isChecked = cb.checked;
   
   // Find the product
   const product = products.find(p => p.id == productId);
-  if (!product) return;
+  if (!product) {
+    console.error('❌ Product not found:', productId);
+    return;
+  }
   
   // ✅ Find the store's slot number
   const storeObj = stores.find(s => s.store_id === store);
-  let availabilityField = `available_${store}`; // Fallback for old stores
+  let availabilityField = `available_${store}`;
   
   if (storeObj && storeObj.slot_number) {
     const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
@@ -3994,12 +4000,13 @@ async function handleAvailabilityChange(e) {
     console.log(`📦 Using fallback availability column: ${availabilityField}`);
   }
   
-  // ✅ IMMEDIATELY update the local product and UI (optimistic)
+  // ✅ Update the product object IMMEDIATELY
   product[availabilityField] = isChecked;
   
-  // ✅ Update the UI immediately
+  // ✅ Update the UI IMMEDIATELY
   const label = cb.closest('label');
   const statusSpan = label ? label.querySelector('span:last-child') : null;
+  
   if (statusSpan) {
     statusSpan.textContent = isChecked ? '✅' : '❌';
     statusSpan.style.color = isChecked ? '#2c7a4b' : '#ef4444';
@@ -4015,11 +4022,11 @@ async function handleAvailabilityChange(e) {
   cb.disabled = true;
   cb.style.opacity = '0.5';
   
-  // Store the original state in case we need to revert
+  // Store the original state
   const originalChecked = isChecked;
   
   try {
-    // ✅ Update Supabase using the correct field
+    // ✅ Update Supabase
     const updateData = {};
     updateData[availabilityField] = isChecked;
     
