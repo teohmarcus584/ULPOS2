@@ -3316,6 +3316,7 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
 // AUTO-SELECT ON LOAD (Dynamic Stores)
 // ============================================================
 
+// Auto-select store on load
 (async function autoSelectOnLoad() {
   loadAndCacheEmployees().catch(console.warn);
   preloadAllStoresData();
@@ -3391,9 +3392,8 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
     }
   }
 
-  // ✅ Auto-select using dynamic store locations
-  const closest = await autoSelectStoreByLocation();
-  
+  // ✅ FIXED: Use autoSelectStoreByLocationDynamic instead of autoSelectStoreByLocation
+  const closest = await autoSelectStoreByLocationDynamic();
   if (closest && storeNames[closest]) {
     storeDisplaySpan.innerText = storeNames[closest];
     storeValueHidden.value = closest;
@@ -3413,11 +3413,17 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
     retryBtn.onclick = async () => {
       storeDisplaySpan.innerText = '📍 Loading location...';
       retryBtn.style.display = 'none';
-      const newClosest = await autoSelectStoreByLocation();
+      // ✅ FIXED: Use autoSelectStoreByLocationDynamic here too
+      const newClosest = await autoSelectStoreByLocationDynamic();
       if (newClosest && storeNames[newClosest]) {
         storeDisplaySpan.innerText = storeNames[newClosest];
         storeValueHidden.value = newClosest;
         setTimeout(() => proceedToLogin(newClosest), 2000);
+      } else if (storesList.length > 0) {
+        const firstStore = storesList[0];
+        storeDisplaySpan.innerText = firstStore.name;
+        storeValueHidden.value = firstStore.store_id;
+        setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
       } else {
         storeDisplaySpan.innerText = '❌ Still failed. Please check GPS.';
         retryBtn.style.display = 'inline-block';
@@ -13433,106 +13439,118 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
   
 
   // Auto-select store on load
-  (async function autoSelectOnLoad() {
+(async function autoSelectOnLoad() {
+  loadAndCacheEmployees().catch(console.warn);
+  preloadAllStoresData();
+  const storeDisplaySpan = document.getElementById('selectedStoreDisplay');
+  const storeValueHidden = document.getElementById('initialStoreValue');
+  const retryBtn = document.getElementById('retryLocationBtn');
+  
+  if (!storeDisplaySpan || !storeValueHidden) return;
+
+  // ✅ Get dynamic store names from Supabase
+  const storesList = await fetchStores();
+  const storeNames = {};
+  storesList.forEach(s => {
+    storeNames[s.store_id] = s.name;
+  });
+
+  async function proceedToLogin(storeId) {
+    if (loginInProgress) return;
+    loginInProgress = true;
+
+    if (window.autoLoginTimeout) clearTimeout(window.autoLoginTimeout);
+
+    initialStore = storeId;
+    currentStore = storeId;
+    storeSelect.value = storeId;
+    document.getElementById('storeSelectModal').style.display = 'none';
+
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('pinInput').focus();
+
     loadAndCacheEmployees().catch(console.warn);
-    preloadAllStoresData();
-    const storeDisplaySpan = document.getElementById('selectedStoreDisplay');
-    const storeValueHidden = document.getElementById('initialStoreValue');
-    const retryBtn = document.getElementById('retryLocationBtn');
-    
-    if (!storeDisplaySpan || !storeValueHidden) return;
 
-   // Dynamic store names from Supabase
-const storeNames = {};
-stores.forEach(s => {
-  storeNames[s.store_id] = s.name;
-});
+    const preloaded = preloadedDataMap[storeId];
+    if (preloaded && preloaded.products && preloaded.products.length > 0) {
+      products = [...preloaded.products].sort((a, b) => a.name.localeCompare(b.name));
 
-    async function proceedToLogin(storeId) {
-      if (loginInProgress) return;
-      loginInProgress = true;
+      const categories = [...new Set(products.map(p => p.category))].sort();
+      categorySelect.innerHTML = '<option value="all">📂 All Categories</option>';
+      categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        categorySelect.appendChild(option);
+      });
+      renderProductGrid();
 
-      if (window.autoLoginTimeout) clearTimeout(window.autoLoginTimeout);
-
-      initialStore = storeId;
-      currentStore = storeId;
-      storeSelect.value = storeId;
-      document.getElementById('storeSelectModal').style.display = 'none';
-
-      document.getElementById('loginModal').style.display = 'flex';
-      document.getElementById('pinInput').focus();
-
-      loadAndCacheEmployees().catch(console.warn);
-
-      const preloaded = preloadedDataMap[storeId];
-      if (preloaded && preloaded.products && preloaded.products.length > 0) {
-        products = [...preloaded.products].sort((a, b) => a.name.localeCompare(b.name));
-
-        const categories = [...new Set(products.map(p => p.category))].sort();
-        categorySelect.innerHTML = '<option value="all">📂 All Categories</option>';
-        categories.forEach(cat => {
+      if (preloaded.employees && preloaded.employees.length > 0) {
+        employeeNameMap = {};
+        soldBySelectCart.innerHTML = '';
+        preloaded.employees.forEach(emp => {
+          employeeNameMap[emp.id] = emp.name;
           const option = document.createElement('option');
-          option.value = cat;
-          option.textContent = cat;
-          categorySelect.appendChild(option);
+          option.value = emp.id;
+          option.textContent = `${emp.name} (ID: ${emp.id})`;
+          soldBySelectCart.appendChild(option);
         });
-        renderProductGrid();
-
-        if (preloaded.employees && preloaded.employees.length > 0) {
+      } else {
+        fetchEmployees().then(employees => {
           employeeNameMap = {};
           soldBySelectCart.innerHTML = '';
-          preloaded.employees.forEach(emp => {
+          employees.forEach(emp => {
             employeeNameMap[emp.id] = emp.name;
             const option = document.createElement('option');
             option.value = emp.id;
             option.textContent = `${emp.name} (ID: ${emp.id})`;
             soldBySelectCart.appendChild(option);
           });
-        } else {
-          fetchEmployees().then(employees => {
-            employeeNameMap = {};
-            soldBySelectCart.innerHTML = '';
-            employees.forEach(emp => {
-              employeeNameMap[emp.id] = emp.name;
-              const option = document.createElement('option');
-              option.value = emp.id;
-              option.textContent = `${emp.name} (ID: ${emp.id})`;
-              soldBySelectCart.appendChild(option);
-            });
-          });
-        }
-        initialDataPromise = Promise.resolve(true);
-      } else {
-        await loadInitialData();
+        });
       }
-    }
-
-    const closest = await autoSelectStoreByLocation();
-    if (closest && storeNames[closest]) {
-      storeDisplaySpan.innerText = storeNames[closest];
-      storeValueHidden.value = closest;
-      setTimeout(() => proceedToLogin(closest), 2000);
+      initialDataPromise = Promise.resolve(true);
     } else {
-      storeDisplaySpan.innerText = '❌ Could not detect location. Please allow GPS and retry.';
-      if (retryBtn) retryBtn.style.display = 'inline-block';
+      await loadInitialData();
     }
+  }
 
-    if (retryBtn) {
-      retryBtn.onclick = async () => {
-        storeDisplaySpan.innerText = '📍 Loading location...';
-        retryBtn.style.display = 'none';
-        const newClosest = await autoSelectStoreByLocation();
-        if (newClosest && storeNames[newClosest]) {
-          storeDisplaySpan.innerText = storeNames[newClosest];
-          storeValueHidden.value = newClosest;
-          setTimeout(() => proceedToLogin(newClosest), 2000);
-        } else {
-          storeDisplaySpan.innerText = '❌ Still failed. Please check GPS.';
-          retryBtn.style.display = 'inline-block';
-        }
-      };
-    }
-  })();
+  // ✅ FIXED: Use autoSelectStoreByLocationDynamic
+  const closest = await autoSelectStoreByLocationDynamic();
+  if (closest && storeNames[closest]) {
+    storeDisplaySpan.innerText = storeNames[closest];
+    storeValueHidden.value = closest;
+    setTimeout(() => proceedToLogin(closest), 2000);
+  } else if (storesList.length > 0) {
+    const firstStore = storesList[0];
+    storeDisplaySpan.innerText = firstStore.name;
+    storeValueHidden.value = firstStore.store_id;
+    setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
+  } else {
+    storeDisplaySpan.innerText = '❌ Could not detect location. Please allow GPS and retry.';
+    if (retryBtn) retryBtn.style.display = 'inline-block';
+  }
+
+  if (retryBtn) {
+    retryBtn.onclick = async () => {
+      storeDisplaySpan.innerText = '📍 Loading location...';
+      retryBtn.style.display = 'none';
+      const newClosest = await autoSelectStoreByLocationDynamic();
+      if (newClosest && storeNames[newClosest]) {
+        storeDisplaySpan.innerText = storeNames[newClosest];
+        storeValueHidden.value = newClosest;
+        setTimeout(() => proceedToLogin(newClosest), 2000);
+      } else if (storesList.length > 0) {
+        const firstStore = storesList[0];
+        storeDisplaySpan.innerText = firstStore.name;
+        storeValueHidden.value = firstStore.store_id;
+        setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
+      } else {
+        storeDisplaySpan.innerText = '❌ Still failed. Please check GPS.';
+        retryBtn.style.display = 'inline-block';
+      }
+    };
+  }
+})();
 
   // Barcode scanner
   document.addEventListener('keydown', (e) => {
