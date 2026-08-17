@@ -8495,7 +8495,10 @@ function showOutOfStockAlert(productName) {
 // Replace the checkAndNotifyOutOfStock function with this:
 
 function checkAndNotifyOutOfStock(productId, productName, newStock) {
-  const storeName = currentStore.charAt(0).toUpperCase() + currentStore.slice(1);
+  // ✅ Get the store name dynamically from the stores array
+  const storeObj = stores.find(s => s.store_id === currentStore);
+  const storeName = storeObj ? storeObj.name : currentStore.charAt(0).toUpperCase() + currentStore.slice(1);
+  
   const timestamp = new Date().toLocaleString();
 
   // Create a unique key per product per store
@@ -8511,13 +8514,13 @@ function checkAndNotifyOutOfStock(productId, productName, newStock) {
       alertedOutOfStockProducts.add(alertKey);
       localStorage.setItem(lastNotifiedStockKey, '0');
       
-      const message = `❌ OUT OF STOCK ❌\nStore: ${storeName}\nProduct: ${productName}\nQuantity: ${newStock}\nTime: ${timestamp}`;
+      const message = `❌ OUT OF STOCK ❌\n🏪 Store: ${storeName}\n📦 Product: ${productName}\n📊 Quantity: ${newStock}\n🕐 Time: ${timestamp}`;
       if (telegramAccounts) sendTelegramMessage(message);
       
       if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
-        new Notification(`❌ Out of Stock`, { body: `${productName} is out of stock.` });
+        new Notification(`❌ Out of Stock`, { body: `${productName} is out of stock at ${storeName}.` });
       } else if (notificationsEnabled) {
-        showOutOfStockAlert(`${productName} is out of stock.`);
+        showOutOfStockAlert(`${productName} is out of stock at ${storeName}.`);
       }
     }
   } else if (newStock > 0 && newStock <= LOW_STOCK_THRESHOLD && !alertedLowStockProducts.has(alertKey)) {
@@ -8526,13 +8529,13 @@ function checkAndNotifyOutOfStock(productId, productName, newStock) {
       alertedLowStockProducts.add(alertKey);
       localStorage.setItem(lastNotifiedStockKey, String(newStock));
       
-      const message = `⚠️ LOW STOCK ⚠️\nStore: ${storeName}\nProduct: ${productName}\nQuantity left: ${newStock}\nTime: ${timestamp}`;
+      const message = `⚠️ LOW STOCK ⚠️\n🏪 Store: ${storeName}\n📦 Product: ${productName}\n📊 Quantity left: ${newStock}\n🕐 Time: ${timestamp}`;
       if (telegramAccounts) sendTelegramMessage(message);
       
       if (notificationsEnabled && notificationsSupported && Notification.permission === "granted") {
-        new Notification(`⚠️ Low Stock`, { body: `${productName} only ${newStock} left.` });
+        new Notification(`⚠️ Low Stock`, { body: `${productName} only ${newStock} left at ${storeName}.` });
       } else if (notificationsEnabled) {
-        showOutOfStockAlert(`${productName} only ${newStock} left.`);
+        showOutOfStockAlert(`${productName} only ${newStock} left at ${storeName}.`);
       }
     }
   }
@@ -8549,7 +8552,39 @@ function checkAndNotifyOutOfStock(productId, productName, newStock) {
     }
   }
 }
+async function sendTelegramMessage(message, storeName = null) {
+  if (!telegramAccounts) return false;
 
+  // ✅ If storeName is provided, add it to the message
+  let finalMessage = message;
+  if (storeName) {
+    finalMessage = `🏪 ${storeName}\n${message}`;
+  }
+
+  const lines = telegramAccounts.split('\n').filter(line => line.trim());
+  const results = await Promise.all(lines.map(async (line) => {
+    const [token, chatId] = line.split(',').map(s => s.trim());
+    if (!token || !chatId) return false;
+    try {
+      const url = `https://api.telegram.org/bot${token}/sendMessage`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: finalMessage,
+          parse_mode: 'HTML'
+        })
+      });
+      const result = await response.json();
+      return result.ok;
+    } catch (err) {
+      console.error(`Telegram send failed for ${token}:`, err);
+      return false;
+    }
+  }));
+  return results.some(success => success);
+}
 // ==================== STOCK TAKE ====================
 
 let stockTakeMode = false;
@@ -12688,6 +12723,10 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
   try {
     console.log('📝 Recording settlement for:', { store, date });
     
+    // ✅ Get the store name dynamically
+    const storeObj = stores.find(s => s.store_id === store);
+    const storeName = storeObj ? storeObj.name : store.charAt(0).toUpperCase() + store.slice(1).replace('_', ' ');
+    
     // ✅ FIRST: Check if settlement already exists and is collected
     const status = await checkSettlementStatus(store, date);
     
@@ -12801,7 +12840,6 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
     }
     
     // ✅ Mark ALL transactions for this store and date as settled
-    // ✅ FIX: Use timestamp range instead of date column
     const startDate = new Date(date + 'T00:00:00+08:00');
     const endDate = new Date(date + 'T23:59:59+08:00');
     
@@ -12819,6 +12857,25 @@ async function recordSettlement(store, date, pettyCashFloat, cashSystem, cardSys
       console.warn('⚠️ Error updating unsettled transactions:', updateError);
     } else {
       console.log(`✅ Marked ${unsettledCount} transactions as settled for ${store} on ${date}`);
+    }
+    
+    // ✅ Send Telegram notification with store name
+    if (telegramAccounts) {
+      const totalActual = (parseFloat(cashActual) || 0) + (parseFloat(cardActual) || 0) + 
+                         (parseFloat(qrActual) || 0) + (parseFloat(alipayActual) || 0);
+      
+      const message = `💰 SETTLEMENT RECORDED\n` +
+                     `🏪 Store: ${storeName}\n` +
+                     `📅 Date: ${date}\n` +
+                     `👤 By: ${currentEmployee?.name || 'Unknown'}\n` +
+                     `💵 Cash: RM ${(parseFloat(cashActual) || 0).toFixed(2)}\n` +
+                     `💳 Card: RM ${(parseFloat(cardActual) || 0).toFixed(2)}\n` +
+                     `📱 QR Pay: RM ${(parseFloat(qrActual) || 0).toFixed(2)}\n` +
+                     `💸 Alipay: RM ${(parseFloat(alipayActual) || 0).toFixed(2)}\n` +
+                     `━━━━━━━━━━━━━━━━━━\n` +
+                     `💰 TOTAL: RM ${totalActual.toFixed(2)}`;
+      
+      sendTelegramMessage(message);
     }
     
     return result;
@@ -13450,7 +13507,8 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
     document.querySelectorAll('.collection-checkbox').forEach(cb => cb.checked = e.target.checked);
     updateCollectionButtonState();
   });
-  document.getElementById('collectSelectedBtn').addEventListener('click', async () => {
+ // Inside the collectSelectedBtn click handler
+document.getElementById('collectSelectedBtn').addEventListener('click', async () => {
   const selectedIds = Array.from(document.querySelectorAll('.collection-checkbox:checked')).map(cb => cb.value);
   if (selectedIds.length === 0) return;
   
@@ -13459,7 +13517,7 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
     // ✅ First, check if any selected are already collected
     const { data: checkData, error: checkError } = await supabase
       .from('settlements')
-      .select('id, collected')
+      .select('id, collected, store, cash_actual, card_actual, qr_actual, alipay_actual, date')
       .in('id', selectedIds);
     
     if (checkError) throw checkError;
@@ -13484,9 +13542,40 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
         collected_at: new Date().toISOString()
       })
       .in('id', selectedIds)
-      .eq('collected', false);  // ✅ Only update if not already collected
+      .eq('collected', false);
     
     if (error) throw error;
+    
+    // ✅ Send Telegram notification with store names
+    if (telegramAccounts && checkData.length > 0) {
+      // Group by store
+      const storeGroups = {};
+      checkData.forEach(item => {
+        const storeName = getStoreName(item.store);
+        if (!storeGroups[storeName]) {
+          storeGroups[storeName] = { total: 0, count: 0, items: [] };
+        }
+        const total = (parseFloat(item.cash_actual) || 0) + (parseFloat(item.card_actual) || 0) + 
+                     (parseFloat(item.qr_actual) || 0) + (parseFloat(item.alipay_actual) || 0);
+        storeGroups[storeName].total += total;
+        storeGroups[storeName].count++;
+        storeGroups[storeName].items.push(item);
+      });
+      
+      let message = `✅ CASH COLLECTED\n`;
+      message += `👤 By: ${currentEmployee?.name || 'Unknown'}\n`;
+      message += `🕐 Time: ${new Date().toLocaleString()}\n━━━━━━━━━━━━━━━━━━\n`;
+      
+      let grandTotal = 0;
+      for (const [storeName, data] of Object.entries(storeGroups)) {
+        message += `🏪 ${storeName}: RM ${data.total.toFixed(2)} (${data.count} settlements)\n`;
+        grandTotal += data.total;
+      }
+      message += `━━━━━━━━━━━━━━━━━━\n`;
+      message += `💰 GRAND TOTAL: RM ${grandTotal.toFixed(2)}`;
+      
+      sendTelegramMessage(message);
+    }
     
     await showAlertModal('Success', `${selectedIds.length} settlement(s) marked as collected.`);
     await loadAllUnsettledCash();
