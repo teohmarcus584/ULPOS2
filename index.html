@@ -14268,141 +14268,135 @@ async function addStore() {
     
     if (error) throw error;
     
-    // 2. ✅ CORRECTED: Use direct SQL via Supabase's /rest/v1/rpc/exec_sql endpoint
-    try {
-      const availabilityField = `available_${storeId}`;
-      const stockField = `stock_${storeId}`;
+    console.log('✅ Store added:', data);
+    
+    // 2. 🔥 FETCH ALL PRODUCTS and update them one by one
+    const availabilityField = `available_${storeId}`;
+    const stockField = `stock_${storeId}`;
+    
+    console.log(`📝 Adding columns for store "${storeId}" to products table...`);
+    
+    // Get all products
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name');
+    
+    if (productsError) {
+      console.warn('Could not fetch products:', productsError);
+    } else if (products && products.length > 0) {
+      console.log(`📦 Found ${products.length} products to update`);
       
-      console.log(`📝 Adding columns for store "${storeId}" to products table...`);
+      // Update each product with the new store fields
+      // This will fail gracefully if columns don't exist
+      let successCount = 0;
+      let failCount = 0;
       
-      // Method 1: Try using the exec_sql RPC function
-      const sql = `
-        ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;
-        ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;
-      `;
-      
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({ query: sql })
-      });
-      
-      if (!response.ok) {
-        // Method 2: Try using the SQL API (if enabled)
-        console.warn('⚠️ exec_sql RPC not available, trying SQL API...');
+      // Process in batches to avoid rate limits
+      const chunkSize = 20;
+      for (let i = 0; i < products.length; i += chunkSize) {
+        const chunk = products.slice(i, i + chunkSize);
         
-        // Use the /rest/v1/sql endpoint (if enabled)
-        const sqlResponse = await fetch(`${SUPABASE_URL}/rest/v1/sql`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Prefer': 'params=single-object'
-          },
-          body: JSON.stringify({ query: sql })
-        });
-        
-        if (!sqlResponse.ok) {
-          const errorText = await sqlResponse.text();
-          console.warn('⚠️ SQL API not available:', errorText);
-          
-          // Method 3: Use the /rest/v1/rpc/pg_execute function
-          const pgResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/pg_execute`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({ query: sql })
-          });
-          
-          if (!pgResponse.ok) {
-            // All methods failed - show manual instructions
-            const pgErrorText = await pgResponse.text();
-            console.warn('⚠️ All SQL methods failed:', pgErrorText);
-            
-            await showAlertModal('⚠️ Manual Action Required', 
-              `Store "${name}" has been added but the product availability columns could not be created automatically.\n\n` +
-              `Please run this SQL in the Supabase SQL Editor:\n\n` +
-              `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;\n` +
-              `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;\n\n` +
-              `After adding the columns, refresh the page.`
-            );
-            
-            // Still refresh the UI to show the store was added
-            await fetchStores(true);
-            renderStoreList();
-            populateStoreDropdowns();
-            renderAllDynamicStoreContent();
-            return;
-          }
-        }
-      }
-      
-      console.log('✅ Columns added successfully!');
-      
-      // 3. After columns are added, update all products with default values
-      try {
-        const availabilityField = `available_${storeId}`;
-        const stockField = `stock_${storeId}`;
-        
-        // Get all products
-        const { data: products, error: productsError } = await supabase
-          .from('products')
-          .select('id');
-        
-        if (productsError) {
-          console.warn('Could not fetch products for availability update:', productsError);
-        } else if (products && products.length > 0) {
-          // Update in batches
-          const chunkSize = 50;
-          for (let i = 0; i < products.length; i += chunkSize) {
-            const chunk = products.slice(i, i + chunkSize);
-            const ids = chunk.map(p => p.id);
+        // Update each product in the chunk
+        for (const product of chunk) {
+          try {
+            const updateData = {
+              [availabilityField]: true,
+              [stockField]: 0
+            };
             
             const { error: updateError } = await supabase
               .from('products')
-              .update({
-                [availabilityField]: true,
-                [stockField]: 0
-              })
-              .in('id', ids);
+              .update(updateData)
+              .eq('id', product.id);
             
             if (updateError) {
-              console.error(`Error updating chunk ${i / chunkSize + 1}:`, updateError);
-              // Skip this chunk if it fails - the columns might not exist yet
+              // If the error is about missing columns, we need to add them
+              if (updateError.code === 'PGRST204') {
+                console.warn(`⚠️ Columns don't exist for product ${product.id}, trying to add them...`);
+                
+                // Try to add columns using ALTER TABLE via Supabase's /rest/v1/pg/exec endpoint
+                // This uses the direct PostgreSQL endpoint
+                const sql = `
+                  ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;
+                  ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;
+                `;
+                
+                // Use the /rest/v1/pg endpoint (if available)
+                const pgResponse = await fetch(`${SUPABASE_URL}/rest/v1/pg`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                  },
+                  body: JSON.stringify({ query: sql })
+                });
+                
+                if (!pgResponse.ok) {
+                  // If it fails, we need to show manual instructions
+                  const errorMsg = await pgResponse.text();
+                  console.error('❌ Failed to add columns:', errorMsg);
+                  
+                  // Show manual SQL instructions
+                  await showAlertModal('⚠️ Manual Action Required', 
+                    `Store "${name}" has been added but the product columns could not be created automatically.\n\n` +
+                    `Please run this SQL in the Supabase SQL Editor:\n\n` +
+                    `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${availabilityField}" BOOLEAN DEFAULT true;\n` +
+                    `ALTER TABLE products ADD COLUMN IF NOT EXISTS "${stockField}" INTEGER DEFAULT 0;\n\n` +
+                    `After adding the columns, refresh the page to see the store.`
+                  );
+                  
+                  // Store was added, but columns weren't created
+                  // Refresh UI to show the store
+                  await fetchStores(true);
+                  renderStoreList();
+                  populateStoreDropdowns();
+                  renderAllDynamicStoreContent();
+                  
+                  hideLoading();
+                  return;
+                } else {
+                  // Columns added successfully!
+                  console.log('✅ Columns added via /rest/v1/pg');
+                  
+                  // Try the update again
+                  const { error: retryError } = await supabase
+                    .from('products')
+                    .update({
+                      [availabilityField]: true,
+                      [stockField]: 0
+                    })
+                    .eq('id', product.id);
+                  
+                  if (retryError) {
+                    console.error('Retry failed:', retryError);
+                  } else {
+                    successCount++;
+                  }
+                }
+              } else {
+                // Other error
+                console.error(`Error updating product ${product.id}:`, updateError);
+                failCount++;
+              }
             } else {
-              console.log(`✅ Updated ${chunk.length} products for store "${storeId}"`);
+              successCount++;
             }
+            
+            // Small delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+          } catch (err) {
+            console.error(`Failed to update product ${product.id}:`, err);
+            failCount++;
           }
         }
-      } catch (updateErr) {
-        console.warn('⚠️ Product update failed:', updateErr);
+        
+        console.log(`✅ Processed chunk ${i / chunkSize + 1}: ${successCount} successes, ${failCount} failures`);
       }
       
-    } catch (alterErr) {
-      console.error('❌ Column addition failed:', alterErr);
-      // Show the manual instructions
-      await showAlertModal('⚠️ Manual Action Required', 
-        `Store "${name}" has been added but the product availability columns could not be created automatically.\n\n` +
-        `Please run this SQL in the Supabase SQL Editor:\n\n` +
-        `ALTER TABLE products ADD COLUMN IF NOT EXISTS "available_${storeId}" BOOLEAN DEFAULT true;\n` +
-        `ALTER TABLE products ADD COLUMN IF NOT EXISTS "stock_${storeId}" INTEGER DEFAULT 0;\n\n` +
-        `After adding the columns, refresh the page.`
-      );
+      console.log(`📊 Summary: ${successCount} products updated, ${failCount} failed`);
     }
-    
-    await showAlertModal('✅ Store Added', 
-      `Store "${name}" has been added successfully!\n\n` +
-      `Products are now available at this store with 0 stock.\n` +
-      `You can adjust stock and availability in Inventory Mode.`
-    );
     
     // Clear form
     document.getElementById('newStoreId').value = '';
@@ -14417,9 +14411,14 @@ async function addStore() {
     populateStoreDropdowns();
     renderAllDynamicStoreContent();
     
-    // Refresh products to show new store availability
+    // Refresh products
     await fetchProductsFromSheet(true);
     renderProductGrid();
+    
+    await showAlertModal('✅ Store Added', 
+      `Store "${name}" has been added successfully!\n\n` +
+      `You can now assign products to this store in Inventory Mode.`
+    );
     
   } catch (err) {
     console.error('Error adding store:', err);
