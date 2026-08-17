@@ -4117,12 +4117,18 @@ function updateStockForProduct(productId, newStock, delta) {
     return;
   }
 
+  // ✅ Find the current store's slot number
+  const currentStoreObj = stores.find(s => s.store_id === currentStore);
+  let stockColumn = `stock_${currentStore}`; // Fallback
+  
+  if (currentStoreObj && currentStoreObj.slot_number) {
+    const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
+    stockColumn = `stock_store_${slotNumStr}`;
+    console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+  }
+
   // Update local product
   product.stock = newStock;
-  
-  // Update store-specific stock column
-  const store = currentStore;
-  const stockColumn = `stock_${store}`;
   product[stockColumn] = newStock;
 
   // Update input field if exists
@@ -4132,12 +4138,12 @@ function updateStockForProduct(productId, newStock, delta) {
   // Log stock change in history
   logStockChange(productId, product.name, product.category, oldStock, newStock, delta);
   
-  // ✅ UPDATE IN SUPABASE IMMEDIATELY
+  // ✅ UPDATE IN SUPABASE USING SLOT COLUMN
   console.log(`📦 Updating stock for ${product.name}: ${oldStock} → ${newStock} (Δ${delta})`);
   
   supabase
     .from('products')
-    .update({ [stockColumn]: newStock })
+    .update({ [stockColumn]: newStock })  // ← Uses stock_store_01 instead of stock_light
     .eq('id', productId)
     .then(({ error }) => {
       if (error) {
@@ -4151,7 +4157,6 @@ function updateStockForProduct(productId, newStock, delta) {
         console.log('✅ Stock updated in Supabase for', product.name, 'new stock:', newStock);
         
         // ✅ SYNC AFTER SUCCESSFUL STOCK UPDATE - with debounce
-        // Debounce to avoid multiple syncs when updating multiple products quickly
         if (window._stockSyncTimeout) {
           clearTimeout(window._stockSyncTimeout);
         }
@@ -4161,7 +4166,7 @@ function updateStockForProduct(productId, newStock, delta) {
             console.warn('⚠️ Background sync after stock update failed:', err);
           });
           window._stockSyncTimeout = null;
-        }, 1000); // Wait 1 second after last stock change before syncing
+        }, 1000);
       }
     });
     
@@ -5003,8 +5008,21 @@ async function completeCheckout(paymentMethod, cashReceived) {
     hideLoading();
 
     if (success) {
-      // ✅ STOCK UPDATE
+      // ✅ STOCK UPDATE - USING SLOT-BASED COLUMNS
       console.log('🔄 Updating stock for items...');
+      
+      // Find the current store's slot number
+      const currentStoreObj = stores.find(s => s.store_id === currentStore);
+      let stockColumn = `stock_${currentStore}`; // Fallback for old stores
+      
+      if (currentStoreObj && currentStoreObj.slot_number) {
+        const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
+        stockColumn = `stock_store_${slotNumStr}`;
+        console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+      } else {
+        console.log(`📦 Using fallback stock column: ${stockColumn}`);
+      }
+      
       for (let item of saleItems) {
         const product = products.find(p => p.id == item.id);
         if (product) {
@@ -5012,19 +5030,23 @@ async function completeCheckout(paymentMethod, cashReceived) {
           const newStock = oldStock - item.quantity;
           product.stock = newStock;
           
-          // ✅ Also update the store-specific stock column
-          const store = currentStore;
-          const stockColumn = `stock_${store}`;
+          // Update the store-specific stock column
           product[stockColumn] = newStock;
           
-          // ✅ Update in Supabase
+          // ✅ Update in Supabase using the correct column
+          const updateData = {};
+          updateData[stockColumn] = newStock;
+          
           supabase
             .from('products')
-            .update({ [stockColumn]: newStock })
+            .update(updateData)
             .eq('id', product.id)
             .then(({ error }) => {
-              if (error) console.error('❌ Error updating stock for', product.name, error);
-              else console.log('✅ Stock updated for', product.name, 'new stock:', newStock);
+              if (error) {
+                console.error('❌ Error updating stock for', product.name, error);
+              } else {
+                console.log('✅ Stock updated for', product.name, 'new stock:', newStock);
+              }
             });
           
           checkAndNotifyOutOfStock(product.id, product.name, newStock);
@@ -5039,7 +5061,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
         products: products
       }));
 
-      // ✅ SYNC AFTER SUCCESSFUL SALE - THIS IS THE KEY CHANGE
+      // ✅ SYNC AFTER SUCCESSFUL SALE
       console.log('🔄 Syncing data after sale...');
       try {
         await backgroundSync(true);
