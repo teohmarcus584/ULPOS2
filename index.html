@@ -3781,7 +3781,16 @@ function renderProductGrid() {
       // Determine if any store is available
       let anyStoreAvailable = false;
       storeIds.forEach(storeId => {
-        if (prod[`available_${storeId}`] !== false) {
+        // ✅ Find the store's slot number
+        const storeObj = stores.find(s => s.store_id === storeId);
+        let availabilityField = `available_${storeId}`;
+        
+        if (storeObj && storeObj.slot_number) {
+          const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+          availabilityField = `available_store_${slotNumStr}`;
+        }
+        
+        if (prod[availabilityField] !== false) {
           anyStoreAvailable = true;
         }
       });
@@ -3802,7 +3811,16 @@ function renderProductGrid() {
             <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
             
             ${storeIds.map(storeId => {
-              const isAvailable = prod[`available_${storeId}`] !== false;
+              // ✅ Find the store's slot number
+              const storeObj = stores.find(s => s.store_id === storeId);
+              let availabilityField = `available_${storeId}`;
+              
+              if (storeObj && storeObj.slot_number) {
+                const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+                availabilityField = `available_store_${slotNumStr}`;
+              }
+              
+              const isAvailable = prod[availabilityField] !== false;
               const storeName = storeNames[storeId] || storeId;
               // Get emoji for store
               let emoji = '🏪';
@@ -3811,8 +3829,13 @@ function renderProductGrid() {
               else if (storeId === 'gurney_paragon') emoji = '🏙️';
               
               return `
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${isAvailable ? 'background: rgba(44, 122, 75, 0.08);' : ''}">
-                  <input type="checkbox" class="store-availability-checkbox" data-product="${prod.id}" data-store="${storeId}" ${isAvailable ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${isAvailable ? 'background: rgba(44, 122, 75, 0.08);' : 'background: rgba(239, 68, 68, 0.08);'}">
+                  <input type="checkbox" 
+                         class="store-availability-checkbox" 
+                         data-product="${prod.id}" 
+                         data-store="${storeId}" 
+                         ${isAvailable ? 'checked' : ''} 
+                         style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
                   <span>${emoji} ${escapeHtml(storeName)}</span>
                   <span style="margin-left: auto; font-size: 0.7rem; color: ${isAvailable ? '#2c7a4b' : '#ef4444'};">${isAvailable ? '✅' : '❌'}</span>
                 </label>
@@ -3969,6 +3992,10 @@ async function handleAvailabilityChange(e) {
     console.log(`📦 Using fallback availability column: ${availabilityField}`);
   }
   
+  // ✅ IMMEDIATELY update the checkbox visual state
+  // (It's already checked/unchecked, but we need to ensure it stays)
+  cb.checked = isChecked;
+  
   // Update the product object locally first (optimistic update)
   product[availabilityField] = isChecked;
   
@@ -3987,6 +4014,9 @@ async function handleAvailabilityChange(e) {
   cb.disabled = true;
   cb.style.opacity = '0.5';
   
+  // ✅ Store the original state in case we need to revert
+  const originalChecked = isChecked;
+  
   try {
     // ✅ Update Supabase using the correct field
     const updateData = {};
@@ -4000,18 +4030,21 @@ async function handleAvailabilityChange(e) {
     if (error) {
       console.error('❌ Error updating store availability:', error);
       // Revert the checkbox
-      cb.checked = !isChecked;
-      product[availabilityField] = !isChecked;
+      cb.checked = !originalChecked;
+      product[availabilityField] = !originalChecked;
       if (statusSpan) {
-        statusSpan.textContent = !isChecked ? '✅' : '❌';
-        statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
+        statusSpan.textContent = !originalChecked ? '✅' : '❌';
+        statusSpan.style.color = !originalChecked ? '#2c7a4b' : '#ef4444';
       }
       if (label) {
-        label.style.background = !isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+        label.style.background = !originalChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
       }
       await showAlertModal('Error', 'Failed to update store availability: ' + error.message);
     } else {
       console.log(`✅ Store ${store} availability updated to ${isChecked} for product ${product.name}`);
+      
+      // ✅ Make sure checkbox stays in the correct state
+      cb.checked = isChecked;
       
       // Update the card appearance
       const card = cb.closest('.product-card');
@@ -4078,18 +4111,21 @@ async function handleAvailabilityChange(e) {
     }
   } catch (err) {
     console.error('❌ Error:', err);
-    cb.checked = !isChecked;
-    product[availabilityField] = !isChecked;
+    // Revert the checkbox
+    cb.checked = !originalChecked;
+    product[availabilityField] = !originalChecked;
     if (statusSpan) {
-      statusSpan.textContent = !isChecked ? '✅' : '❌';
-      statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
+      statusSpan.textContent = !originalChecked ? '✅' : '❌';
+      statusSpan.style.color = !originalChecked ? '#2c7a4b' : '#ef4444';
     }
     if (label) {
-      label.style.background = !isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+      label.style.background = !originalChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
     }
   } finally {
     cb.disabled = false;
     cb.style.opacity = '1';
+    // ✅ Ensure the checkbox stays in the correct state
+    cb.checked = isChecked;
   }
 }
 // ==================== HELPER FUNCTIONS FOR STORE AVAILABILITY ====================
