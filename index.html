@@ -2837,6 +2837,10 @@ let notificationsEnabled = false;
 let alertedOutOfStockProducts = new Set();
 let alertedLowStockProducts = new Set();
 let preloadedReportCache = null;
+// ✅ ADD THIS LINE HERE - Declare stores BEFORE fetchStores
+let stores = [];
+let storeIdToName = {};
+let storeNameToId = {};
 // ==================== DOM ELEMENTS ====================
 const productGridEl = document.getElementById('productGrid');
 const cartContainer = document.getElementById('cartItemsContainer');
@@ -13438,119 +13442,7 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
 
   
 
-  // Auto-select store on load
-(async function autoSelectOnLoad() {
-  loadAndCacheEmployees().catch(console.warn);
-  preloadAllStoresData();
-  const storeDisplaySpan = document.getElementById('selectedStoreDisplay');
-  const storeValueHidden = document.getElementById('initialStoreValue');
-  const retryBtn = document.getElementById('retryLocationBtn');
-  
-  if (!storeDisplaySpan || !storeValueHidden) return;
-
-  // ✅ Get dynamic store names from Supabase
-  const storesList = await fetchStores();
-  const storeNames = {};
-  storesList.forEach(s => {
-    storeNames[s.store_id] = s.name;
-  });
-
-  async function proceedToLogin(storeId) {
-    if (loginInProgress) return;
-    loginInProgress = true;
-
-    if (window.autoLoginTimeout) clearTimeout(window.autoLoginTimeout);
-
-    initialStore = storeId;
-    currentStore = storeId;
-    storeSelect.value = storeId;
-    document.getElementById('storeSelectModal').style.display = 'none';
-
-    document.getElementById('loginModal').style.display = 'flex';
-    document.getElementById('pinInput').focus();
-
-    loadAndCacheEmployees().catch(console.warn);
-
-    const preloaded = preloadedDataMap[storeId];
-    if (preloaded && preloaded.products && preloaded.products.length > 0) {
-      products = [...preloaded.products].sort((a, b) => a.name.localeCompare(b.name));
-
-      const categories = [...new Set(products.map(p => p.category))].sort();
-      categorySelect.innerHTML = '<option value="all">📂 All Categories</option>';
-      categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat;
-        option.textContent = cat;
-        categorySelect.appendChild(option);
-      });
-      renderProductGrid();
-
-      if (preloaded.employees && preloaded.employees.length > 0) {
-        employeeNameMap = {};
-        soldBySelectCart.innerHTML = '';
-        preloaded.employees.forEach(emp => {
-          employeeNameMap[emp.id] = emp.name;
-          const option = document.createElement('option');
-          option.value = emp.id;
-          option.textContent = `${emp.name} (ID: ${emp.id})`;
-          soldBySelectCart.appendChild(option);
-        });
-      } else {
-        fetchEmployees().then(employees => {
-          employeeNameMap = {};
-          soldBySelectCart.innerHTML = '';
-          employees.forEach(emp => {
-            employeeNameMap[emp.id] = emp.name;
-            const option = document.createElement('option');
-            option.value = emp.id;
-            option.textContent = `${emp.name} (ID: ${emp.id})`;
-            soldBySelectCart.appendChild(option);
-          });
-        });
-      }
-      initialDataPromise = Promise.resolve(true);
-    } else {
-      await loadInitialData();
-    }
-  }
-
-  // ✅ FIXED: Use autoSelectStoreByLocationDynamic
-  const closest = await autoSelectStoreByLocationDynamic();
-  if (closest && storeNames[closest]) {
-    storeDisplaySpan.innerText = storeNames[closest];
-    storeValueHidden.value = closest;
-    setTimeout(() => proceedToLogin(closest), 2000);
-  } else if (storesList.length > 0) {
-    const firstStore = storesList[0];
-    storeDisplaySpan.innerText = firstStore.name;
-    storeValueHidden.value = firstStore.store_id;
-    setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
-  } else {
-    storeDisplaySpan.innerText = '❌ Could not detect location. Please allow GPS and retry.';
-    if (retryBtn) retryBtn.style.display = 'inline-block';
-  }
-
-  if (retryBtn) {
-    retryBtn.onclick = async () => {
-      storeDisplaySpan.innerText = '📍 Loading location...';
-      retryBtn.style.display = 'none';
-      const newClosest = await autoSelectStoreByLocationDynamic();
-      if (newClosest && storeNames[newClosest]) {
-        storeDisplaySpan.innerText = storeNames[newClosest];
-        storeValueHidden.value = newClosest;
-        setTimeout(() => proceedToLogin(newClosest), 2000);
-      } else if (storesList.length > 0) {
-        const firstStore = storesList[0];
-        storeDisplaySpan.innerText = firstStore.name;
-        storeValueHidden.value = firstStore.store_id;
-        setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
-      } else {
-        storeDisplaySpan.innerText = '❌ Still failed. Please check GPS.';
-        retryBtn.style.display = 'inline-block';
-      }
-    };
-  }
-})();
+ 
 
   // Barcode scanner
   document.addEventListener('keydown', (e) => {
@@ -13965,9 +13857,7 @@ document.getElementById('sideChangePinBtn').addEventListener('click', wrapMenuAc
 // DYNAMIC STORE MANAGEMENT
 // ============================================================
 
-let stores = [];
-let storeIdToName = {};
-let storeNameToId = {};
+
 
 async function fetchStores(forceRefresh = false) {
   try {
@@ -13983,12 +13873,13 @@ async function fetchStores(forceRefresh = false) {
     
     const { data, error } = await supabase
       .from('stores')
-      .select('*')  // This now includes 'prefix' if you added the column
+      .select('*')
       .eq('is_active', true)
       .order('name');
     
     if (error) throw error;
     
+    // ✅ Ensure stores is an array
     stores = data || [];
     
     // If any store doesn't have a prefix, generate one and update
@@ -14029,14 +13920,18 @@ async function fetchStores(forceRefresh = false) {
 function updateStoreMaps() {
   storeIdToName = {};
   storeNameToId = {};
-  stores.forEach(s => {
-    storeIdToName[s.store_id] = s.name;
-    storeNameToId[s.name] = s.store_id;
-  });
+  // ✅ Ensure stores is defined and is an array
+  if (stores && Array.isArray(stores)) {
+    stores.forEach(s => {
+      storeIdToName[s.store_id] = s.name;
+      storeNameToId[s.name] = s.store_id;
+    });
+  }
 }
 
-// Get store coordinates
 function getStoreCoords(storeId) {
+  // ✅ Ensure stores is defined and is an array
+  if (!stores || !Array.isArray(stores)) return null;
   const store = stores.find(s => s.store_id === storeId);
   if (store) {
     return { lat: store.latitude, lng: store.longitude };
