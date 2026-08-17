@@ -2841,6 +2841,8 @@ let preloadedReportCache = null;
 let stores = [];
 let storeIdToName = {};
 let storeNameToId = {};
+let storeFilterActive = true; // Default: ON (show only store-specific products)
+let showAllProductsInInventory = false; // Override in inventory mode
 // ==================== DOM ELEMENTS ====================
 const productGridEl = document.getElementById('productGrid');
 const cartContainer = document.getElementById('cartItemsContainer');
