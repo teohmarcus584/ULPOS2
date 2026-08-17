@@ -3974,6 +3974,8 @@ async function handleAvailabilityChange(e) {
   const cb = this;
   const productId = cb.dataset.product;
   const store = cb.dataset.store;
+  
+  // ✅ Get the current checked state BEFORE any changes
   const isChecked = cb.checked;
   
   // Find the product
@@ -3992,14 +3994,10 @@ async function handleAvailabilityChange(e) {
     console.log(`📦 Using fallback availability column: ${availabilityField}`);
   }
   
-  // ✅ IMMEDIATELY update the checkbox visual state
-  // (It's already checked/unchecked, but we need to ensure it stays)
-  cb.checked = isChecked;
-  
-  // Update the product object locally first (optimistic update)
+  // ✅ IMMEDIATELY update the local product and UI (optimistic)
   product[availabilityField] = isChecked;
   
-  // Update the status indicator
+  // ✅ Update the UI immediately
   const label = cb.closest('label');
   const statusSpan = label ? label.querySelector('span:last-child') : null;
   if (statusSpan) {
@@ -4010,11 +4008,14 @@ async function handleAvailabilityChange(e) {
     label.style.background = isChecked ? 'rgba(44, 122, 75, 0.08)' : 'rgba(239, 68, 68, 0.08)';
   }
   
+  // ✅ Keep the checkbox in the correct state
+  cb.checked = isChecked;
+  
   // Show loading indicator
   cb.disabled = true;
   cb.style.opacity = '0.5';
   
-  // ✅ Store the original state in case we need to revert
+  // Store the original state in case we need to revert
   const originalChecked = isChecked;
   
   try {
@@ -4029,7 +4030,7 @@ async function handleAvailabilityChange(e) {
     
     if (error) {
       console.error('❌ Error updating store availability:', error);
-      // Revert the checkbox
+      // Revert everything
       cb.checked = !originalChecked;
       product[availabilityField] = !originalChecked;
       if (statusSpan) {
@@ -4067,7 +4068,7 @@ async function handleAvailabilityChange(e) {
         // Update the product name badge
         const nameDiv = card.querySelector('.product-name');
         if (nameDiv) {
-          const currentText = nameDiv.textContent;
+          const currentText = nameDiv.textContent || '';
           if (!anyStoreAvailable) {
             if (!currentText.includes('🚫')) {
               nameDiv.textContent = currentText.replace('🚫', '').trim() + ' 🚫';
@@ -4111,7 +4112,7 @@ async function handleAvailabilityChange(e) {
     }
   } catch (err) {
     console.error('❌ Error:', err);
-    // Revert the checkbox
+    // Revert everything
     cb.checked = !originalChecked;
     product[availabilityField] = !originalChecked;
     if (statusSpan) {
@@ -4124,8 +4125,13 @@ async function handleAvailabilityChange(e) {
   } finally {
     cb.disabled = false;
     cb.style.opacity = '1';
-    // ✅ Ensure the checkbox stays in the correct state
-    cb.checked = isChecked;
+    // ✅ Force the checkbox to the correct state
+    cb.checked = originalChecked;
+    // ✅ Also force update the status span again
+    if (statusSpan) {
+      statusSpan.textContent = originalChecked ? '✅' : '❌';
+      statusSpan.style.color = originalChecked ? '#2c7a4b' : '#ef4444';
+    }
   }
 }
 // ==================== HELPER FUNCTIONS FOR STORE AVAILABILITY ====================
