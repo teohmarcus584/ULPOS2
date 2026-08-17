@@ -3957,18 +3957,20 @@ async function handleAvailabilityChange(e) {
   const product = products.find(p => p.id == productId);
   if (!product) return;
   
-  // Map store to database field
-  const fieldMap = {
-    'queens': 'available_queens',
-    'sunshine': 'available_sunshine',
-    'gurney_paragon': 'available_gurney_paragon'
-  };
+  // ✅ Find the store's slot number
+  const storeObj = stores.find(s => s.store_id === store);
+  let availabilityField = `available_${store}`; // Fallback for old stores
   
-  const field = fieldMap[store];
-  if (!field) return;
+  if (storeObj && storeObj.slot_number) {
+    const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+    availabilityField = `available_store_${slotNumStr}`;
+    console.log(`📦 Using slot-based availability column: ${availabilityField}`);
+  } else {
+    console.log(`📦 Using fallback availability column: ${availabilityField}`);
+  }
   
   // Update the product object locally first (optimistic update)
-  product[field] = isChecked;
+  product[availabilityField] = isChecked;
   
   // Update the status indicator
   const label = cb.closest('label');
@@ -3986,9 +3988,9 @@ async function handleAvailabilityChange(e) {
   cb.style.opacity = '0.5';
   
   try {
-    // ✅ Update Supabase
+    // ✅ Update Supabase using the correct field
     const updateData = {};
-    updateData[field] = isChecked;
+    updateData[availabilityField] = isChecked;
     
     const { error } = await supabase
       .from('products')
@@ -3999,7 +4001,7 @@ async function handleAvailabilityChange(e) {
       console.error('❌ Error updating store availability:', error);
       // Revert the checkbox
       cb.checked = !isChecked;
-      product[field] = !isChecked;
+      product[availabilityField] = !isChecked;
       if (statusSpan) {
         statusSpan.textContent = !isChecked ? '✅' : '❌';
         statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
@@ -4015,10 +4017,16 @@ async function handleAvailabilityChange(e) {
       const card = cb.closest('.product-card');
       if (card) {
         // Check if any store is available
-        const hasQueens = product.available_queens !== false;
-        const hasSunshine = product.available_sunshine !== false;
-        const hasGurney = product.available_gurney_paragon !== false;
-        const anyStoreAvailable = hasQueens || hasSunshine || hasGurney;
+        let anyStoreAvailable = false;
+        stores.forEach(s => {
+          if (s.slot_number) {
+            const slotNumStr = String(s.slot_number).padStart(2, '0');
+            const key = `available_store_${slotNumStr}`;
+            if (product[key] !== false) {
+              anyStoreAvailable = true;
+            }
+          }
+        });
         
         card.style.opacity = anyStoreAvailable ? '1' : '0.6';
         card.style.borderColor = anyStoreAvailable ? '' : '#ef4444';
@@ -4055,11 +4063,23 @@ async function handleAvailabilityChange(e) {
           }
         }
       }
+      
+      // ✅ Sync after availability change
+      if (window._availabilitySyncTimeout) {
+        clearTimeout(window._availabilitySyncTimeout);
+      }
+      window._availabilitySyncTimeout = setTimeout(() => {
+        console.log('🔄 Syncing after availability update...');
+        backgroundSync(true).catch(err => {
+          console.warn('⚠️ Background sync after availability update failed:', err);
+        });
+        window._availabilitySyncTimeout = null;
+      }, 1000);
     }
   } catch (err) {
     console.error('❌ Error:', err);
     cb.checked = !isChecked;
-    product[field] = !isChecked;
+    product[availabilityField] = !isChecked;
     if (statusSpan) {
       statusSpan.textContent = !isChecked ? '✅' : '❌';
       statusSpan.style.color = !isChecked ? '#2c7a4b' : '#ef4444';
@@ -6557,12 +6577,15 @@ async function processRefund(transactionId, store) {
       console.log(`📦 Using fallback stock column for refund: ${stockColumn}`);
     }
     
+    // Track which products were updated
+    const updatedProducts = [];
+    
     for (const item of transaction.items) {
       if (item.quantity > 0) {
         // Get current stock from Supabase
         const { data: product, error: pError } = await supabase
           .from('products')
-          .select(stockColumn)
+          .select('*')  // Get all columns
           .eq('id', item.id)
           .single();
         
@@ -6583,6 +6606,7 @@ async function processRefund(transactionId, store) {
             console.error(`❌ Error restoring stock for ${item.name}:`, updateError);
           } else {
             console.log(`✅ Stock restored for ${item.name}: ${currentStock} → ${newStock}`);
+            updatedProducts.push({ id: item.id, name: item.name, newStock: newStock });
           }
           
           // Update local product
@@ -6592,13 +6616,25 @@ async function processRefund(transactionId, store) {
             localProduct[stockColumn] = newStock;
           }
         } else {
-          console.warn(`⚠️ Could not find product ${item.id} or no stock column`);
+          console.warn(`⚠️ Could not find product ${item.id}`);
         }
       }
     }
 
+    // ✅ Force sync after refund
+    if (updatedProducts.length > 0) {
+      console.log('🔄 Syncing after refund...');
+      try {
+        await backgroundSync(true);
+        console.log('✅ Background sync completed after refund');
+      } catch (syncErr) {
+        console.warn('⚠️ Background sync failed after refund:', syncErr);
+      }
+    }
+
     await showAlertModal('Refund Successful', 
-      `Refund ID: ${refundId}\nStock restored for ${transaction.items.length} item(s).`
+      `Refund ID: ${refundId}\n` +
+      `Stock restored for ${updatedProducts.length} item(s).`
     );
 
     // Print refund receipt if printer is connected
@@ -6637,6 +6673,9 @@ async function processRefund(transactionId, store) {
     if (reportModal && reportModal.style.display === 'flex') {
       await updateAdminReport(true);
     }
+    
+    // ✅ Re-render product grid to show updated stock
+    renderProductGrid();
     
   } catch (err) {
     console.error('Refund error:', err);
