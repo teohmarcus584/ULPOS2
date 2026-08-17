@@ -2134,7 +2134,9 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
       <img src="https://i.imgur.com/STBkLrm.jpeg" alt="POS System Logo" class="pos-logo" id="logoImage">
       <div class="store-selector-header">
         <label for="storeSelect">Store:</label>
-        <select id="storeSelect" class="store-header-select"><option value="queens">Queens</option><option value="sunshine">Sunshine</option><option value="gurney_paragon">Gurney Paragon</option></select>
+        <select id="storeSelect" class="store-header-select">
+  <option value="">Loading stores...</option>
+</select>
         <div id="syncStatus" class="sync-status"><i class="fas fa-database"></i> <span>Loading...</span></div>
       </div>
     </div>
@@ -2154,7 +2156,10 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search product...">
   <button id="refreshProductsPanelBtn" class="refresh-btn">🔄 Sync now</button>
   <button id="lowStockToggleBtn" class="low-stock-toggle">⚠️ Low Stock</button>
-  
+   <!-- ✅ PUT THE MANAGE STORES BUTTON RIGHT HERE -->
+    <button id="manageStoresBtn" class="cart-header-btn" style="display: none; background: #8b5cf6; color: white;">
+      🏪 Manage Stores
+    </button>
   <!-- ✅ ADD THIS BUTTON - Store Filter Toggle -->
   <button id="storeFilterToggleBtn" class="low-stock-toggle" style="display: none;">
     🏪 Store Filter: ON
@@ -2533,7 +2538,53 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <div class="modal-buttons"><button id="checkSettlementBtn" class="modal-btn modal-btn-primary">Check</button><button id="recordSettlementBtn" class="modal-btn modal-btn-primary" style="display: none;">Record Settlement</button> <button id="reprintSettlementBtn" class="modal-btn modal-btn-secondary">Settlement History</button><button id="closeSettlementModalBtn" class="modal-btn modal-btn-secondary">Cancel</button></div>
   </div>
 </div>
-
+<!-- Store Management Modal -->
+<div id="storeManagementModal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 800px;">
+    <span class="close-modal" id="closeStoreManagementModal">×</span>
+    <div class="modal-title">🏪 Store Management</div>
+    
+    <!-- Add New Store Form -->
+    <div style="background: #f8fafc; padding: 16px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+      <h4 style="margin-bottom: 12px;">➕ Add New Store</h4>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="filter-group">
+          <label>Store ID (unique)</label>
+          <input type="text" id="newStoreId" class="modal-input" placeholder="e.g., klcc" style="width:100%;">
+        </div>
+        <div class="filter-group">
+          <label>Store Name</label>
+          <input type="text" id="newStoreName" class="modal-input" placeholder="e.g., KLCC" style="width:100%;">
+        </div>
+        <div class="filter-group" style="grid-column: 1 / -1;">
+          <label>Address</label>
+          <input type="text" id="newStoreAddress" class="modal-input" placeholder="Full address" style="width:100%;">
+        </div>
+        <div class="filter-group">
+          <label>Latitude</label>
+          <input type="number" id="newStoreLat" class="modal-input" placeholder="5.334932" step="any" style="width:100%;">
+        </div>
+        <div class="filter-group">
+          <label>Longitude</label>
+          <input type="number" id="newStoreLng" class="modal-input" placeholder="100.306625" step="any" style="width:100%;">
+        </div>
+      </div>
+      <button id="addStoreBtn" class="modal-btn modal-btn-primary" style="margin-top: 12px; width: 100%;">➕ Add Store</button>
+    </div>
+    
+    <!-- Store List -->
+    <div style="max-height: 400px; overflow-y: auto;">
+      <h4 style="margin-bottom: 12px;">📋 Current Stores</h4>
+      <div id="storeListContainer">
+        <div style="text-align:center; padding:20px; color:#94a3b8;">Loading stores...</div>
+      </div>
+    </div>
+    
+    <div class="modal-buttons">
+      <button id="closeStoreManagementBtn" class="modal-btn modal-btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
 <div id="collectionModal" class="modal-overlay">
   <div class="modal-container" style="max-width: 800px;">
     <span class="close-modal" id="closeCollectionModal">×</span>
@@ -3261,42 +3312,119 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-async function autoSelectStoreByLocation() {
-  const storeCoords = {
-    queens:          { lat: 5.334932,  lng: 100.306625 },
-    gurney_paragon:  { lat: 5.434950,  lng: 100.310854 },
-    sunshine:        { lat: 5.398593,  lng: 100.286827 }
-  };
+// ============================================================
+// AUTO-SELECT ON LOAD (Dynamic Stores)
+// ============================================================
 
-  if (!navigator.geolocation) {
-    console.warn("Geolocation not supported");
-    return null;
+(async function autoSelectOnLoad() {
+  loadAndCacheEmployees().catch(console.warn);
+  preloadAllStoresData();
+  const storeDisplaySpan = document.getElementById('selectedStoreDisplay');
+  const storeValueHidden = document.getElementById('initialStoreValue');
+  const retryBtn = document.getElementById('retryLocationBtn');
+  
+  if (!storeDisplaySpan || !storeValueHidden) return;
+
+  // ✅ Get dynamic store names from Supabase
+  const storesList = await fetchStores();
+  const storeNames = {};
+  storesList.forEach(s => {
+    storeNames[s.store_id] = s.name;
+  });
+
+  async function proceedToLogin(storeId) {
+    if (loginInProgress) return;
+    loginInProgress = true;
+
+    if (window.autoLoginTimeout) clearTimeout(window.autoLoginTimeout);
+
+    initialStore = storeId;
+    currentStore = storeId;
+    storeSelect.value = storeId;
+    document.getElementById('storeSelectModal').style.display = 'none';
+
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('pinInput').focus();
+
+    loadAndCacheEmployees().catch(console.warn);
+
+    const preloaded = preloadedDataMap[storeId];
+    if (preloaded && preloaded.products && preloaded.products.length > 0) {
+      products = [...preloaded.products].sort((a, b) => a.name.localeCompare(b.name));
+
+      const categories = [...new Set(products.map(p => p.category))].sort();
+      categorySelect.innerHTML = '<option value="all">📂 All Categories</option>';
+      categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        categorySelect.appendChild(option);
+      });
+      renderProductGrid();
+
+      if (preloaded.employees && preloaded.employees.length > 0) {
+        employeeNameMap = {};
+        soldBySelectCart.innerHTML = '';
+        preloaded.employees.forEach(emp => {
+          employeeNameMap[emp.id] = emp.name;
+          const option = document.createElement('option');
+          option.value = emp.id;
+          option.textContent = `${emp.name} (ID: ${emp.id})`;
+          soldBySelectCart.appendChild(option);
+        });
+      } else {
+        fetchEmployees().then(employees => {
+          employeeNameMap = {};
+          soldBySelectCart.innerHTML = '';
+          employees.forEach(emp => {
+            employeeNameMap[emp.id] = emp.name;
+            const option = document.createElement('option');
+            option.value = emp.id;
+            option.textContent = `${emp.name} (ID: ${emp.id})`;
+            soldBySelectCart.appendChild(option);
+          });
+        });
+      }
+      initialDataPromise = Promise.resolve(true);
+    } else {
+      await loadInitialData();
+    }
   }
 
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        let closestStore = null;
-        let minDistance = Infinity;
+  // ✅ Auto-select using dynamic store locations
+  const closest = await autoSelectStoreByLocation();
+  
+  if (closest && storeNames[closest]) {
+    storeDisplaySpan.innerText = storeNames[closest];
+    storeValueHidden.value = closest;
+    setTimeout(() => proceedToLogin(closest), 2000);
+  } else if (storesList.length > 0) {
+    // ✅ If GPS fails, use the first available store
+    const firstStore = storesList[0];
+    storeDisplaySpan.innerText = firstStore.name;
+    storeValueHidden.value = firstStore.store_id;
+    setTimeout(() => proceedToLogin(firstStore.store_id), 2000);
+  } else {
+    storeDisplaySpan.innerText = '❌ Could not detect location. Please allow GPS and retry.';
+    if (retryBtn) retryBtn.style.display = 'inline-block';
+  }
 
-        for (const [storeId, coords] of Object.entries(storeCoords)) {
-          const dist = getDistanceFromLatLon(latitude, longitude, coords.lat, coords.lng);
-          if (dist < minDistance) {
-            minDistance = dist;
-            closestStore = storeId;
-          }
-        }
-        resolve(closestStore);
-      },
-      (error) => {
-        console.warn("Location error:", error.message);
-        resolve(null);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
-}
+  if (retryBtn) {
+    retryBtn.onclick = async () => {
+      storeDisplaySpan.innerText = '📍 Loading location...';
+      retryBtn.style.display = 'none';
+      const newClosest = await autoSelectStoreByLocation();
+      if (newClosest && storeNames[newClosest]) {
+        storeDisplaySpan.innerText = storeNames[newClosest];
+        storeValueHidden.value = newClosest;
+        setTimeout(() => proceedToLogin(newClosest), 2000);
+      } else {
+        storeDisplaySpan.innerText = '❌ Still failed. Please check GPS.';
+        retryBtn.style.display = 'inline-block';
+      }
+    };
+  }
+})();
 
 // ==================== PRODUCTS ====================
 
@@ -3579,11 +3707,11 @@ function renderProductGrid() {
   if (filtered.length === 0) {
     let message = 'No products match your filters.';
     if (storeFilterActive && !inventoryMode && !showAllProductsInInventory) {
-      const storeNames = {
-        queens: 'Queens',
-        sunshine: 'Sunshine',
-        gurney_paragon: 'Gurney Paragon'
-      };
+     // Dynamic store names from Supabase
+const storeNames = {};
+stores.forEach(s => {
+  storeNames[s.store_id] = s.name;
+});
       message = `No products available at ${storeNames[currentStore] || currentStore}. Try turning off the store filter.`;
     }
     productGridEl.innerHTML = `<div style="text-align:center; padding:20px;">${message}</div>`;
@@ -3596,11 +3724,11 @@ function renderProductGrid() {
   
   // Show store filter indicator - ONLY in inventory mode
   if (inventoryMode && storeFilterActive && !showAllProductsInInventory) {
-    const storeNames = {
-      queens: '🏬 Queens',
-      sunshine: '☀️ Sunshine',
-      gurney_paragon: '🏙️ Gurney Paragon'
-    };
+    // Dynamic store names from Supabase
+const storeNames = {};
+stores.forEach(s => {
+  storeNames[s.store_id] = s.name;
+});
     const productCount = filtered.length;
     html += `<div style="font-size:0.8rem; color:#64748b; margin-bottom:12px; padding:6px 14px; background:#f1f5f9; border-radius:20px; display:inline-block;">
       📍 Showing ${productCount} product(s) available at ${storeNames[currentStore] || currentStore}
@@ -3925,11 +4053,11 @@ function getStoreAvailabilityBadge(product) {
 function getStoreAvailabilityText(product) {
   if (!product) return '';
   
-  const storeNames = {
-    queens: '🏬 Queens',
-    sunshine: '☀️ Sunshine',
-    gurney_paragon: '🏙️ Gurney Paragon'
-  };
+  // Dynamic store names from Supabase
+const storeNames = {};
+stores.forEach(s => {
+  storeNames[s.store_id] = s.name;
+});
   
   const available = [];
   if (product.available_queens) available.push(storeNames.queens);
@@ -5322,21 +5450,8 @@ async function getNextIRSInvoiceNumber() {
 }
 async function getNextTransactionNumber(store) {
   try {
-    // Map store to prefix
-    const prefixMap = {
-      queens: 'TXN38',
-      sunshine: 'TXN39',
-      gurney_paragon: 'TXN40'
-    };
-    
-    const prefix = prefixMap[store];
-    if (!prefix) {
-      console.error(`❌ Unknown store: ${store}`);
-      const fallbackPrefix = store.substring(0, 3).toUpperCase();
-      const timestamp = Date.now();
-      const random = Math.floor(Math.random() * 1000);
-      return `${fallbackPrefix}-${timestamp}-${String(random).padStart(4, '0')}`;
-    }
+    // Get prefix dynamically
+    const prefix = await getStorePrefix(store);
     
     console.log(`🔍 Getting next transaction number for ${store} with prefix ${prefix}`);
     
@@ -5360,7 +5475,7 @@ async function getNextTransactionNumber(store) {
       // Extract all numbers and find the highest
       for (const row of data) {
         const id = row.transaction_id;
-        // Extract number from TXN38XXXXX format
+        // Extract number from PREFIXXXXXX format
         const match = id.match(new RegExp(`${prefix}(\\d+)`));
         if (match) {
           const num = parseInt(match[1]);
@@ -5388,12 +5503,7 @@ async function getNextTransactionNumber(store) {
   } catch (err) {
     console.error('❌ Failed to get transaction number:', err);
     // Fallback: use timestamp
-    const prefixMap = {
-      queens: 'TXN38',
-      sunshine: 'TXN39',
-      gurney_paragon: 'TXN40'
-    };
-    const prefix = prefixMap[store] || store.substring(0, 3).toUpperCase();
+    const prefix = await getStorePrefix(store);
     const timestamp = Date.now().toString().slice(-6);
     const fallbackId = `${prefix}${timestamp}`;
     console.log(`⚠️ Using fallback ID: ${fallbackId}`);
@@ -7441,7 +7551,10 @@ async function loadAllUnsettledCash() {
 }
 
 function updateStoreCashSummary() {
-  const storeTotals = { queens: 0, sunshine: 0, gurney_paragon: 0 };
+   const storeTotals = {};
+  stores.forEach(store => {
+    storeTotals[store.store_id] = 0;
+  });
   
   for (const rec of allUnsettledCash) {
     if (rec.collected === true) continue;
@@ -10191,7 +10304,17 @@ function getStoreCardData(storeName) {
   };
 }
 
-const storeOrder = ['queens', 'sunshine', 'gurney_paragon'];
+// Dynamic store order from Supabase
+let storeOrder = [];
+
+// ============================================================
+// UPDATE STORE ORDER (For Swipeable Cards)
+// ============================================================
+
+function updateStoreOrder() {
+  storeOrder = stores.map(s => s.store_id);
+  console.log('📋 Updated store order:', storeOrder);
+}
 let currentCardIndex = 0;
 let touchStartX = 0;
 let touchEndX = 0;
@@ -10366,7 +10489,7 @@ async function updateAdminReport(forceRefresh = false) {
   const storeBreakdownDiv = document.getElementById('storeBreakdownContainer');
   if (currentEmployee.isAdmin) {
     storeBreakdownDiv.style.display = 'block';
-    const stores = ['queens', 'sunshine', 'gurney_paragon'];
+    const stores = storeOrder.length > 0 ? storeOrder : stores.map(s => s.store_id);
 
     let needFetch = forceRefresh;
     for (const storeName of stores) {
@@ -10758,7 +10881,48 @@ async function updateNonAdminReport(from, to) {
     renderProductDetails(productData);
   }
 }
+// ============================================================
+// HELPER - GET STORE NAME DYNAMICALLY
+// ============================================================
 
+function getStoreName(storeId) {
+  const store = stores.find(s => s.store_id === storeId);
+  return store ? store.name : storeId;
+}
+
+function getStoreEmoji(storeId) {
+  const emojiMap = {
+    'queens': '🏬',
+    'sunshine': '☀️',
+    'gurney_paragon': '🏙️'
+  };
+  return emojiMap[storeId] || '🏪';
+}
+
+function getStoreNamesObject() {
+  const names = {};
+  stores.forEach(s => {
+    names[s.store_id] = s.name;
+  });
+  return names;
+}
+
+function getStoreCoordsObject() {
+  const coords = {};
+  stores.forEach(s => {
+    if (s.latitude && s.longitude) {
+      coords[s.store_id] = {
+        lat: parseFloat(s.latitude),
+        lng: parseFloat(s.longitude)
+      };
+    }
+  });
+  return coords;
+}
+
+function getStoreIds() {
+  return stores.map(s => s.store_id);
+}
 async function updateNonAdminStatsCards(from, to) {
   if (!currentEmployee || currentEmployee.isAdmin) return;
   
@@ -10776,14 +10940,11 @@ async function updateNonAdminStatsCards(from, to) {
     storeTotalElem.innerText = 'RM ' + storeTotals.totalSales.toFixed(2);
     console.log('Store total for ' + store + ': RM ' + storeTotals.totalSales.toFixed(2));
   }
-  if (storeNameElem) {
-    const storeNames = {
-      queens: 'Queens',
-      sunshine: 'Sunshine',
-      gurney_paragon: 'Gurney Paragon'
-    };
-    storeNameElem.innerText = storeNames[store] || store;
-  }
+if (storeNameElem) {
+  const store = stores.find(s => s.store_id === currentStore);
+  const storeName = store ? store.name : currentStore;
+  storeNameElem.innerText = storeName;
+}
   
   // ✅ My Sales = Employee sales across ALL stores, EXCLUDING refunds
   try {
@@ -10926,18 +11087,15 @@ function populateStoreSelects() {
   if (receiptsStore) {
     // ✅ For non-admin, only show their store
     if (currentEmployee && !currentEmployee.isAdmin) {
-      const storeNames = {
-        queens: '🏬 Queens',
-        sunshine: '☀️ Sunshine',
-        gurney_paragon: '🏙️ Gurney Paragon'
-      };
+  const store = stores.find(s => s.store_id === currentStore);
+  const storeName = store ? store.name : currentStore;
       receiptsStore.innerHTML = '';
       const opt = document.createElement('option');
       opt.value = currentStore;
-      opt.textContent = storeNames[currentStore] || currentStore;
+      opt.textContent = storeName;
       receiptsStore.appendChild(opt);
       receiptsStore.disabled = true;
-    } else {
+} else {
       // Admin: show all stores
       receiptsStore.innerHTML = '<option value="all">All Stores</option>';
       stores.forEach(s => {
@@ -11952,9 +12110,10 @@ function disableBarcodeScanner() {
 // ==================== PRELOAD ====================
 
 async function preloadAllStoresData() {
-  const stores = ["queens", "sunshine", "gurney_paragon"];
-  stores.forEach(store => {
-    preloadProductsForStore(store).catch(err => console.warn(`Preload failed for ${store}:`, err));
+  // ✅ Use dynamic stores from Supabase
+  const storesList = await fetchStores();
+  storesList.forEach(store => {
+    preloadProductsForStore(store.store_id).catch(err => console.warn(`Preload failed for ${store.store_id}:`, err));
   });
 }
 
@@ -13283,11 +13442,11 @@ document.getElementById('recordSettlementBtn').addEventListener('click', async (
     
     if (!storeDisplaySpan || !storeValueHidden) return;
 
-    const storeNames = {
-      queens: 'Queens',
-      sunshine: 'Sunshine',
-      gurney_paragon: 'Gurney Paragon'
-    };
+   // Dynamic store names from Supabase
+const storeNames = {};
+stores.forEach(s => {
+  storeNames[s.store_id] = s.name;
+});
 
     async function proceedToLogin(storeId) {
       if (loginInProgress) return;
@@ -13784,7 +13943,683 @@ document.getElementById('sideChangePinBtn').addEventListener('click', wrapMenuAc
 // Customer points functions are already included above
 
 // ==================== STOCK HISTORY SAVE TO SHEET ====================
+// ============================================================
+// DYNAMIC STORE MANAGEMENT
+// ============================================================
 
+let stores = [];
+let storeIdToName = {};
+let storeNameToId = {};
+
+async function fetchStores(forceRefresh = false) {
+  try {
+    const cached = localStorage.getItem('cachedStores');
+    if (cached && !forceRefresh) {
+      const { timestamp, data } = JSON.parse(cached);
+      if (Date.now() - timestamp < 60000) { // 1 minute cache
+        stores = data;
+        updateStoreMaps();
+        return stores;
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('stores')
+      .select('*')  // This now includes 'prefix' if you added the column
+      .eq('is_active', true)
+      .order('name');
+    
+    if (error) throw error;
+    
+    stores = data || [];
+    
+    // If any store doesn't have a prefix, generate one and update
+    let needsUpdate = false;
+    for (const store of stores) {
+      if (!store.prefix) {
+        const base = store.store_id.substring(0, 3).toUpperCase();
+        const hash = store.store_id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const num = String(hash % 90 + 10).padStart(2, '0');
+        store.prefix = `${base}${num}`;
+        needsUpdate = true;
+      }
+    }
+    
+    // If we generated prefixes, update them in the database
+    if (needsUpdate) {
+      for (const store of stores) {
+        await supabase
+          .from('stores')
+          .update({ prefix: store.prefix })
+          .eq('store_id', store.store_id);
+      }
+    }
+    
+    localStorage.setItem('cachedStores', JSON.stringify({
+      timestamp: Date.now(),
+      data: stores
+    }));
+    
+    updateStoreMaps();
+    return stores;
+  } catch (err) {
+    console.error('Error fetching stores:', err);
+    return [];
+  }
+}
+
+function updateStoreMaps() {
+  storeIdToName = {};
+  storeNameToId = {};
+  stores.forEach(s => {
+    storeIdToName[s.store_id] = s.name;
+    storeNameToId[s.name] = s.store_id;
+  });
+}
+
+// Get store coordinates
+function getStoreCoords(storeId) {
+  const store = stores.find(s => s.store_id === storeId);
+  if (store) {
+    return { lat: store.latitude, lng: store.longitude };
+  }
+  return null;
+}
+
+function populateStoreDropdowns() {
+  const selects = [
+    document.getElementById('storeSelect'),
+    document.getElementById('settlementStoreSelect'),
+    document.getElementById('adminReportStoreSelect'),
+    document.getElementById('receiptsStoreSelect'),
+    document.getElementById('collectionStoreSelect')
+  ];
+  
+  // For each select, preserve 'all' option if it exists
+  selects.forEach(select => {
+    if (!select) return;
+    
+    // Save current value
+    const currentValue = select.value;
+    
+    // Clear existing options except 'all'
+    const hasAllOption = Array.from(select.options).some(opt => opt.value === 'all');
+    select.innerHTML = '';
+    
+    if (hasAllOption) {
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.textContent = 'All Stores';
+      select.appendChild(allOpt);
+    }
+    
+    // Add dynamic stores
+    stores.forEach(store => {
+      const option = document.createElement('option');
+      option.value = store.store_id;
+      option.textContent = store.name;
+      select.appendChild(option);
+    });
+    
+    // Restore selection if possible
+    if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+      select.value = currentValue;
+    }
+  });
+}
+
+// ============================================================
+// RENDER STORE LIST (for management modal)
+// ============================================================
+
+function renderStoreList() {
+  const container = document.getElementById('storeListContainer');
+  if (!container) return;
+  
+  if (!stores || stores.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No stores found. Add your first store!</div>';
+    return;
+  }
+  
+  let html = '';
+  stores.forEach(store => {
+    const isCurrent = currentStore === store.store_id;
+    const productCount = products.filter(p => p[`available_${store.store_id}`] !== false).length;
+    
+    html += `
+      <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid ${isCurrent ? '#3b82f6' : '#e2e8f0'}; ${isCurrent ? 'border-left: 4px solid #3b82f6;' : ''}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong style="font-size: 1.1rem;">${escapeHtml(store.name)}</strong>
+              ${isCurrent ? '<span style="background: #3b82f6; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">CURRENT</span>' : ''}
+              <span style="font-size: 0.75rem; color: #64748b;">ID: ${escapeHtml(store.store_id)}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">${escapeHtml(store.address || 'No address')}</div>
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
+              📍 ${store.latitude || 'N/A'}, ${store.longitude || 'N/A'}
+              <span style="margin-left: 12px;">📦 ${productCount} products</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            ${!isCurrent ? `<button class="set-store-btn" data-store="${store.store_id}" style="background: #3b82f6; color: white; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer;">Switch</button>` : ''}
+            <button class="edit-store-btn" data-store="${store.store_id}" style="background: #f1f5f9; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer;">✏️ Edit</button>
+            <button class="delete-store-btn" data-store="${store.store_id}" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer;">🗑️ Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+  
+  // Event listeners
+  document.querySelectorAll('.set-store-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const storeId = btn.dataset.store;
+      await switchStore(storeId);
+      renderStoreList();
+      closeStoreManagementModal();
+    });
+  });
+  
+  document.querySelectorAll('.edit-store-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const storeId = btn.dataset.store;
+      editStore(storeId);
+    });
+  });
+  
+  document.querySelectorAll('.delete-store-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const storeId = btn.dataset.store;
+      deleteStore(storeId);
+    });
+  });
+}
+// ============================================================
+// RENDER STORE SUMMARY CARDS (For Admin Report Modal)
+// ============================================================
+
+// ============================================================
+// DYNAMIC STORE RENDER FUNCTIONS - ADD AFTER renderStoreList()
+// ============================================================
+
+function renderStoreSummaryCards(container) {
+  if (!container) {
+    console.warn('⚠️ Container for store summary cards not found');
+    return;
+  }
+  
+  if (!stores || stores.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No stores available</div>';
+    return;
+  }
+  
+  let html = '';
+  stores.forEach(store => {
+    const emoji = getStoreEmoji(store.store_id);
+    html += `
+      <div class="store-summary-card" data-store="${store.store_id}">
+        <div class="store-name">${emoji} ${escapeHtml(store.name)}</div>
+        <div class="store-total">Total Sales: RM 0.00</div>
+        <div class="store-cash">💵 Cash: RM 0.00</div>
+        <div class="store-card">💳 Card: RM 0.00</div>
+        <div class="store-qr">📱 QR Pay: RM 0.00</div>
+        <div class="store-alipay">💸 Alipay: RM 0.00</div>
+        <div class="store-refund">❌ Refunds: RM 0.00</div>
+        <div class="store-refunded-bills">📄 Refunded Bills: 0</div>
+        <div class="store-transactions">Transactions: 0</div>
+        <div class="store-items-sold">Items Sold: 0</div>
+        <div class="store-employee-sales">
+          <h4>👥 Employee Sales</h4>
+          <div class="employee-list"></div>
+        </div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function renderStoreCashCards(container) {
+  if (!container) {
+    console.warn('⚠️ Container for store cash cards not found');
+    return;
+  }
+  
+  if (!stores || stores.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No stores available</div>';
+    return;
+  }
+  
+  let html = '';
+  stores.forEach(store => {
+    const emoji = getStoreEmoji(store.store_id);
+    html += `
+      <div class="store-cash-card" data-store="${store.store_id}">
+        <div class="store-name">${emoji} ${escapeHtml(store.name)}</div>
+        <div class="store-cash-amount">RM 0.00</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function getStoreEmoji(storeId) {
+  const emojiMap = {
+    'queens': '🏬',
+    'sunshine': '☀️',
+    'gurney_paragon': '🏙️'
+  };
+  return emojiMap[storeId] || '🏪';
+}
+
+function renderAllDynamicStoreContent() {
+  // Update store summary cards
+  const storeBreakdown = document.getElementById('storeBreakdownContainer');
+  if (storeBreakdown) {
+    const container = storeBreakdown.querySelector('div[style*="display: flex; flex-wrap: wrap;"]');
+    if (container) renderStoreSummaryCards(container);
+  }
+  
+  // Update store cash cards
+  const cashSummary = document.getElementById('storeCashSummary');
+  if (cashSummary) renderStoreCashCards(cashSummary);
+  
+  // Update store order for swipeable cards
+  updateStoreOrder();
+  
+  // Update all dropdowns
+  populateStoreDropdowns();
+}
+
+// ============================================================
+// RENDER STORE CASH CARDS (For Collection Modal)
+// ============================================================
+
+function renderStoreCashCards(container) {
+  if (!container) {
+    console.warn('⚠️ Container for store cash cards not found');
+    return;
+  }
+  
+  if (!stores || stores.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No stores available</div>';
+    return;
+  }
+  
+  let html = '';
+  stores.forEach(store => {
+    const emoji = getStoreEmoji(store.store_id);
+    html += `
+      <div class="store-cash-card" data-store="${store.store_id}">
+        <div class="store-name">${emoji} ${escapeHtml(store.name)}</div>
+        <div class="store-cash-amount">RM 0.00</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+// ============================================================
+// HELPER - GET STORE EMOJI
+// ============================================================
+
+function getStoreEmoji(storeId) {
+  const emojiMap = {
+    'queens': '🏬',
+    'sunshine': '☀️',
+    'gurney_paragon': '🏙️'
+  };
+  return emojiMap[storeId] || '🏪';
+}
+
+// ============================================================
+// RENDER ALL DYNAMIC STORE CONTENT
+// ============================================================
+
+function renderAllDynamicStoreContent() {
+  // Update store summary cards
+  const storeBreakdown = document.getElementById('storeBreakdownContainer');
+  if (storeBreakdown) {
+    const container = storeBreakdown.querySelector('div[style*="display: flex; flex-wrap: wrap;"]');
+    if (container) renderStoreSummaryCards(container);
+  }
+  
+  // Update store cash cards
+  const cashSummary = document.getElementById('storeCashSummary');
+  if (cashSummary) renderStoreCashCards(cashSummary);
+  
+  // Update store order for swipeable cards
+  updateStoreOrder();
+  
+  // Update all dropdowns
+  populateStoreDropdowns();
+}
+// ============================================================
+// STORE CRUD OPERATIONS
+// ============================================================
+
+async function addStore() {
+  const storeId = document.getElementById('newStoreId').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const name = document.getElementById('newStoreName').value.trim();
+  const address = document.getElementById('newStoreAddress').value.trim();
+  const lat = parseFloat(document.getElementById('newStoreLat').value);
+  const lng = parseFloat(document.getElementById('newStoreLng').value);
+  
+  // Validate
+  if (!storeId) {
+    await showAlertModal('Error', 'Store ID is required (e.g., klcc)');
+    return;
+  }
+  if (!name) {
+    await showAlertModal('Error', 'Store name is required');
+    return;
+  }
+  if (stores.find(s => s.store_id === storeId)) {
+    await showAlertModal('Error', `Store ID "${storeId}" already exists!`);
+    return;
+  }
+  
+  showLoading('Adding store...');
+  
+  try {
+    const { data, error } = await supabase
+      .from('stores')
+      .insert([{
+        store_id: storeId,
+        name: name,
+        address: address || '',
+        latitude: lat || null,
+        longitude: lng || null,
+        is_active: true
+      }])
+      .select();
+    
+    if (error) throw error;
+    
+    // ✅ Also add availability columns to products that need it
+    // We'll handle this dynamically when fetching products
+    
+    await showAlertModal('✅ Store Added', `Store "${name}" has been added successfully!`);
+    
+    // Clear form
+    document.getElementById('newStoreId').value = '';
+    document.getElementById('newStoreName').value = '';
+    document.getElementById('newStoreAddress').value = '';
+    document.getElementById('newStoreLat').value = '';
+    document.getElementById('newStoreLng').value = '';
+    
+    // Refresh stores and UI
+    await fetchStores(true);
+    renderStoreList();
+    populateStoreDropdowns();
+    
+    // Refresh products to show new store availability
+    await fetchProductsFromSheet(true);
+    
+  } catch (err) {
+    console.error('Error adding store:', err);
+    await showAlertModal('Error', 'Failed to add store: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function editStore(storeId) {
+  const store = stores.find(s => s.store_id === storeId);
+  if (!store) return;
+  
+  // Show edit modal with pre-filled data
+  const newName = await showInputModal(`Edit Store: ${store.name}`, `New name (current: ${store.name})`);
+  if (newName === null) return; // Cancelled
+  
+  if (newName.trim() === '') {
+    await showAlertModal('Error', 'Store name cannot be empty');
+    return;
+  }
+  
+  showLoading('Updating store...');
+  
+  try {
+    const { error } = await supabase
+      .from('stores')
+      .update({ name: newName.trim() })
+      .eq('store_id', storeId);
+    
+    if (error) throw error;
+    
+    await showAlertModal('✅ Store Updated', `Store renamed to "${newName.trim()}"`);
+    await fetchStores(true);
+    renderStoreList();
+    populateStoreDropdowns();
+    
+    // Update current store name if it's the active store
+    if (currentStore === storeId) {
+      document.getElementById('storeSelect').value = storeId;
+    }
+    
+  } catch (err) {
+    console.error('Error updating store:', err);
+    await showAlertModal('Error', 'Failed to update store: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function deleteStore(storeId) {
+  // Prevent deleting current store
+  if (currentStore === storeId) {
+    await showAlertModal('Cannot Delete', 'You cannot delete the currently active store. Please switch to another store first.');
+    return;
+  }
+  
+  const store = stores.find(s => s.store_id === storeId);
+  if (!store) return;
+  
+  // Check if store has products
+  const productCount = products.filter(p => p[`available_${storeId}`] !== false).length;
+  let warningMsg = `Are you sure you want to delete store "${store.name}"?`;
+  if (productCount > 0) {
+    warningMsg += `\n\n⚠️ This store has ${productCount} products assigned to it. They will still exist but won't be visible for this store.`;
+  }
+  
+  const confirmed = await showConfirmModal('Delete Store', warningMsg);
+  if (!confirmed) return;
+  
+  showLoading('Deleting store...');
+  
+  try {
+    // Soft delete - just mark as inactive
+    const { error } = await supabase
+      .from('stores')
+      .update({ is_active: false })
+      .eq('store_id', storeId);
+    
+    if (error) throw error;
+    
+    await showAlertModal('✅ Store Deleted', `Store "${store.name}" has been deleted.`);
+    await fetchStores(true);
+    renderStoreList();
+    populateStoreDropdowns();
+    
+  } catch (err) {
+    console.error('Error deleting store:', err);
+    await showAlertModal('Error', 'Failed to delete store: ' + err.message);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ============================================================
+// SWITCH STORE
+// ============================================================
+
+async function switchStore(storeId) {
+  if (storeId === currentStore) return;
+  
+  const store = stores.find(s => s.store_id === storeId);
+  if (!store) return;
+  
+  const confirmed = await showConfirmModal('Switch Store', `Switch to "${store.name}"? This will reload products for this store.`);
+  if (!confirmed) return;
+  
+  currentStore = storeId;
+  document.getElementById('storeSelect').value = storeId;
+  
+  // Clear cart
+  clearCart();
+  discountAmount = 0;
+  buy2Free1Discount = 0;
+  buy3Free1Discount = 0;
+  customDiscount = 0;
+  staffDiscountActive = false;
+  staffDiscount = 0;
+  selectedCustomer = null;
+  updateCustomerDisplay();
+  
+  // Reload products
+  await fetchProductsFromSheet(true);
+  renderProductGrid();
+  
+  await showAlertModal('✅ Store Switched', `Now using "${store.name}"`);
+}
+
+// ============================================================
+// AUTO-SELECT STORE BY LOCATION (with dynamic stores)
+// ============================================================
+
+async function autoSelectStoreByLocationDynamic() {
+  if (!navigator.geolocation) {
+    console.warn("Geolocation not supported");
+    return null;
+  }
+  
+  // Fetch stores from Supabase
+  const storesList = await fetchStores();
+  
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        let closestStore = null;
+        let minDistance = Infinity;
+        
+        for (const store of storesList) {
+          if (!store.latitude || !store.longitude) continue;
+          const dist = getDistanceFromLatLon(
+            latitude, longitude,
+            store.latitude, store.longitude
+          );
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestStore = store.store_id;
+          }
+        }
+        resolve(closestStore);
+      },
+      (error) => {
+        console.warn("Location error:", error.message);
+        resolve(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+}
+
+// ============================================================
+// STORE MANAGEMENT MODAL
+// ============================================================
+
+let storeManagementModalOpen = false;
+
+function openStoreManagementModal() {
+  storeManagementModalOpen = true;
+  document.getElementById('storeManagementModal').style.display = 'flex';
+  renderStoreList();
+}
+
+function closeStoreManagementModal() {
+  storeManagementModalOpen = false;
+  document.getElementById('storeManagementModal').style.display = 'none';
+}
+
+// ============================================================
+// INITIALIZE DYNAMIC STORES
+// ============================================================
+
+async function initializeStores() {
+  // Fetch stores from Supabase
+  await fetchStores(true);
+  
+  // Populate all dropdowns
+  populateStoreDropdowns();
+  
+  // ✅ RENDER DYNAMIC STORE CARDS
+  renderAllDynamicStoreContent();
+  
+  // Auto-select store by location
+  const closest = await autoSelectStoreByLocationDynamic();
+  if (closest) {
+    const store = stores.find(s => s.store_id === closest);
+    if (store) {
+      currentStore = closest;
+      document.getElementById('storeSelect').value = closest;
+      document.getElementById('selectedStoreDisplay').innerText = store.name;
+    }
+  } else if (stores.length > 0) {
+    // Default to first store
+    currentStore = stores[0].store_id;
+    document.getElementById('storeSelect').value = stores[0].store_id;
+    document.getElementById('selectedStoreDisplay').innerText = stores[0].name;
+  }
+  
+  // Load products
+  await fetchProductsFromSheet(true);
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+
+// Store Management Button (in Inventory Mode)
+document.getElementById('manageStoresBtn').addEventListener('click', openStoreManagementModal);
+document.getElementById('closeStoreManagementModal').addEventListener('click', closeStoreManagementModal);
+document.getElementById('closeStoreManagementBtn').addEventListener('click', closeStoreManagementModal);
+
+// Add Store
+document.getElementById('addStoreBtn').addEventListener('click', addStore);
+
+// Store modal overlay click to close
+document.getElementById('storeManagementModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('storeManagementModal')) {
+    closeStoreManagementModal();
+  }
+});
+
+// ============================================================
+// UPDATE INVENTORY MODE TO SHOW STORE MANAGEMENT BUTTON
+// ============================================================
+
+// Modify toggleInventoryMode to show/hide Manage Stores button
+const originalToggleInventoryMode = toggleInventoryMode;
+toggleInventoryMode = function() {
+  originalToggleInventoryMode();
+  
+  const manageStoresBtn = document.getElementById('manageStoresBtn');
+  if (manageStoresBtn) {
+    manageStoresBtn.style.display = inventoryMode ? 'inline-flex' : 'none';
+  }
+};
+
+// Call this after DOM load
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize stores
+  initializeStores();
+});
 async function saveStockHistoryToSheet() {
   if (stockHistory.length === 0) {
     await showAlertModal('No History', 'There is no stock adjustment history to save.');
