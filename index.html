@@ -14024,18 +14024,15 @@ function renderStoreList() {
   
   sortedStores.forEach(store => {
     const isCurrent = currentStore === store.store_id;
-    let productCount = 0;
-    
-    if (store.slot_number) {
-      const slotNumStr = String(store.slot_number).padStart(2, '0');
-      const availabilityKey = `available_store_${slotNumStr}`;
-      productCount = products.filter(p => p[availabilityKey] !== false).length;
-    }
+    const productCount = products.filter(p => {
+      if (store.slot_number) {
+        const slotNumStr = String(store.slot_number).padStart(2, '0');
+        return p[`available_store_${slotNumStr}`] !== false;
+      }
+      return false;
+    }).length;
     
     const slotDisplay = store.slot_number ? `#${String(store.slot_number).padStart(2, '0')}` : 'No slot';
-    const isActive = store.is_active !== false;
-    const statusText = isActive ? '✅ Active' : '⏸️ Inactive';
-    const statusColor = isActive ? '#2c7a4b' : '#ef4444';
     
     html += `
       <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid ${isCurrent ? '#3b82f6' : '#e2e8f0'}; ${isCurrent ? 'border-left: 4px solid #3b82f6;' : ''}">
@@ -14044,9 +14041,7 @@ function renderStoreList() {
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <strong style="font-size: 1.1rem;">${escapeHtml(store.name)}</strong>
               <span style="background: #f1f5f9; color: #475569; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">Slot ${slotDisplay}</span>
-              <span style="background: ${isCurrent ? '#3b82f6' : '#f1f5f9'}; color: ${isCurrent ? 'white' : '#475569'}; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">
-                ${isCurrent ? '⭐ CURRENT' : statusText}
-              </span>
+              ${isCurrent ? '<span style="background: #3b82f6; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem;">CURRENT</span>' : ''}
             </div>
             <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">${escapeHtml(store.address || 'No address')}</div>
             <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
@@ -14306,7 +14301,7 @@ async function addStore() {
   showLoading('Adding store...');
   
   try {
-    // 🔥 GET NEXT AVAILABLE SLOT
+    // 🔥 GET NEXT AVAILABLE SLOT (NO COLUMN CREATION NEEDED!)
     const slotNumber = await getNextAvailableSlot();
     
     if (!slotNumber) {
@@ -14343,11 +14338,17 @@ async function addStore() {
     console.log('✅ Store added:', data);
     
     // 2. Update all products with the new store columns (set default values)
+    // ✅ THESE COLUMNS ALREADY EXIST (from the initial slot setup)
+    console.log('🔄 Setting default availability for all products...');
+    
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id');
     
-    if (products && products.length > 0) {
+    if (productsError) {
+      console.warn('Could not fetch products:', productsError);
+    } else if (products && products.length > 0) {
+      // Update in batches
       const chunkSize = 30;
       for (let i = 0; i < products.length; i += chunkSize) {
         const chunk = products.slice(i, i + chunkSize);
@@ -14366,6 +14367,15 @@ async function addStore() {
         } else {
           console.log(`✅ Updated chunk ${i / chunkSize + 1}`);
         }
+      }
+    }
+    
+    // 3. Also update local products array
+    for (const product of products || []) {
+      const localProduct = products.find(p => p.id === product.id);
+      if (localProduct) {
+        localProduct[availabilityField] = true;
+        localProduct[stockField] = 0;
       }
     }
     
