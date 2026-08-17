@@ -3483,8 +3483,7 @@ async function fetchProductsFromSheet(force = false) {
           
           // ✅ Correctly set the availability based on the database value
           // If the column doesn't exist or is null, default to true
-          // IMPORTANT: Use strict comparison to handle false values correctly
-          product[availabilityKey] = p[availabilityKey] === true;
+          product[availabilityKey] = p[availabilityKey] !== false;
           product[stockKey] = parseInt(p[stockKey]) || 0;
         }
       });
@@ -3770,7 +3769,7 @@ function renderProductGrid() {
   }
   
   // ============================================================
-  // INVENTORY MODE - DYNAMIC STORE CHECKBOXES
+  // INVENTORY MODE - SLOT-BASED CHECKBOXES
   // ============================================================
   if (inventoryMode) {
     // ✅ Get all store IDs dynamically
@@ -3784,20 +3783,16 @@ function renderProductGrid() {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
       
-      // Determine if any store is available
+      // Determine if any store is available using slot-based fields
       let anyStoreAvailable = false;
       storeIds.forEach(storeId => {
-        // ✅ Find the store's slot number
         const storeObj = stores.find(s => s.store_id === storeId);
-        let availabilityField = `available_${storeId}`;
-        
         if (storeObj && storeObj.slot_number) {
           const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
-          availabilityField = `available_store_${slotNumStr}`;
-        }
-        
-        if (prod[availabilityField] !== false) {
-          anyStoreAvailable = true;
+          const availabilityKey = `available_store_${slotNumStr}`;
+          if (prod[availabilityKey] !== false) {
+            anyStoreAvailable = true;
+          }
         }
       });
       
@@ -3816,44 +3811,39 @@ function renderProductGrid() {
           <div style="display: flex; flex-direction: column; gap: 6px; background: #f8fafc; padding: 8px 12px; border-radius: 12px; border: 1px solid #e2e8f0; min-width: 140px;">
             <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
             
-            // In renderProductGrid() - Inside the inventory mode section
-// Replace the checkbox rendering with this:
-
-${storeIds.map(storeId => {
-  // ✅ Find the store's slot number
-  const storeObj = stores.find(s => s.store_id === storeId);
-  let availabilityField = `available_${storeId}`;
-  
-  if (storeObj && storeObj.slot_number) {
-    const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
-    availabilityField = `available_store_${slotNumStr}`;
-  }
-  
-  // ✅ Get the actual value from the product - use strict equality
-  const isAvailable = prod[availabilityField] === true;
-  
-  // ✅ Debug log to check the value
-  console.log(`📋 ${prod.name} - ${storeId}: ${availabilityField} = ${isAvailable}`);
-  
-  const storeName = storeNames[storeId] || storeId;
-  let emoji = '🏪';
-  if (storeId === 'queens') emoji = '🏬';
-  else if (storeId === 'sunshine') emoji = '☀️';
-  else if (storeId === 'gurney_paragon') emoji = '🏙️';
-  
-  return `
-    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${isAvailable ? 'background: rgba(44, 122, 75, 0.08);' : 'background: rgba(239, 68, 68, 0.08);'}">
-      <input type="checkbox" 
-             class="store-availability-checkbox" 
-             data-product="${prod.id}" 
-             data-store="${storeId}" 
-             ${isAvailable ? 'checked' : ''} 
-             style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
-      <span>${emoji} ${escapeHtml(storeName)}</span>
-      <span style="margin-left: auto; font-size: 0.7rem; color: ${isAvailable ? '#2c7a4b' : '#ef4444'};">${isAvailable ? '✅' : '❌'}</span>
-    </label>
-  `;
-}).join('')}
+            ${storeIds.map(storeId => {
+              // ✅ Find the store's slot number
+              const storeObj = stores.find(s => s.store_id === storeId);
+              let availabilityField = `available_${storeId}`;
+              let slotDisplay = '';
+              
+              if (storeObj && storeObj.slot_number) {
+                const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+                availabilityField = `available_store_${slotNumStr}`;
+                slotDisplay = `(Slot ${slotNumStr})`;
+              }
+              
+              const isAvailable = prod[availabilityField] !== false;
+              const storeName = storeNames[storeId] || storeId;
+              // Get emoji for store
+              let emoji = '🏪';
+              if (storeId === 'queens') emoji = '🏬';
+              else if (storeId === 'sunshine') emoji = '☀️';
+              else if (storeId === 'gurney_paragon') emoji = '🏙️';
+              
+              return `
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; ${isAvailable ? 'background: rgba(44, 122, 75, 0.08);' : 'background: rgba(239, 68, 68, 0.08);'}">
+                  <input type="checkbox" 
+                         class="store-availability-checkbox" 
+                         data-product="${prod.id}" 
+                         data-store="${storeId}" 
+                         ${isAvailable ? 'checked' : ''} 
+                         style="width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;">
+                  <span>${emoji} ${escapeHtml(storeName)}</span>
+                  <span style="margin-left: auto; font-size: 0.7rem; color: ${isAvailable ? '#2c7a4b' : '#ef4444'};">${isAvailable ? '✅' : '❌'}</span>
+                </label>
+              `;
+            }).join('')}
           </div>
         </div>
         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -4000,7 +3990,7 @@ async function handleAvailabilityChange(e) {
   
   // ✅ Find the store's slot number
   const storeObj = stores.find(s => s.store_id === store);
-  let availabilityField = `available_${store}`;
+  let availabilityField = `available_${store}`; // Fallback for old stores
   
   if (storeObj && storeObj.slot_number) {
     const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
@@ -4064,19 +4054,16 @@ async function handleAvailabilityChange(e) {
       // ✅ Make sure checkbox stays in the correct state
       cb.checked = isChecked;
       
-      // ✅ Force the product object to match
-      product[availabilityField] = isChecked;
-      
       // Update the card appearance
       const card = cb.closest('.product-card');
       if (card) {
-        // Check if any store is available
+        // Check if any store is available using slot-based fields
         let anyStoreAvailable = false;
         stores.forEach(s => {
           if (s.slot_number) {
             const slotNumStr = String(s.slot_number).padStart(2, '0');
             const key = `available_store_${slotNumStr}`;
-            if (product[key] === true) {
+            if (product[key] !== false) {
               anyStoreAvailable = true;
             }
           }
