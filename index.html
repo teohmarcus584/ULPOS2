@@ -2544,32 +2544,11 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <span class="close-modal" id="closeStoreManagementModal">×</span>
     <div class="modal-title">🏪 Store Management</div>
     
-    <!-- Add New Store Form -->
-    <div style="background: #f8fafc; padding: 16px; border-radius: 16px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
-      <h4 style="margin-bottom: 12px;">➕ Add New Store</h4>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div class="filter-group">
-          <label>Store ID (unique)</label>
-          <input type="text" id="newStoreId" class="modal-input" placeholder="e.g., klcc" style="width:100%;">
-        </div>
-        <div class="filter-group">
-          <label>Store Name</label>
-          <input type="text" id="newStoreName" class="modal-input" placeholder="e.g., KLCC" style="width:100%;">
-        </div>
-        <div class="filter-group" style="grid-column: 1 / -1;">
-          <label>Address</label>
-          <input type="text" id="newStoreAddress" class="modal-input" placeholder="Full address" style="width:100%;">
-        </div>
-        <div class="filter-group">
-          <label>Latitude</label>
-          <input type="number" id="newStoreLat" class="modal-input" placeholder="5.334932" step="any" style="width:100%;">
-        </div>
-        <div class="filter-group">
-          <label>Longitude</label>
-          <input type="number" id="newStoreLng" class="modal-input" placeholder="100.306625" step="any" style="width:100%;">
-        </div>
-      </div>
-      <button id="addStoreBtn" class="modal-btn modal-btn-primary" style="margin-top: 12px; width: 100%;">➕ Add Store</button>
+    <!-- ✅ REPLACE the Add New Store form with this button -->
+    <div style="margin-bottom: 20px;">
+      <button id="openAddStoreBtn" class="modal-btn modal-btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem; background: linear-gradient(135deg, #059669 0%, #047857 100%); display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <span style="font-size: 1.5rem;">➕</span> Add New Store
+      </button>
     </div>
     
     <!-- Store List -->
@@ -15001,136 +14980,440 @@ async function getNextAvailableSlot() {
 // ============================================================
 
 async function addStore() {
-  const storeId = document.getElementById('newStoreId').value.trim().toLowerCase().replace(/\s+/g, '_');
-  const name = document.getElementById('newStoreName').value.trim();
-  const address = document.getElementById('newStoreAddress').value.trim();
-  const lat = parseFloat(document.getElementById('newStoreLat').value);
-  const lng = parseFloat(document.getElementById('newStoreLng').value);
-  
-  // Validate
-  if (!storeId) {
-    await showAlertModal('Error', 'Store ID is required (e.g., klcc)');
-    return;
-  }
-  if (!name) {
-    await showAlertModal('Error', 'Store name is required');
-    return;
-  }
-  if (stores.find(s => s.store_id === storeId)) {
-    await showAlertModal('Error', `Store ID "${storeId}" already exists!`);
-    return;
-  }
-  
-  showLoading('Adding store...');
-  
-  try {
-    // 🔥 GET NEXT AVAILABLE SLOT
-    const slotNumber = await getNextAvailableSlot();
+  // ✅ Create a nice add store modal
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.style.zIndex = '99999';
+    overlay.style.background = 'rgba(0,0,0,0.7)';
+    overlay.style.backdropFilter = 'blur(4px)';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
     
-    if (!slotNumber) {
-      await showAlertModal('⚠️ All Slots Used', 
-        'All 20 store slots are used. Please contact the admin to add more slots.'
-      );
-      hideLoading();
-      return;
-    }
-    
-    const slotNumStr = String(slotNumber).padStart(2, '0');
-    const availabilityField = `available_store_${slotNumStr}`;
-    const stockField = `stock_store_${slotNumStr}`;
-    
-    // ✅ Generate a prefix for the store
-    const base = storeId.substring(0, 3).toUpperCase();
-    const hash = storeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const num = String(hash % 90 + 10).padStart(2, '0');
-    const prefix = `${base}${num}`;
-    
-    console.log(`📌 Assigned slot ${slotNumber} (${availabilityField}) to store "${name}"`);
-    console.log(`📌 Generated prefix: ${prefix}`);
-    
-    // 1. Add the store with slot number AND prefix
-    const { data, error } = await supabase
-      .from('stores')
-      .insert([{
-        store_id: storeId,
-        name: name,
-        address: address || '',
-        latitude: lat || null,
-        longitude: lng || null,
-        is_active: true,
-        prefix: prefix,  // ✅ Add prefix
-        slot_number: slotNumber
-      }])
-      .select();
-    
-    if (error) throw error;
-    
-    console.log('✅ Store added:', data);
-    
-    // 2. Update all products with the new store columns (set default values)
-    console.log('🔄 Setting default availability for all products...');
-    
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id');
-    
-    if (productsError) {
-      console.warn('Could not fetch products:', productsError);
-    } else if (products && products.length > 0) {
-      // Update in batches
-      const chunkSize = 30;
-      for (let i = 0; i < products.length; i += chunkSize) {
-        const chunk = products.slice(i, i + chunkSize);
-        const ids = chunk.map(p => p.id);
+    overlay.innerHTML = `
+      <div class="modal-container" style="max-width: 600px; border-radius: 24px; padding: 0; overflow: hidden; z-index: 99999; position: relative; box-shadow: 0 24px 64px rgba(0,0,0,0.4); background: white;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 24px 28px; display: flex; align-items: center; gap: 16px;">
+          <div style="background: rgba(255,255,255,0.2); border-radius: 50%; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; font-size: 2rem; flex-shrink: 0;">
+            ➕
+          </div>
+          <div style="flex: 1;">
+            <div style="color: white; font-size: 1.5rem; font-weight: 700;">Add New Store</div>
+            <div style="color: rgba(255,255,255,0.8); font-size: 0.9rem; margin-top: 2px;">Create a new store location</div>
+          </div>
+          <button id="closeAddStoreModal" style="background: rgba(255,255,255,0.15); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+        </div>
         
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({
-            [availabilityField]: true,
-            [stockField]: 0
-          })
-          .in('id', ids);
+        <!-- Body -->
+        <div style="padding: 28px 28px 20px 28px; background: #f8fafc;">
+          <!-- Store ID -->
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; color: #1e293b; font-size: 0.9rem; margin-bottom: 6px;">
+              Store ID <span style="color: #ef4444;">*</span>
+              <span style="color: #94a3b8; font-weight: 400; font-size: 0.8rem;">(unique identifier, e.g., klcc)</span>
+            </label>
+            <input type="text" id="newStoreId" 
+                   style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white; transition: all 0.2s; text-transform: lowercase;"
+                   onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.15)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                   placeholder="e.g., klcc, pavilion, midvalley">
+          </div>
+          
+          <!-- Store Name -->
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; color: #1e293b; font-size: 0.9rem; margin-bottom: 6px;">
+              Store Name <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="text" id="newStoreName" 
+                   style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white; transition: all 0.2s;"
+                   onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.15)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                   placeholder="e.g., KLCC, Pavilion, Mid Valley">
+          </div>
+          
+          <!-- Address -->
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; color: #1e293b; font-size: 0.9rem; margin-bottom: 6px;">
+              Address
+            </label>
+            <input type="text" id="newStoreAddress" 
+                   style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white; transition: all 0.2s;"
+                   onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.15)';"
+                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                   placeholder="Full address of the store">
+          </div>
+          
+          <!-- Coordinates Row with Detect Location Button -->
+          <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="font-weight: 600; color: #1e293b; font-size: 0.9rem;">
+                📌 Coordinates
+              </label>
+              <button id="detectLocationBtn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 20px; padding: 6px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">
+                <span style="font-size: 1rem;">📍</span> Detect Location
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div>
+                <input type="number" id="newStoreLat" step="any"
+                       style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white; transition: all 0.2s;"
+                       onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.15)';"
+                       onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                       placeholder="Latitude">
+              </div>
+              <div>
+                <input type="number" id="newStoreLng" step="any"
+                       style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white; transition: all 0.2s;"
+                       onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 4px rgba(59,130,246,0.15)';"
+                       onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';"
+                       placeholder="Longitude">
+              </div>
+            </div>
+            <div id="locationStatus" style="margin-top: 8px; font-size: 0.85rem; color: #94a3b8; display: none; align-items: center; gap: 8px;">
+              <span id="locationStatusIcon">🔄</span>
+              <span id="locationStatusText">Detecting location...</span>
+            </div>
+          </div>
+          
+          <!-- Slot Preview -->
+          <div style="margin-bottom: 8px; background: #f1f5f9; border-radius: 12px; padding: 12px 16px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 500; color: #64748b; font-size: 0.85rem;">🔢 Slot Assignment</span>
+              <span style="background: #3b82f6; color: white; padding: 2px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                Auto-assigned on save
+              </span>
+            </div>
+            <div style="margin-top: 4px; font-size: 0.8rem; color: #94a3b8;">
+              The next available slot will be automatically assigned (1-20)
+            </div>
+          </div>
+        </div>
         
-        if (updateError) {
-          console.warn(`Error updating chunk ${i / chunkSize + 1}:`, updateError);
-        } else {
-          console.log(`✅ Updated chunk ${i / chunkSize + 1}`);
-        }
+        <!-- Footer -->
+        <div style="padding: 16px 28px 24px 28px; background: white; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; justify-content: flex-end;">
+          <button id="cancelAddStoreBtn" class="modal-btn modal-btn-secondary" style="padding: 12px 28px; font-size: 1rem; border-radius: 40px; background: #f1f5f9; color: #475569; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s;">
+            Cancel
+          </button>
+          <button id="saveAddStoreBtn" class="modal-btn" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 12px 32px; font-size: 1rem; border-radius: 40px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(5,150,105,0.3); transition: all 0.2s;">
+            ➕ Add Store
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    const closeBtn = overlay.querySelector('#closeAddStoreModal');
+    const cancelBtn = overlay.querySelector('#cancelAddStoreBtn');
+    const saveBtn = overlay.querySelector('#saveAddStoreBtn');
+    const storeIdInput = overlay.querySelector('#newStoreId');
+    const nameInput = overlay.querySelector('#newStoreName');
+    const addressInput = overlay.querySelector('#newStoreAddress');
+    const latInput = overlay.querySelector('#newStoreLat');
+    const lngInput = overlay.querySelector('#newStoreLng');
+    const detectBtn = overlay.querySelector('#detectLocationBtn');
+    const locationStatus = overlay.querySelector('#locationStatus');
+    const locationStatusIcon = overlay.querySelector('#locationStatusIcon');
+    const locationStatusText = overlay.querySelector('#locationStatusText');
+    
+    const cleanup = () => {
+      overlay.remove();
+      resolve();
+    };
+    
+    // ✅ Detect Location Function
+    const detectLocation = () => {
+      if (!navigator.geolocation) {
+        locationStatus.style.display = 'flex';
+        locationStatusIcon.textContent = '❌';
+        locationStatusText.textContent = 'Geolocation is not supported by your browser.';
+        locationStatus.style.color = '#ef4444';
+        return;
       }
-    }
+      
+      locationStatus.style.display = 'flex';
+      locationStatusIcon.textContent = '🔄';
+      locationStatusText.textContent = 'Detecting location...';
+      locationStatus.style.color = '#3b82f6';
+      detectBtn.disabled = true;
+      detectBtn.style.opacity = '0.6';
+      detectBtn.innerHTML = '⏳ Detecting...';
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          latInput.value = latitude.toFixed(6);
+          lngInput.value = longitude.toFixed(6);
+          
+          latInput.style.borderColor = '#10b981';
+          latInput.style.boxShadow = '0 0 0 4px rgba(16,185,129,0.2)';
+          lngInput.style.borderColor = '#10b981';
+          lngInput.style.boxShadow = '0 0 0 4px rgba(16,185,129,0.2)';
+          
+          setTimeout(() => {
+            latInput.style.borderColor = '#e2e8f0';
+            latInput.style.boxShadow = 'none';
+            lngInput.style.borderColor = '#e2e8f0';
+            lngInput.style.boxShadow = 'none';
+          }, 2000);
+          
+          locationStatusIcon.textContent = '✅';
+          locationStatusText.textContent = `Location detected! ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          locationStatus.style.color = '#10b981';
+          detectBtn.disabled = false;
+          detectBtn.style.opacity = '1';
+          detectBtn.innerHTML = '<span style="font-size:1rem;">📍</span> Detect Location';
+          
+          setTimeout(() => {
+            locationStatus.style.display = 'none';
+          }, 5000);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          let errorMessage = 'Could not detect location. ';
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Please allow location access in your browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Location information is unavailable.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage += 'Unknown error occurred.';
+          }
+          
+          locationStatus.style.display = 'flex';
+          locationStatusIcon.textContent = '❌';
+          locationStatusText.textContent = errorMessage;
+          locationStatus.style.color = '#ef4444';
+          detectBtn.disabled = false;
+          detectBtn.style.opacity = '1';
+          detectBtn.innerHTML = '<span style="font-size:1rem;">📍</span> Detect Location';
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    };
     
-    // Clear form
-    document.getElementById('newStoreId').value = '';
-    document.getElementById('newStoreName').value = '';
-    document.getElementById('newStoreAddress').value = '';
-    document.getElementById('newStoreLat').value = '';
-    document.getElementById('newStoreLng').value = '';
+    // ✅ Detect Location Button Click
+    detectBtn.addEventListener('click', detectLocation);
     
-    // Refresh stores and UI
-    await fetchStores(true);
-    renderStoreList();
-    populateStoreDropdowns();
-    renderAllDynamicStoreContent();
+    // Close handlers
+    closeBtn.addEventListener('click', cleanup);
+    cancelBtn.addEventListener('click', cleanup);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cleanup();
+    });
     
-    // Refresh products
-    await fetchProductsFromSheet(true);
-    renderProductGrid();
+    // Keyboard shortcuts
+    storeIdInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') nameInput.focus();
+      if (e.key === 'Escape') cleanup();
+    });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addressInput.focus();
+      if (e.key === 'Escape') cleanup();
+    });
+    addressInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') latInput.focus();
+      if (e.key === 'Escape') cleanup();
+    });
+    latInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') lngInput.focus();
+      if (e.key === 'Escape') cleanup();
+    });
+    lngInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') saveBtn.click();
+      if (e.key === 'Escape') cleanup();
+    });
     
-    await showAlertModal('✅ Store Added', 
-      `Store "${name}" has been added successfully!\n\n` +
-      `📌 Assigned Slot: ${slotNumber}/20\n` +
-      `📌 Transaction Prefix: ${prefix}\n` +
-      `📦 All products are now available at this store with 0 stock.\n\n` +
-      `You can adjust stock and availability in Inventory Mode.`
-    );
+    // Save handler
+    saveBtn.addEventListener('click', async () => {
+      const storeId = storeIdInput.value.trim().toLowerCase().replace(/\s+/g, '_');
+      const name = nameInput.value.trim();
+      const address = addressInput.value.trim();
+      const lat = parseFloat(latInput.value);
+      const lng = parseFloat(lngInput.value);
+      
+      // Validate
+      if (!storeId) {
+        storeIdInput.style.borderColor = '#ef4444';
+        storeIdInput.style.boxShadow = '0 0 0 4px rgba(239,68,68,0.15)';
+        await showAlertModal('Error', 'Store ID is required (e.g., klcc)');
+        storeIdInput.focus();
+        return;
+      }
+      
+      if (!name) {
+        nameInput.style.borderColor = '#ef4444';
+        nameInput.style.boxShadow = '0 0 0 4px rgba(239,68,68,0.15)';
+        await showAlertModal('Error', 'Store name is required');
+        nameInput.focus();
+        return;
+      }
+      
+      // Check if store ID already exists
+      if (stores.find(s => s.store_id === storeId)) {
+        storeIdInput.style.borderColor = '#ef4444';
+        storeIdInput.style.boxShadow = '0 0 0 4px rgba(239,68,68,0.15)';
+        await showAlertModal('Error', `Store ID "${storeId}" already exists!`);
+        storeIdInput.focus();
+        return;
+      }
+      
+      showLoading('Adding store...');
+      
+      try {
+        // Get next available slot
+        const slotNumber = await getNextAvailableSlot();
+        
+        if (!slotNumber) {
+          await showAlertModal('⚠️ All Slots Used', 
+            'All 20 store slots are used. Please contact the admin to add more slots.'
+          );
+          hideLoading();
+          return;
+        }
+        
+        const slotNumStr = String(slotNumber).padStart(2, '0');
+        const availabilityField = `available_store_${slotNumStr}`;
+        const stockField = `stock_store_${slotNumStr}`;
+        
+        // Generate a prefix for the store
+        const base = storeId.substring(0, 3).toUpperCase();
+        const hash = storeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const num = String(hash % 90 + 10).padStart(2, '0');
+        const prefix = `${base}${num}`;
+        
+        console.log(`📌 Assigned slot ${slotNumber} (${availabilityField}) to store "${name}"`);
+        console.log(`📌 Generated prefix: ${prefix}`);
+        
+        // Add the store
+        const { data, error } = await supabase
+          .from('stores')
+          .insert([{
+            store_id: storeId,
+            name: name,
+            address: address || '',
+            latitude: isNaN(lat) ? null : lat,
+            longitude: isNaN(lng) ? null : lng,
+            is_active: true,
+            prefix: prefix,
+            slot_number: slotNumber
+          }])
+          .select();
+        
+        if (error) throw error;
+        
+        console.log('✅ Store added:', data);
+        
+        // Update all products with the new store columns
+        console.log('🔄 Setting default availability for all products...');
+        
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('id');
+        
+        if (productsError) {
+          console.warn('Could not fetch products:', productsError);
+        } else if (products && products.length > 0) {
+          const chunkSize = 30;
+          for (let i = 0; i < products.length; i += chunkSize) {
+            const chunk = products.slice(i, i + chunkSize);
+            const ids = chunk.map(p => p.id);
+            
+            const { error: updateError } = await supabase
+              .from('products')
+              .update({
+                [availabilityField]: true,
+                [stockField]: 0
+              })
+              .in('id', ids);
+            
+            if (updateError) {
+              console.warn(`Error updating chunk ${i / chunkSize + 1}:`, updateError);
+            } else {
+              console.log(`✅ Updated chunk ${i / chunkSize + 1}`);
+            }
+          }
+        }
+        
+        cleanup();
+        
+        // Show success modal
+        await showAlertModal('✅ Store Added', 
+          `<div style="text-align:left;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+              <span style="font-size:2rem;">🏪</span>
+              <div>
+                <div style="font-weight:600; color:#0f172a; font-size:1.1rem;">Store Added Successfully</div>
+                <div style="font-size:0.9rem; color:#64748b;">${escapeHtml(name)}</div>
+              </div>
+            </div>
+            <div style="background:#f0fdf4; border-radius:12px; padding:12px 16px; border-left:4px solid #059669;">
+              <div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span style="color:#64748b;">🆔 Store ID</span>
+                <span style="font-weight:500;">${escapeHtml(storeId)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span style="color:#64748b;">📌 Slot</span>
+                <span style="font-weight:500; background:#3b82f6; color:white; padding:0 10px; border-radius:12px;">#${String(slotNumber).padStart(2, '0')}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span style="color:#64748b;">🔤 Prefix</span>
+                <span style="font-weight:500; background:#8b5cf6; color:white; padding:0 10px; border-radius:12px;">${prefix}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span style="color:#64748b;">📍 Address</span>
+                <span style="font-weight:500;">${escapeHtml(address || 'Not set')}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:2px 0;">
+                <span style="color:#64748b;">📌 Coordinates</span>
+                <span style="font-weight:500;">${!isNaN(lat) && !isNaN(lng) ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : 'Not set'}</span>
+              </div>
+            </div>
+            <div style="margin-top:12px; padding:10px 16px; background:#eff6ff; border-radius:8px; color:#1e40af; font-size:0.85rem;">
+              📦 All products are now available at this store with 0 stock.
+              You can adjust stock and availability in Inventory Mode.
+            </div>
+          </div>`
+        );
+        
+        // Refresh stores and UI
+        await fetchStores(true);
+        renderStoreList();
+        populateStoreDropdowns();
+        renderAllDynamicStoreContent();
+        
+        // Refresh products
+        await fetchProductsFromSheet(true);
+        renderProductGrid();
+        
+      } catch (err) {
+        console.error('Error adding store:', err);
+        await showAlertModal('Error', 'Failed to add store: ' + err.message);
+      } finally {
+        hideLoading();
+      }
+    });
     
-  } catch (err) {
-    console.error('Error adding store:', err);
-    await showAlertModal('Error', 'Failed to add store: ' + err.message);
-  } finally {
-    hideLoading();
-  }
+    // Focus the store ID input
+    setTimeout(() => storeIdInput.focus(), 300);
+  });
 }
+
 async function editStore(storeId) {
   const store = stores.find(s => s.store_id === storeId);
   if (!store) {
@@ -15775,7 +16058,14 @@ document.getElementById('closeStoreManagementModal').addEventListener('click', c
 document.getElementById('closeStoreManagementBtn').addEventListener('click', closeStoreManagementModal);
 
 // Add Store
-document.getElementById('addStoreBtn').addEventListener('click', addStore);
+// Add Store - The button inside the modal is "saveAddStoreBtn"
+// The "Add New Store" button that opens the modal is "openAddStoreBtn"
+document.getElementById('openAddStoreBtn')?.addEventListener('click', function() {
+    // Close the store management modal first
+    closeStoreManagementModal();
+    // Open the add store modal
+    addStore();
+});
 
 // Store modal overlay click to close
 document.getElementById('storeManagementModal').addEventListener('click', (e) => {
