@@ -9466,8 +9466,8 @@ async function approveStoreGroup(groupId, modal) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.display = 'flex';
-    overlay.style.zIndex = '99999'; // ✅ HIGHEST Z-INDEX
-    overlay.style.background = 'rgba(0,0,0,0.8)'; // ✅ Darker backdrop
+    overlay.style.zIndex = '99999';
+    overlay.style.background = 'rgba(0,0,0,0.8)';
     overlay.style.backdropFilter = 'blur(4px)';
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -9542,26 +9542,49 @@ async function approveStoreGroup(groupId, modal) {
         let successCount = 0;
         let failCount = 0;
         let errors = [];
-        let store = currentStore;
         
-        // Find the store's slot number for stock update
-        const storeObj = stores.find(s => s.store_id === store);
-        let stockColumn = `stock_${store}`;
-        
-        if (storeObj && storeObj.slot_number) {
-          const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
-          stockColumn = `stock_store_${slotNumStr}`;
-          console.log(`📦 Using slot-based stock column: ${stockColumn}`);
-        } else {
-          console.log(`📦 Using fallback stock column: ${stockColumn}`);
-        }
+        // ✅ Track which stores we're updating
+        const storeUpdates = {};
         
         for (const [requestId, items] of Object.entries(groupedByRequest)) {
           const category = items[0]?.category || 'Unknown';
           
           try {
+            // ✅ FIRST: Get the request details to find which store this is for
+            const { data: requestData, error: fetchError } = await supabase
+              .from('stock_take_requests')
+              .select('store')
+              .eq('id', requestId)
+              .single();
+            
+            if (fetchError) {
+              console.error('Error fetching request store:', fetchError);
+              throw fetchError;
+            }
+            
+            const storeForThisRequest = requestData.store || currentStore;
+            console.log(`📦 Processing request ${requestId} for store: ${storeForThisRequest}`);
+            
+            // ✅ Find the store's slot number
+            const storeObj = stores.find(s => s.store_id === storeForThisRequest);
+            let stockColumn = `stock_${storeForThisRequest}`; // Default for old stores
+            
+            if (storeObj && storeObj.slot_number) {
+              const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+              stockColumn = `stock_store_${slotNumStr}`;
+              console.log(`📦 Using slot-based stock column: ${stockColumn}`);
+            } else {
+              console.log(`📦 Using fallback stock column: ${stockColumn}`);
+            }
+            
+            // Track this store for refresh
+            if (!storeUpdates[storeForThisRequest]) {
+              storeUpdates[storeForThisRequest] = [];
+            }
+            
+            // Update each product's stock for the specific store
             for (const item of items) {
-              console.log(`📦 Updating stock for product ${item.product_id}: ${item.current_stock} → ${item.counted_stock}`);
+              console.log(`📦 Updating stock for product ${item.product_id}: ${item.current_stock} → ${item.counted_stock} at store ${storeForThisRequest}`);
               
               const updateData = {};
               updateData[stockColumn] = item.counted_stock;
@@ -9576,16 +9599,22 @@ async function approveStoreGroup(groupId, modal) {
                 throw new Error(`Failed to update product: ${error.message}`);
               }
               
+              // ✅ Update local product cache for ALL stores that might be affected
               const localProduct = products.find(p => p.id == item.product_id);
               if (localProduct) {
-                localProduct.stock = item.counted_stock;
+                // If the store being updated is the current store, update the main stock
+                if (storeForThisRequest === currentStore) {
+                  localProduct.stock = item.counted_stock;
+                }
+                // Always update the store-specific stock column
                 localProduct[stockColumn] = item.counted_stock;
-                console.log(`✅ Local product updated: ${localProduct.name} → stock: ${localProduct.stock}`);
+                console.log(`✅ Local product updated: ${localProduct.name} → ${stockColumn}: ${localProduct[stockColumn]}`);
               }
               
               successCount++;
             }
             
+            // Update the request status
             const { error } = await supabase
               .from('stock_take_requests')
               .update({
@@ -9609,11 +9638,11 @@ async function approveStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ SHOW APPROVAL RESULT MODAL - With HIGHEST z-index
+        // ✅ Show approval result
         const resultOverlay = document.createElement('div');
         resultOverlay.className = 'modal-overlay';
         resultOverlay.style.display = 'flex';
-        resultOverlay.style.zIndex = '999999'; // ✅ EVEN HIGHER
+        resultOverlay.style.zIndex = '999999';
         resultOverlay.style.background = 'rgba(0,0,0,0.8)';
         resultOverlay.style.backdropFilter = 'blur(4px)';
         resultOverlay.style.position = 'fixed';
@@ -9623,13 +9652,17 @@ async function approveStoreGroup(groupId, modal) {
         resultOverlay.style.height = '100%';
         resultOverlay.style.alignItems = 'center';
         resultOverlay.style.justifyContent = 'center';
+        
+        // ✅ Build store info for display
+        const storeNamesList = Object.keys(storeUpdates).map(s => getStoreName(s)).join(', ');
+        
         resultOverlay.innerHTML = `
           <div class="modal-container" style="max-width: 550px; border-radius: 24px; padding: 28px; z-index: 999999; position: relative; box-shadow: 0 24px 64px rgba(0,0,0,0.4); background: white;">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
               <span style="font-size:2.5rem;">📋</span>
               <div>
                 <div style="font-weight:600; color:#0f172a; font-size:1.3rem;">${failCount === 0 ? '✅ Stock Take Approved' : '⚠️ Partially Approved'}</div>
-                <div style="font-size:0.9rem; color:#64748b;">Store: ${getStoreName(store)}</div>
+                <div style="font-size:0.9rem; color:#64748b;">Store(s): ${storeNamesList || 'N/A'}</div>
               </div>
             </div>
             <div style="background:#f0fdf4; border-radius:12px; padding:16px 20px; border-left:4px solid #059669; margin-bottom:12px;">
@@ -9662,7 +9695,7 @@ async function approveStoreGroup(groupId, modal) {
         `;
         document.body.appendChild(resultOverlay);
         
-        // ✅ Wait for user to click OK
+        // Wait for user to click OK
         await new Promise((resultResolve) => {
           const okBtn = resultOverlay.querySelector('#resultOkBtn');
           const closeResult = () => {
@@ -9670,35 +9703,39 @@ async function approveStoreGroup(groupId, modal) {
             resultResolve();
           };
           okBtn.addEventListener('click', closeResult);
-          // Also close on overlay click
           resultOverlay.addEventListener('click', (e) => {
             if (e.target === resultOverlay) closeResult();
           });
         });
         
-        // ✅ NOW PERFORM THE REFRESH AFTER THE MODAL IS CLOSED
+        // ✅ PERFORM REFRESH
         console.log('🔄 User clicked OK - performing refresh...');
         showLoading('Refreshing data...');
         
-        // 1. Clear all caches
+        // Clear all caches
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
         storeReportCache = {};
+        
+        // Clear cache for all affected stores
+        Object.keys(storeUpdates).forEach(storeId => {
+          localStorage.removeItem(`products_${storeId}`);
+        });
         localStorage.removeItem(`products_${currentStore}`);
         
-        // 2. Fetch fresh products from Supabase
+        // Fetch fresh products from Supabase
         await fetchProductsFromSheet(true);
         
-        // 3. Render the product grid
+        // Render the product grid
         renderProductGrid();
         
-        // 4. If stock take mode is active, render stock take grid
+        // If stock take mode is active, render stock take grid
         if (stockTakeMode) {
           renderStockTakeProductGrid();
         }
         
-        // 5. Find and refresh the approval modal
+        // Find and refresh the approval modal
         const targetModal = findStockTakeApprovalModal();
         
         if (targetModal) {
@@ -9710,18 +9747,17 @@ async function approveStoreGroup(groupId, modal) {
           await loadPendingStockTakeRequests(targetModal);
           console.log('✅ Stock take approval list refreshed');
           attachStockTakeApprovalEvents(targetModal);
-        } else {
-          console.log('ℹ️ No approval modal found, but stock take view refreshed if active');
         }
         
-        // 6. Update sync status
+        // Update sync status
         updateSyncStatus(true, Date.now());
         
         hideLoading();
         
-        // ✅ FINAL CONFIRMATION - Another modal on top
+        // Final confirmation
         await showAlertModal('✅ Stock Updated', 
           `${successCount} product(s) stock has been updated successfully!\n\n` +
+          `Store(s): ${storeNamesList}\n\n` +
           `The approval list has been refreshed.`
         );
         
@@ -9765,7 +9801,7 @@ async function rejectStoreGroup(groupId, modal) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.display = 'flex';
-    overlay.style.zIndex = '99999'; // ✅ HIGHEST Z-INDEX
+    overlay.style.zIndex = '99999';
     overlay.style.background = 'rgba(0,0,0,0.8)';
     overlay.style.backdropFilter = 'blur(4px)';
     overlay.style.position = 'fixed';
@@ -9867,18 +9903,26 @@ async function rejectStoreGroup(groupId, modal) {
         let errors = [];
         let updatedRequests = new Set();
         
+        // ✅ Track which stores are affected
+        const storeAffected = new Set();
+        
         for (const [requestId, items] of Object.entries(groupedByRequest)) {
           try {
+            // ✅ Get the request details to find which store this is for
             const { data: requestData, error: fetchError } = await supabase
               .from('stock_take_requests')
-              .select('*')
+              .select('store')
               .eq('id', requestId)
               .single();
             
             if (fetchError) {
-              console.error('Error fetching request:', fetchError);
+              console.error('Error fetching request store:', fetchError);
               throw fetchError;
             }
+            
+            const storeForThisRequest = requestData.store || currentStore;
+            console.log(`📦 Processing rejection request ${requestId} for store: ${storeForThisRequest}`);
+            storeAffected.add(storeForThisRequest);
             
             let requestItems = requestData.items;
             if (typeof requestItems === 'string') {
@@ -9932,11 +9976,14 @@ async function rejectStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ SHOW REJECTION RESULT MODAL - With HIGHEST z-index
+        // ✅ Build store info for display
+        const storeNamesList = Array.from(storeAffected).map(s => getStoreName(s)).join(', ');
+        
+        // ✅ SHOW REJECTION RESULT MODAL
         const resultOverlay = document.createElement('div');
         resultOverlay.className = 'modal-overlay';
         resultOverlay.style.display = 'flex';
-        resultOverlay.style.zIndex = '999999'; // ✅ EVEN HIGHER
+        resultOverlay.style.zIndex = '999999';
         resultOverlay.style.background = 'rgba(0,0,0,0.8)';
         resultOverlay.style.backdropFilter = 'blur(4px)';
         resultOverlay.style.position = 'fixed';
@@ -9952,7 +9999,7 @@ async function rejectStoreGroup(groupId, modal) {
               <span style="font-size:2.5rem;">📋</span>
               <div>
                 <div style="font-weight:600; color:#0f172a; font-size:1.3rem;">${failCount === 0 ? '✅ All Items Rejected' : '⚠️ Partially Rejected'}</div>
-                <div style="font-size:0.9rem; color:#64748b;">${totalItems} item(s) processed</div>
+                <div style="font-size:0.9rem; color:#64748b;">Store(s): ${storeNamesList || 'N/A'}</div>
               </div>
             </div>
             <div style="background:#fef2f2; border-radius:12px; padding:16px 20px; border-left:4px solid #ef4444; margin-bottom:12px;">
@@ -10002,29 +10049,34 @@ async function rejectStoreGroup(groupId, modal) {
           });
         });
         
-        // ✅ NOW PERFORM THE REFRESH AFTER THE MODAL IS CLOSED
+        // ✅ PERFORM REFRESH
         console.log('🔄 User clicked OK - performing refresh...');
         showLoading('Refreshing data...');
         
-        // 1. Clear all caches
+        // Clear all caches
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
         storeReportCache = {};
+        
+        // Clear cache for all affected stores
+        Array.from(storeAffected).forEach(storeId => {
+          localStorage.removeItem(`products_${storeId}`);
+        });
         localStorage.removeItem(`products_${currentStore}`);
         
-        // 2. Fetch fresh products from Supabase
+        // Fetch fresh products from Supabase
         await fetchProductsFromSheet(true);
         
-        // 3. Render the product grid
+        // Render the product grid
         renderProductGrid();
         
-        // 4. If stock take mode is active, render stock take grid
+        // If stock take mode is active, render stock take grid
         if (stockTakeMode) {
           renderStockTakeProductGrid();
         }
         
-        // 5. Find and refresh the approval modal
+        // Find and refresh the approval modal
         const targetModal = findStockTakeApprovalModal();
         
         if (targetModal) {
@@ -10036,11 +10088,9 @@ async function rejectStoreGroup(groupId, modal) {
           await loadPendingStockTakeRequests(targetModal);
           console.log('✅ Stock take approval list refreshed');
           attachStockTakeApprovalEvents(targetModal);
-        } else {
-          console.log('ℹ️ No approval modal found, but stock take view refreshed if active');
         }
         
-        // 6. Update sync status
+        // Update sync status
         updateSyncStatus(true, Date.now());
         
         hideLoading();
@@ -10048,6 +10098,7 @@ async function rejectStoreGroup(groupId, modal) {
         // ✅ FINAL CONFIRMATION
         await showAlertModal('✅ Rejection Complete', 
           `${successCount} item(s) have been rejected.\n\n` +
+          `Store(s): ${storeNamesList}\n\n` +
           `Reason: ${reason}\n\n` +
           `The approval list has been refreshed.`
         );
