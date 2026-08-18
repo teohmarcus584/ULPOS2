@@ -9553,7 +9553,7 @@ async function approveStoreGroup(groupId, modal) {
             // ✅ FIRST: Get the request details to find which store this is for
             const { data: requestData, error: fetchError } = await supabase
               .from('stock_take_requests')
-              .select('store')
+              .select('*')  // ✅ Get ALL fields including store
               .eq('id', requestId)
               .single();
             
@@ -9562,11 +9562,34 @@ async function approveStoreGroup(groupId, modal) {
               throw fetchError;
             }
             
-            const storeForThisRequest = requestData.store || currentStore;
+            const storeForThisRequest = requestData.store;
             console.log(`📦 Processing request ${requestId} for store: ${storeForThisRequest}`);
             
-            // ✅ Find the store's slot number
-            const storeObj = stores.find(s => s.store_id === storeForThisRequest);
+            // ✅ CRITICAL: If store is null/undefined, skip this request
+            if (!storeForThisRequest) {
+              console.error(`❌ Request ${requestId} has no store associated!`);
+              throw new Error(`Request ${requestId} has no store associated. Please submit again.`);
+            }
+            
+            // ✅ Find the store's slot number - REFRESH from Supabase to ensure we have latest data
+            const { data: storeData, error: storeError } = await supabase
+              .from('stores')
+              .select('*')
+              .eq('store_id', storeForThisRequest)
+              .maybeSingle();
+            
+            if (storeError) {
+              console.error('Error fetching store data:', storeError);
+              throw storeError;
+            }
+            
+            if (!storeData) {
+              console.error(`❌ Store ${storeForThisRequest} not found!`);
+              throw new Error(`Store ${storeForThisRequest} not found. Please refresh and try again.`);
+            }
+            
+            // ✅ Use the fresh store data
+            const storeObj = storeData;
             let stockColumn = `stock_${storeForThisRequest}`; // Default for old stores
             
             if (storeObj && storeObj.slot_number) {
@@ -9579,10 +9602,13 @@ async function approveStoreGroup(groupId, modal) {
             
             // Track this store for refresh
             if (!storeUpdates[storeForThisRequest]) {
-              storeUpdates[storeForThisRequest] = [];
+              storeUpdates[storeForThisRequest] = {
+                storeName: storeObj.name || storeForThisRequest,
+                items: []
+              };
             }
             
-            // Update each product's stock for the specific store
+            // ✅ Update each product's stock for the specific store
             for (const item of items) {
               console.log(`📦 Updating stock for product ${item.product_id}: ${item.current_stock} → ${item.counted_stock} at store ${storeForThisRequest}`);
               
@@ -9599,22 +9625,23 @@ async function approveStoreGroup(groupId, modal) {
                 throw new Error(`Failed to update product: ${error.message}`);
               }
               
-              // ✅ Update local product cache for ALL stores that might be affected
+              // ✅ Update local product cache
               const localProduct = products.find(p => p.id == item.product_id);
               if (localProduct) {
+                // Always update the store-specific stock column
+                localProduct[stockColumn] = item.counted_stock;
                 // If the store being updated is the current store, update the main stock
                 if (storeForThisRequest === currentStore) {
                   localProduct.stock = item.counted_stock;
                 }
-                // Always update the store-specific stock column
-                localProduct[stockColumn] = item.counted_stock;
                 console.log(`✅ Local product updated: ${localProduct.name} → ${stockColumn}: ${localProduct[stockColumn]}`);
+                storeUpdates[storeForThisRequest].items.push(localProduct.name);
               }
               
               successCount++;
             }
             
-            // Update the request status
+            // Update the request status to approved
             const { error } = await supabase
               .from('stock_take_requests')
               .update({
@@ -9629,6 +9656,8 @@ async function approveStoreGroup(groupId, modal) {
               console.error(`❌ Error updating request ${requestId}:`, error);
             }
             
+            console.log(`✅ Request ${requestId} approved successfully for store ${storeForThisRequest}`);
+            
           } catch (err) {
             failCount += items.length;
             errors.push(`Category "${category}": ${err.message}`);
@@ -9638,7 +9667,13 @@ async function approveStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ Show approval result
+        // ✅ Build store info for display
+        const storeNamesList = Object.keys(storeUpdates).map(s => storeUpdates[s].storeName).join(', ');
+        const storeDetails = Object.entries(storeUpdates).map(([storeId, data]) => {
+          return `🏪 ${data.storeName}: ${data.items.length} item(s)`;
+        }).join('\n');
+        
+        // ✅ SHOW APPROVAL RESULT MODAL
         const resultOverlay = document.createElement('div');
         resultOverlay.className = 'modal-overlay';
         resultOverlay.style.display = 'flex';
@@ -9652,17 +9687,13 @@ async function approveStoreGroup(groupId, modal) {
         resultOverlay.style.height = '100%';
         resultOverlay.style.alignItems = 'center';
         resultOverlay.style.justifyContent = 'center';
-        
-        // ✅ Build store info for display
-        const storeNamesList = Object.keys(storeUpdates).map(s => getStoreName(s)).join(', ');
-        
         resultOverlay.innerHTML = `
           <div class="modal-container" style="max-width: 550px; border-radius: 24px; padding: 28px; z-index: 999999; position: relative; box-shadow: 0 24px 64px rgba(0,0,0,0.4); background: white;">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
               <span style="font-size:2.5rem;">📋</span>
               <div>
                 <div style="font-weight:600; color:#0f172a; font-size:1.3rem;">${failCount === 0 ? '✅ Stock Take Approved' : '⚠️ Partially Approved'}</div>
-                <div style="font-size:0.9rem; color:#64748b;">Store(s): ${storeNamesList || 'N/A'}</div>
+                <div style="font-size:0.9rem; color:#64748b;">${Object.keys(storeUpdates).length} store(s) updated</div>
               </div>
             </div>
             <div style="background:#f0fdf4; border-radius:12px; padding:16px 20px; border-left:4px solid #059669; margin-bottom:12px;">
@@ -9676,6 +9707,10 @@ async function approveStoreGroup(groupId, modal) {
                   <span style="font-weight:700; color:#ef4444;">${failCount}</span>
                 </div>
               ` : ''}
+            </div>
+            <div style="background:#f8fafc; border-radius:8px; padding:12px 16px; margin-top:12px; border:1px solid #e2e8f0;">
+              <div style="font-weight:500; color:#1e293b; font-size:0.85rem;">📂 Stores Updated:</div>
+              <div style="color:#475569; font-size:0.9rem; margin-top:4px; white-space:pre-line;">${storeDetails || 'N/A'}</div>
             </div>
             ${errors.length > 0 ? `
               <div style="background:#fef2f2; border-radius:8px; padding:12px 16px; margin-top:12px; border:1px solid #fecaca;">
@@ -9712,17 +9747,22 @@ async function approveStoreGroup(groupId, modal) {
         console.log('🔄 User clicked OK - performing refresh...');
         showLoading('Refreshing data...');
         
-        // Clear all caches
+        // ✅ CRITICAL: Clear ALL caches for ALL stores
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
         storeReportCache = {};
         
-        // Clear cache for all affected stores
-        Object.keys(storeUpdates).forEach(storeId => {
+        // Clear cache for ALL stores (not just affected ones)
+        // This ensures we get fresh data for all stores
+        const allStoreIds = stores.map(s => s.store_id);
+        allStoreIds.forEach(storeId => {
           localStorage.removeItem(`products_${storeId}`);
         });
         localStorage.removeItem(`products_${currentStore}`);
+        
+        // ✅ Force refresh the stores array from Supabase
+        await fetchStores(true);
         
         // Fetch fresh products from Supabase
         await fetchProductsFromSheet(true);
@@ -9754,10 +9794,11 @@ async function approveStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // Final confirmation
+        // ✅ FINAL CONFIRMATION with store details
         await showAlertModal('✅ Stock Updated', 
           `${successCount} product(s) stock has been updated successfully!\n\n` +
-          `Store(s): ${storeNamesList}\n\n` +
+          `Updated ${Object.keys(storeUpdates).length} store(s):\n` +
+          `${storeDetails}\n\n` +
           `The approval list has been refreshed.`
         );
         
@@ -9777,7 +9818,6 @@ async function approveStoreGroup(groupId, modal) {
     });
   });
 }
-
 async function rejectStoreGroup(groupId, modal) {
   const selectedItems = getSelectedItemsForGroup(groupId);
   
@@ -9904,14 +9944,14 @@ async function rejectStoreGroup(groupId, modal) {
         let updatedRequests = new Set();
         
         // ✅ Track which stores are affected
-        const storeAffected = new Set();
+        const storeAffected = {};
         
         for (const [requestId, items] of Object.entries(groupedByRequest)) {
           try {
             // ✅ Get the request details to find which store this is for
             const { data: requestData, error: fetchError } = await supabase
               .from('stock_take_requests')
-              .select('store')
+              .select('*')  // ✅ Get ALL fields including store
               .eq('id', requestId)
               .single();
             
@@ -9920,9 +9960,35 @@ async function rejectStoreGroup(groupId, modal) {
               throw fetchError;
             }
             
-            const storeForThisRequest = requestData.store || currentStore;
+            const storeForThisRequest = requestData.store;
             console.log(`📦 Processing rejection request ${requestId} for store: ${storeForThisRequest}`);
-            storeAffected.add(storeForThisRequest);
+            
+            // ✅ CRITICAL: If store is null/undefined, skip this request
+            if (!storeForThisRequest) {
+              console.error(`❌ Request ${requestId} has no store associated!`);
+              throw new Error(`Request ${requestId} has no store associated. Please submit again.`);
+            }
+            
+            // ✅ Get the store name for display
+            const { data: storeData, error: storeError } = await supabase
+              .from('stores')
+              .select('name')
+              .eq('store_id', storeForThisRequest)
+              .maybeSingle();
+            
+            if (storeError) {
+              console.error('Error fetching store name:', storeError);
+            }
+            
+            const storeName = storeData ? storeData.name : storeForThisRequest;
+            
+            // Track this store
+            if (!storeAffected[storeForThisRequest]) {
+              storeAffected[storeForThisRequest] = {
+                storeName: storeName,
+                items: []
+              };
+            }
             
             let requestItems = requestData.items;
             if (typeof requestItems === 'string') {
@@ -9937,6 +10003,10 @@ async function rejectStoreGroup(groupId, modal) {
             const remainingItems = requestItems.filter(item => !productIdsToReject.has(item.product_id));
             
             console.log(`📋 Request ${requestId}: ${requestItems.length} items total, ${items.length} to reject, ${remainingItems.length} remaining`);
+            
+            // Track rejected items for this store
+            const rejectedItems = items.map(item => item.product_name || 'Unknown');
+            storeAffected[storeForThisRequest].items.push(...rejectedItems);
             
             if (remainingItems.length === 0) {
               const { error: updateError } = await supabase
@@ -9967,6 +10037,8 @@ async function rejectStoreGroup(groupId, modal) {
               successCount += items.length;
             }
             
+            console.log(`✅ Request ${requestId} rejected successfully for store ${storeForThisRequest}`);
+            
           } catch (err) {
             console.error(`Error processing request ${requestId}:`, err);
             failCount += items.length;
@@ -9977,7 +10049,9 @@ async function rejectStoreGroup(groupId, modal) {
         hideLoading();
         
         // ✅ Build store info for display
-        const storeNamesList = Array.from(storeAffected).map(s => getStoreName(s)).join(', ');
+        const storeDetails = Object.entries(storeAffected).map(([storeId, data]) => {
+          return `🏪 ${data.storeName}: ${data.items.length} item(s) rejected`;
+        }).join('\n');
         
         // ✅ SHOW REJECTION RESULT MODAL
         const resultOverlay = document.createElement('div');
@@ -9999,7 +10073,7 @@ async function rejectStoreGroup(groupId, modal) {
               <span style="font-size:2.5rem;">📋</span>
               <div>
                 <div style="font-weight:600; color:#0f172a; font-size:1.3rem;">${failCount === 0 ? '✅ All Items Rejected' : '⚠️ Partially Rejected'}</div>
-                <div style="font-size:0.9rem; color:#64748b;">Store(s): ${storeNamesList || 'N/A'}</div>
+                <div style="font-size:0.9rem; color:#64748b;">${Object.keys(storeAffected).length} store(s) affected</div>
               </div>
             </div>
             <div style="background:#fef2f2; border-radius:12px; padding:16px 20px; border-left:4px solid #ef4444; margin-bottom:12px;">
@@ -10013,6 +10087,10 @@ async function rejectStoreGroup(groupId, modal) {
                   <span style="font-weight:700; color:#ef4444;">${failCount}</span>
                 </div>
               ` : ''}
+            </div>
+            <div style="background:#f8fafc; border-radius:8px; padding:12px 16px; margin-top:12px; border:1px solid #e2e8f0;">
+              <div style="font-weight:500; color:#1e293b; font-size:0.85rem;">📂 Stores Affected:</div>
+              <div style="color:#475569; font-size:0.9rem; margin-top:4px; white-space:pre-line;">${storeDetails || 'N/A'}</div>
             </div>
             <div style="background:#f8fafc; border-radius:8px; padding:12px 16px; margin-top:12px; border:1px solid #e2e8f0;">
               <div style="font-weight:500; color:#1e293b; font-size:0.85rem;">📝 Rejection Reason:</div>
@@ -10053,17 +10131,21 @@ async function rejectStoreGroup(groupId, modal) {
         console.log('🔄 User clicked OK - performing refresh...');
         showLoading('Refreshing data...');
         
-        // Clear all caches
+        // ✅ CRITICAL: Clear ALL caches for ALL stores
         if (window._stockTakeCache) {
           delete window._stockTakeCache;
         }
         storeReportCache = {};
         
-        // Clear cache for all affected stores
-        Array.from(storeAffected).forEach(storeId => {
+        // Clear cache for ALL stores
+        const allStoreIds = stores.map(s => s.store_id);
+        allStoreIds.forEach(storeId => {
           localStorage.removeItem(`products_${storeId}`);
         });
         localStorage.removeItem(`products_${currentStore}`);
+        
+        // ✅ Force refresh the stores array from Supabase
+        await fetchStores(true);
         
         // Fetch fresh products from Supabase
         await fetchProductsFromSheet(true);
@@ -10095,10 +10177,11 @@ async function rejectStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ FINAL CONFIRMATION
+        // ✅ FINAL CONFIRMATION with store details
         await showAlertModal('✅ Rejection Complete', 
           `${successCount} item(s) have been rejected.\n\n` +
-          `Store(s): ${storeNamesList}\n\n` +
+          `Affected ${Object.keys(storeAffected).length} store(s):\n` +
+          `${storeDetails}\n\n` +
           `Reason: ${reason}\n\n` +
           `The approval list has been refreshed.`
         );
