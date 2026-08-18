@@ -9542,10 +9542,17 @@ async function approveStoreGroup(groupId, modal) {
           const category = items[0]?.category || 'Unknown';
           
           try {
+            // ✅ Find the store's slot number for stock update
+            const storeObj = stores.find(s => s.store_id === store);
+            let stockColumn = `stock_${store}`; // Default for old stores
+            
+            if (storeObj && storeObj.slot_number) {
+              const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
+              stockColumn = `stock_store_${slotNumStr}`;
+            }
+            
             // ✅ Update each product's stock for the specific store
             for (const item of items) {
-              const stockColumn = `stock_${store}`;
-              
               // Update the product in Supabase
               const { error } = await supabase
                 .from('products')
@@ -9622,8 +9629,8 @@ async function approveStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ FORCE REFRESH: Reload the stock take approval list
-        console.log('🔄 Refreshing stock take approval list after approval...');
+        // ✅ FORCE REFRESH: Reload the stock take approval list (AUTO-REFRESH)
+        console.log('🔄 Auto-refreshing stock take approval list after approval...');
         showLoading('Refreshing stock take list...');
         
         // Clear caches
@@ -9636,7 +9643,7 @@ async function approveStoreGroup(groupId, modal) {
         await fetchProductsFromSheet(true);
         renderProductGrid();
         
-        // ✅ Find the approval modal and refresh it
+        // ✅ Find the approval modal and refresh it (AUTO-REFRESH)
         const approvalModals = document.querySelectorAll('.modal-overlay');
         let targetModal = null;
         for (const m of approvalModals) {
@@ -9649,7 +9656,7 @@ async function approveStoreGroup(groupId, modal) {
         if (targetModal) {
           // Refresh the list in the existing modal
           await loadPendingStockTakeRequests(targetModal);
-          console.log('✅ Stock take approval list refreshed in existing modal');
+          console.log('✅ Stock take approval list auto-refreshed in existing modal');
         } else {
           // If no modal is open, but stock take mode is active, refresh the grid
           if (stockTakeMode) {
@@ -9895,8 +9902,8 @@ async function rejectStoreGroup(groupId, modal) {
         
         hideLoading();
         
-        // ✅ FORCE REFRESH: Reload the stock take approval list
-        console.log('🔄 Refreshing stock take approval list after rejection...');
+        // ✅ FORCE REFRESH: Reload the stock take approval list (AUTO-REFRESH)
+        console.log('🔄 Auto-refreshing stock take approval list after rejection...');
         showLoading('Refreshing stock take list...');
         
         // Clear caches
@@ -9909,7 +9916,7 @@ async function rejectStoreGroup(groupId, modal) {
         await fetchProductsFromSheet(true);
         renderProductGrid();
         
-        // ✅ Find the approval modal and refresh it
+        // ✅ Find the approval modal and refresh it (AUTO-REFRESH)
         const approvalModals = document.querySelectorAll('.modal-overlay');
         let targetModal = null;
         for (const m of approvalModals) {
@@ -9922,7 +9929,7 @@ async function rejectStoreGroup(groupId, modal) {
         if (targetModal) {
           // Refresh the list in the existing modal
           await loadPendingStockTakeRequests(targetModal);
-          console.log('✅ Stock take approval list refreshed in existing modal');
+          console.log('✅ Stock take approval list auto-refreshed in existing modal');
         } else {
           // If no modal is open, but stock take mode is active, refresh the grid
           if (stockTakeMode) {
