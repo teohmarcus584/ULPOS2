@@ -2092,6 +2092,9 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 #storeFilterToggleBtn.active:hover {
   background: #2563eb;
 }
+#syncStatus {
+  display: none !important;
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2133,12 +2136,12 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <div class="pos-header-left">
       <img src="https://i.imgur.com/STBkLrm.jpeg" alt="POS System Logo" class="pos-logo" id="logoImage">
       <div class="store-selector-header">
-        <label for="storeSelect">Store:</label>
-        <select id="storeSelect" class="store-header-select">
-  <option value="">Loading stores...</option>
-</select>
-        <div id="syncStatus" class="sync-status"><i class="fas fa-database"></i> <span>Loading...</span></div>
-      </div>
+  <label for="storeSelect">Store:</label>
+  <select id="storeSelect" class="store-header-select">
+    <option value="">Loading stores...</option>
+  </select>
+</div>
+    
     </div>
     <div class="pos-header-right">
 	 <button id="editProductHeaderBtn" class="cart-header-btn" style="display: none;">✏️ Edit Product</button>
