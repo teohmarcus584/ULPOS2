@@ -2176,6 +2176,95 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   color: #94a3b8;
   margin-top: 2px;
 }
+/* Special Price Buttons - Different Colors */
+.special-price-btn {
+  border: 2px solid #e2e8f0;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #1e293b;
+  min-width: 90px;
+  touch-action: manipulation;
+  background: #f1f5f9;
+}
+
+.special-price-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.special-price-btn:active {
+  transform: scale(0.95);
+}
+
+.special-price-btn.active {
+  color: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.special-price-btn.active:hover {
+  opacity: 0.9;
+}
+
+.special-price-hint {
+  font-size: 0.6rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* Cart item special styling */
+.cart-item-special {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* Special Price Buttons - 3-state cycling */
+.special-price-btn {
+  border: 2px solid #e2e8f0;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #1e293b;
+  min-width: 90px;
+  touch-action: manipulation;
+  background: #f1f5f9;
+}
+
+.special-price-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.special-price-btn:active {
+  transform: scale(0.95);
+}
+
+.special-price-btn.active {
+  color: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.special-price-btn.active:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* Free state specific styling */
+.special-price-btn[style*="background: #f59e0b"] {
+  animation: pulse-gold 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 4px 20px rgba(245, 158, 11, 0.6); }
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -3947,7 +4036,7 @@ function renderProductGrid() {
   }
   
   // ============================================================
-  // NORMAL SALES MODE - Clean display with special offer badge
+  // NORMAL SALES MODE - Clean display with special offer badges
   // ============================================================
   filtered.forEach(prod => {
     let additionalClass = '';
@@ -3955,11 +4044,25 @@ function renderProductGrid() {
       additionalClass = 'out-of-stock-card';
     }
     
-    // ✅ Add special badge for 100ML PERFUME EDP or 50ML PERFUME EDP category
-    const isEligibleForRm1 = prod.category === "100ML PERFUME EDP" || prod.category === "50ML PERFUME EDP";
-    const specialBadge = isEligibleForRm1 
-      ? ' <span style="background:#dc2626; color:white; font-size:0.6rem; padding:2px 8px; border-radius:10px; margin-left:4px; font-weight:600;">RM 1 OFFER</span>' 
-      : '';
+    // ✅ Add special badge based on category
+    let specialBadge = '';
+    let badgeColor = '';
+    let badgeText = '';
+    
+    if (prod.category === "100ML PERFUME EDP" || prod.category === "50ML PERFUME EDP") {
+      badgeColor = '#dc2626';
+      badgeText = 'RM 1 OFFER';
+    } else if (prod.category === "15ML PERFUME EDP") {
+      badgeColor = '#059669';
+      badgeText = 'RM 10 OFFER';
+    } else if (prod.category === "CAR AROMATIC") {
+      badgeColor = '#8b5cf6';
+      badgeText = 'RM 5 OFFER';
+    }
+    
+    if (badgeText) {
+      specialBadge = ` <span style="background:${badgeColor}; color:white; font-size:0.6rem; padding:2px 8px; border-radius:10px; margin-left:4px; font-weight:600;">${badgeText}</span>`;
+    }
     
     const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
     
@@ -4907,21 +5010,47 @@ function addToCart(product) {
     if (existing.freeQuantity > existing.quantity) existing.freeQuantity = existing.quantity;
     // ✅ If special price was active, check if we need to adjust specialQuantity
     if (existing.isSpecialOffer && existing.specialPriceActive) {
-      // Keep specialQuantity at 1 (only ONE unit gets RM 1)
       if (existing.specialQuantity > 1) {
         existing.specialQuantity = 1;
       }
     }
+    // ✅ Reset free quantity if it exceeds quantity
+    if (existing.freeQuantity > existing.quantity) {
+      existing.freeQuantity = existing.quantity;
+    }
   } else {
-    // ✅ Check if this product is in "100ML PERFUME EDP" or "50ML PERFUME EDP" category
-    const isSpecialOffer = product.category === "100ML PERFUME EDP" || product.category === "50ML PERFUME EDP";
+    // ✅ Check which special offer this product qualifies for
+    let specialPrice = null;
+    let specialLabel = null;
+    let offerType = 'none'; // 'special', 'free', 'none'
+    
+    if (product.category === "100ML PERFUME EDP" || product.category === "50ML PERFUME EDP") {
+      specialPrice = 1;
+      specialLabel = "RM 1";
+      offerType = 'special';
+    } else if (product.category === "15ML PERFUME EDP") {
+      specialPrice = 10;
+      specialLabel = "RM 10";
+      offerType = 'special';
+    } else if (product.category === "CAR AROMATIC") {
+      specialPrice = 5;
+      specialLabel = "RM 5";
+      offerType = 'special';
+    }
+    
+    const isSpecialOffer = specialPrice !== null;
+    
     cart.push({ 
       product: { ...product }, 
       quantity: 1, 
       freeQuantity: 0,
       isSpecialOffer: isSpecialOffer,
       specialPriceActive: false,
-      specialQuantity: 0  // ✅ Track how many units get special price
+      specialQuantity: 0,
+      specialPrice: specialPrice,
+      specialLabel: specialLabel,
+      offerType: offerType,  // 'special' or 'free' or 'none'
+      offerState: 0  // 0=normal, 1=special, 2=free
     });
   }
   updateCartUI();
@@ -4976,54 +5105,114 @@ function updateCartUI() {
   let html = '';
   let subtotal = 0;
   cart.forEach((item, idx) => {
-    // ✅ Calculate effective price with special quantity logic
-    let effectivePrice = item.product.price;
+    // ✅ Calculate effective pricing based on state
     let regularCount = item.quantity;
     let specialCount = 0;
+    let freeCount = item.freeQuantity || 0;
+    let specialPrice = item.specialPrice || 1;
+    let regularPrice = item.product.price;
+    let effectivePrice = regularPrice;
+    let itemTotal = 0;
     
-    if (item.isSpecialOffer && item.specialPriceActive) {
-      // ✅ Only ONE unit gets RM 1, the rest at regular price
+    // ✅ Check if this is a 3-state item (CAR AROMATIC or 15ML PERFUME EDP)
+    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+    
+    if (isThreeStateItem) {
+      // 3-state cycling
+      if (item.offerState === 1) {
+        // Special price state
+        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+        regularCount = item.quantity - specialCount;
+        const regularTotal = regularCount * regularPrice;
+        const specialTotal = specialCount * specialPrice;
+        itemTotal = regularTotal + specialTotal;
+        effectivePrice = specialPrice;
+      } else if (item.offerState === 2) {
+        // Free gift state - one unit is free
+        freeCount = Math.min(1, item.quantity);
+        const paidCount = item.quantity - freeCount;
+        itemTotal = paidCount * regularPrice;
+        effectivePrice = 0; // Free
+      } else {
+        // Normal state
+        itemTotal = item.quantity * regularPrice;
+        effectivePrice = regularPrice;
+        freeCount = 0;
+      }
+    } else if (item.isSpecialOffer && item.specialPriceActive) {
+      // 2-state items (100ML and 50ML PERFUME EDP)
       specialCount = Math.min(item.specialQuantity || 1, item.quantity);
       regularCount = item.quantity - specialCount;
-      
-      // If specialQuantity is not set or 0, default to 1
-      if (specialCount === 0 && item.specialPriceActive) {
-        specialCount = 1;
-        regularCount = item.quantity - 1;
-        item.specialQuantity = 1;
-      }
-      
-      // Calculate total with mixed pricing
-      const regularTotal = regularCount * item.product.price;
-      const specialTotal = specialCount * 1; // RM 1 each
-      const itemTotal = regularTotal + specialTotal;
-      subtotal += itemTotal;
-      
-      // Display the effective price (show RM 1 for special units)
-      effectivePrice = specialCount > 0 ? 1 : item.product.price;
+      const regularTotal = regularCount * regularPrice;
+      const specialTotal = specialCount * specialPrice;
+      itemTotal = regularTotal + specialTotal;
+      effectivePrice = specialPrice;
+      freeCount = 0; // No free items when special is active
     } else {
-      const paidUnits = item.quantity - (item.freeQuantity || 0);
-      const itemTotal = paidUnits * item.product.price;
-      subtotal += itemTotal;
+      // Normal items
+      const paidUnits = item.quantity - freeCount;
+      itemTotal = paidUnits * regularPrice;
+      effectivePrice = regularPrice;
     }
+    
+    subtotal += itemTotal;
     
     const categoryDisplay = item.product.category
       ? `<div class="cart-item-category">${escapeHtml(item.product.category)}</div>`
       : '';
     
-    // ✅ Determine which button to show
+    // ✅ Determine which button to show based on item type
     let buttonHtml = '';
-    if (item.isSpecialOffer) {
-      // Special offer button - changes to RM 1
-      const isActive = item.specialPriceActive;
-      const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
+    
+    if (isThreeStateItem) {
+      // 3-state button for CAR AROMATIC and 15ML PERFUME EDP
+      let stateText = '';
+      let stateColor = '';
+      let bgColor = '';
+      
+      if (item.offerState === 0) {
+        stateText = `🏷️ ${item.specialLabel}`;
+        stateColor = '#1e293b';
+        bgColor = '#f1f5f9';
+      } else if (item.offerState === 1) {
+        stateText = `🔄 ${item.specialLabel} ✓`;
+        stateColor = 'white';
+        bgColor = getSpecialPriceColor(item.specialPrice);
+      } else if (item.offerState === 2) {
+        stateText = `🎁 FREE ✓`;
+        stateColor = 'white';
+        bgColor = '#f59e0b';
+      }
+      
       buttonHtml = `
         <div class="cart-item-special">
-          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}">
-            ${isActive ? `🔄 RM 1 ✓ (${specialCountDisplay} unit)` : '🏷️ AT RM 1'}
+          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}" 
+                  style="${item.offerState > 0 ? `background: ${bgColor}; border-color: ${bgColor}; color: ${stateColor};` : ''}">
+            ${stateText}
           </button>
           <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-            ${isActive ? `${specialCountDisplay} unit at RM 1, ${regularCount} at RM ${item.product.price.toFixed(2)}` : 'Click for RM 1 on 1 unit'}
+            ${item.offerState === 0 ? 'Click for special price' : 
+              item.offerState === 1 ? `${item.specialLabel} on 1 unit` : 
+              '1 unit FREE'}
+            (Click to cycle)
+          </span>
+        </div>
+      `;
+    } else if (item.isSpecialOffer) {
+      // 2-state button for 100ML and 50ML PERFUME EDP
+      const isActive = item.specialPriceActive;
+      const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
+      const label = item.specialLabel || `RM ${item.specialPrice}`;
+      const bgColor = getSpecialPriceColor(item.specialPrice);
+      
+      buttonHtml = `
+        <div class="cart-item-special">
+          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}" 
+                  style="${isActive ? `background: ${bgColor}; border-color: ${bgColor}; color: white;` : ''}">
+            ${isActive ? `🔄 ${label} ✓ (${specialCountDisplay} unit)` : `🏷️ AT ${label}`}
+          </button>
+          <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
+            ${isActive ? `${specialCountDisplay} unit at ${label}, ${regularCount} at RM ${regularPrice.toFixed(2)}` : `Click for ${label} on 1 unit`}
           </span>
         </div>
       `;
@@ -5040,28 +5229,40 @@ function updateCartUI() {
       `;
     }
     
-    // Calculate item total for display
-    let itemTotalDisplay = 0;
-    if (item.isSpecialOffer && item.specialPriceActive) {
-      const regularTotal = regularCount * item.product.price;
-      const specialTotal = specialCount * 1;
-      itemTotalDisplay = regularTotal + specialTotal;
+    // Build price display
+    let priceDisplay = '';
+    let priceColor = '';
+    let specialBadge = '';
+    
+    if (isThreeStateItem) {
+      if (item.offerState === 1) {
+        priceColor = getSpecialPriceColor(item.specialPrice);
+        priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
+      } else if (item.offerState === 2) {
+        priceColor = '#f59e0b';
+        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 FREE</span>`;
+      } else {
+        priceDisplay = `RM ${regularPrice.toFixed(2)}`;
+      }
+    } else if (item.isSpecialOffer && item.specialPriceActive) {
+      priceColor = getSpecialPriceColor(item.specialPrice);
+      priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
+      specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
     } else {
-      const paidUnits = item.quantity - (item.freeQuantity || 0);
-      itemTotalDisplay = paidUnits * item.product.price;
+      priceDisplay = `RM ${regularPrice.toFixed(2)}`;
     }
+    
+    const totalDisplay = itemTotal.toFixed(2);
     
     html += `
       <div class="cart-item" data-index="${idx}">
         <div class="cart-item-info">
           <div class="cart-item-name">${escapeHtml(item.product.name)}</div>
           ${categoryDisplay}
-          <div class="cart-item-price" style="${item.isSpecialOffer && item.specialPriceActive ? 'color:#dc2626; font-weight:700;' : ''}">
-            ${item.isSpecialOffer && item.specialPriceActive ? 
-              `${specialCount} x RM 1 + ${regularCount} x RM ${item.product.price.toFixed(2)}` : 
-              `RM ${item.product.price.toFixed(2)}`
-            }
-            ${item.isSpecialOffer && item.specialPriceActive ? ' <span style="font-size:0.7rem; color:#dc2626; background:#fee2e2; padding:2px 8px; border-radius:10px;">SPECIAL</span>' : ''}
+          <div class="cart-item-price" style="${(item.offerState > 0 || (item.isSpecialOffer && item.specialPriceActive)) ? `color:${priceColor || '#dc2626'}; font-weight:700;` : ''}">
+            ${priceDisplay}${specialBadge}
           </div>
         </div>
         ${buttonHtml}
@@ -5070,7 +5271,7 @@ function updateCartUI() {
           <span>${item.quantity}</span>
           <button class="qty-btn" data-index="${idx}" data-delta="1">+</button>
         </div>
-        <div class="cart-item-total">RM ${itemTotalDisplay.toFixed(2)}</div>
+        <div class="cart-item-total">RM ${totalDisplay}</div>
         <button class="remove-item" data-index="${idx}">✕</button>
       </div>
     `;
@@ -5132,59 +5333,111 @@ function updateCartUI() {
 
   // Event listeners
   document.querySelectorAll('.qty-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      const delta = parseInt(btn.dataset.delta);
-      if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleQtyClick);
+    btn.addEventListener('click', handleQtyClick);
   });
   
   document.querySelectorAll('.remove-item').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      if (!isNaN(idx)) removeCartItem(idx);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleRemoveClick);
+    btn.addEventListener('click', handleRemoveClick);
   });
   
   document.querySelectorAll('.free-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      if (!isNaN(idx)) toggleFreeCount(idx);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleFreeToggle);
+    btn.addEventListener('click', handleFreeToggle);
   });
   
   document.querySelectorAll('.special-price-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      if (!isNaN(idx)) toggleSpecialPrice(idx);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleSpecialPriceClick);
+    btn.addEventListener('click', handleSpecialPriceClick);
   });
+}
+
+// Helper functions for event handlers
+function handleQtyClick(e) {
+  const idx = parseInt(this.dataset.index);
+  const delta = parseInt(this.dataset.delta);
+  if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
+  e.stopPropagation();
+}
+
+function handleRemoveClick(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) removeCartItem(idx);
+  e.stopPropagation();
+}
+
+function handleFreeToggle(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) toggleFreeCount(idx);
+  e.stopPropagation();
+}
+
+function handleSpecialPriceClick(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) toggleSpecialPrice(idx);
+  e.stopPropagation();
+}
+
+// Helper function to get color based on special price
+function getSpecialPriceColor(specialPrice) {
+  if (specialPrice === 1) return '#dc2626';      // Red for RM 1
+  if (specialPrice === 5) return '#8b5cf6';      // Purple for RM 5
+  if (specialPrice === 10) return '#059669';     // Green for RM 10
+  return '#dc2626'; // Default red
 }
 function toggleSpecialPrice(index) {
   const item = cart[index];
   if (!item) return;
   
-  // ✅ If special price is already active, deactivate it completely
-  if (item.specialPriceActive) {
-    item.specialPriceActive = false;
-    item.specialQuantity = 0; // Reset special quantity
+  // ✅ For 100ML and 50ML PERFUME EDP - simple toggle (special on/off)
+  if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
+    // Toggle special price
+    item.specialPriceActive = !item.specialPriceActive;
+    if (item.specialPriceActive) {
+      item.specialQuantity = 1;
+      item.freeQuantity = 0; // Remove any free items
+    } else {
+      item.specialQuantity = 0;
+    }
     updateCartUI();
     return;
   }
   
-  // ✅ Activate special price for ONE unit only
-  item.specialPriceActive = true;
-  item.specialQuantity = 1; // Only ONE unit gets the special price
-  
-  // ✅ If there are free items, remove them when special price is active
-  if (item.freeQuantity > 0) {
-    item.freeQuantity = 0;
+  // ✅ For CAR AROMATIC and 15ML PERFUME EDP - 3-state cycling
+  if (item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP") {
+    // Cycle states: 0=normal → 1=special → 2=free → 0=normal
+    item.offerState = (item.offerState + 1) % 3;
+    
+    if (item.offerState === 0) {
+      // Normal state
+      item.specialPriceActive = false;
+      item.specialQuantity = 0;
+      item.freeQuantity = 0;
+    } else if (item.offerState === 1) {
+      // Special price state (RM 5 or RM 10)
+      item.specialPriceActive = true;
+      item.specialQuantity = 1;
+      item.freeQuantity = 0;
+    } else if (item.offerState === 2) {
+      // Free gift state
+      item.specialPriceActive = false;
+      item.specialQuantity = 0;
+      item.freeQuantity = 1; // One free unit
+    }
+    
+    updateCartUI();
+    return;
   }
   
+  // ✅ Default toggle for other items
+  item.specialPriceActive = !item.specialPriceActive;
+  if (item.specialPriceActive) {
+    item.specialQuantity = 1;
+    item.freeQuantity = 0;
+  } else {
+    item.specialQuantity = 0;
+  }
   updateCartUI();
 }
 function updateQuantity(index, delta) {
@@ -5204,6 +5457,14 @@ function updateQuantity(index, delta) {
       }
       if (item.specialQuantity < 1) {
         item.specialQuantity = 1;
+      }
+    }
+    
+    // ✅ If 3-state item, ensure states are valid
+    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+    if (isThreeStateItem) {
+      if (item.offerState === 2 && item.freeQuantity > newQty) {
+        item.freeQuantity = newQty;
       }
     }
   }
@@ -5244,11 +5505,11 @@ async function startCheckout() {
   let subtotal = 0;
   for (let item of cart) {
     if (item.isSpecialOffer && item.specialPriceActive) {
-      // ✅ Only ONE unit gets RM 1, the rest at regular price
+      // ✅ Only ONE unit gets special price, the rest at regular price
       const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
       const regularCount = item.quantity - specialCount;
       const regularTotal = regularCount * item.product.price;
-      const specialTotal = specialCount * 1; // RM 1 each
+      const specialTotal = specialCount * (item.specialPrice || 1);
       subtotal += regularTotal + specialTotal;
     } else {
       const paidQty = item.quantity - (item.freeQuantity || 0);
@@ -5513,58 +5774,93 @@ async function completeCheckout(paymentMethod, cashReceived) {
     const salesPersonName = selectedOption ? selectedOption.text.split(' (ID:')[0] : '';
     const salesPersonId = salesPersonSelect.value;
 
-    // ✅ Calculate sale items with mixed pricing for special offers
+    // ✅ Calculate sale items with all special offers
     const saleItems = cart.map(item => {
-      // ✅ Check if this product is eligible for RM 1 offer
-      const isEligibleForRm1 = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
+      // ✅ Check which special offer this product qualifies for
+      let specialPrice = null;
+      let specialLabel = null;
       
-      // ✅ Calculate effective price with special quantity logic
+      if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
+        specialPrice = 1;
+        specialLabel = "RM 1";
+      } else if (item.product.category === "15ML PERFUME EDP") {
+        specialPrice = 10;
+        specialLabel = "RM 10";
+      } else if (item.product.category === "CAR AROMATIC") {
+        specialPrice = 5;
+        specialLabel = "RM 5";
+      }
+      
+      const isEligibleForSpecial = specialPrice !== null;
+      const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+      
+      // ✅ Calculate effective price based on state
       let specialCount = 0;
       let regularCount = item.quantity;
+      let freeCount = item.freeQuantity || 0;
       let itemTotal = 0;
+      let isSpecialActive = false;
+      let isFreeActive = false;
+      let effectivePrice = item.product.price;
       
-      if (isEligibleForRm1 && item.specialPriceActive) {
-        // Only ONE unit gets RM 1, the rest at regular price
+      if (isThreeStateItem) {
+        // 3-state cycling for CAR AROMATIC and 15ML PERFUME EDP
+        if (item.offerState === 1) {
+          // Special price state
+          specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+          regularCount = item.quantity - specialCount;
+          const regularTotal = regularCount * item.product.price;
+          const specialTotal = specialCount * specialPrice;
+          itemTotal = regularTotal + specialTotal;
+          isSpecialActive = true;
+          effectivePrice = specialPrice;
+        } else if (item.offerState === 2) {
+          // Free gift state - one unit is free
+          freeCount = Math.min(1, item.quantity);
+          const paidCount = item.quantity - freeCount;
+          itemTotal = paidCount * item.product.price;
+          isFreeActive = true;
+          effectivePrice = 0;
+        } else {
+          // Normal state
+          itemTotal = item.quantity * item.product.price;
+          effectivePrice = item.product.price;
+          freeCount = 0;
+        }
+      } else if (isEligibleForSpecial && item.specialPriceActive) {
+        // 2-state items (100ML and 50ML PERFUME EDP)
         specialCount = Math.min(item.specialQuantity || 1, item.quantity);
         regularCount = item.quantity - specialCount;
-        
-        // Calculate total with mixed pricing
         const regularTotal = regularCount * item.product.price;
-        const specialTotal = specialCount * 1; // RM 1 each
+        const specialTotal = specialCount * specialPrice;
         itemTotal = regularTotal + specialTotal;
-        
-        return {
-          id: item.product.id,
-          category: item.product.category,
-          name: item.product.name,
-          price: item.product.price, // Original price
-          effective_price: 1, // Special price for special units
-          quantity: item.quantity,
-          regular_quantity: regularCount,
-          special_quantity: specialCount,
-          free_quantity: item.freeQuantity || 0,
-          total: itemTotal,
-          is_special_offer: true,
-          special_price_active: true
-        };
+        isSpecialActive = true;
+        effectivePrice = specialPrice;
+        freeCount = 0;
       } else {
-        const paidQty = item.quantity - (item.freeQuantity || 0);
+        // Normal items
+        const paidQty = item.quantity - freeCount;
         itemTotal = paidQty * item.product.price;
-        
-        return {
-          id: item.product.id,
-          category: item.product.category,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-          regular_quantity: item.quantity,
-          special_quantity: 0,
-          free_quantity: item.freeQuantity || 0,
-          total: itemTotal,
-          is_special_offer: false,
-          special_price_active: false
-        };
+        effectivePrice = item.product.price;
       }
+      
+      return {
+        id: item.product.id,
+        category: item.product.category,
+        name: item.product.name,
+        price: item.product.price,
+        effective_price: isSpecialActive ? specialPrice : (isFreeActive ? 0 : item.product.price),
+        special_label: isSpecialActive ? specialLabel : (isFreeActive ? 'FREE' : null),
+        quantity: item.quantity,
+        regular_quantity: regularCount,
+        special_quantity: specialCount,
+        free_quantity: freeCount,
+        total: itemTotal,
+        is_special_offer: isSpecialActive,
+        is_free_offer: isFreeActive,
+        offer_state: item.offerState || 0,
+        special_price_active: isSpecialActive
+      };
     });
 
     const transaction = {
@@ -5657,6 +5953,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
         const product = products.find(p => p.id == item.id);
         if (product) {
           const oldStock = product.stock;
+          // ✅ Deduct total quantity (including free items - they still come from stock)
           const newStock = oldStock - item.quantity;
           product.stock = newStock;
           
