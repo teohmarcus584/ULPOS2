@@ -2095,176 +2095,6 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 #syncStatus {
   display: none !important;
 }
-/* Auto-save price input styling */
-.price-input-auto {
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-}
-
-.price-input-auto:focus {
-  outline: none;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important;
-  background: #f8fafc;
-}
-
-.price-input-auto:hover {
-  border-color: #94a3b8 !important;
-}
-
-.price-save-status {
-  font-size: 0.7rem;
-  min-width: 70px;
-  display: inline-block;
-  transition: all 0.3s ease;
-}
-
-.price-save-status.saving {
-  color: #f59e0b !important;
-  animation: pulse-status 0.8s ease-in-out infinite;
-}
-
-.price-save-status.saved {
-  color: #10b981 !important;
-}
-
-.price-save-status.error {
-  color: #ef4444 !important;
-}
-
-@keyframes pulse-status {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-/* Special Price Button for 100ML PERFUME EDP */
-.special-price-btn {
-  background: #f1f5f9;
-  border: 2px solid #e2e8f0;
-  border-radius: 30px;
-  padding: 6px 16px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #1e293b;
-  min-width: 90px;
-  touch-action: manipulation;
-}
-
-.special-price-btn:hover {
-  background: #e2e8f0;
-  transform: translateY(-1px);
-}
-
-.special-price-btn.active {
-  background: #dc2626;
-  color: white;
-  border-color: #dc2626;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-}
-
-.special-price-btn.active:hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-
-.special-price-btn:active {
-  transform: scale(0.95);
-}
-
-.special-price-hint {
-  font-size: 0.6rem;
-  color: #94a3b8;
-  margin-top: 2px;
-}
-/* Special Price Buttons - Different Colors */
-.special-price-btn {
-  border: 2px solid #e2e8f0;
-  border-radius: 30px;
-  padding: 6px 16px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #1e293b;
-  min-width: 90px;
-  touch-action: manipulation;
-  background: #f1f5f9;
-}
-
-.special-price-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.special-price-btn:active {
-  transform: scale(0.95);
-}
-
-.special-price-btn.active {
-  color: white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
-
-.special-price-btn.active:hover {
-  opacity: 0.9;
-}
-
-.special-price-hint {
-  font-size: 0.6rem;
-  color: #94a3b8;
-  margin-top: 2px;
-}
-
-/* Cart item special styling */
-.cart-item-special {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-/* Special Price Buttons - 3-state cycling */
-.special-price-btn {
-  border: 2px solid #e2e8f0;
-  border-radius: 30px;
-  padding: 6px 16px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: #1e293b;
-  min-width: 90px;
-  touch-action: manipulation;
-  background: #f1f5f9;
-}
-
-.special-price-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.special-price-btn:active {
-  transform: scale(0.95);
-}
-
-.special-price-btn.active {
-  color: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-}
-
-.special-price-btn.active:hover {
-  opacity: 0.9;
-  transform: translateY(-2px);
-}
-
-/* Free state specific styling */
-.special-price-btn[style*="background: #f59e0b"] {
-  animation: pulse-gold 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse-gold {
-  0%, 100% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
-  50% { box-shadow: 0 4px 20px rgba(245, 158, 11, 0.6); }
-}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -3804,11 +3634,12 @@ function renderProductGrid() {
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
     let categories = [...new Set(products.map(p => p.category))];
     
-    // Apply store filter to categories
+    // Apply store filter to categories - ✅ FIXED for both old and new stores
     if (storeFilterActive && !showAllProductsInInventory) {
       const storeObj = stores.find(s => s.store_id === currentStore);
-      let availabilityKey = `available_${currentStore}`;
+      let availabilityKey = `available_${currentStore}`; // Default for old stores
       
+      // If store has a slot, use slot-based field
       if (storeObj && storeObj.slot_number) {
         const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
         availabilityKey = `available_store_${slotNumStr}`;
@@ -3872,11 +3703,13 @@ function renderProductGrid() {
   // Apply ALL filters
   let filtered = products.slice();
   
-  // 1. Store filter
+  // 1. Store filter (only in normal mode, not when "Show All" is active)
+  // ✅ FIXED for both old and new stores
   if (storeFilterActive && !showAllProductsInInventory && !inventoryMode) {
     const storeObj = stores.find(s => s.store_id === currentStore);
-    let availabilityKey = `available_${currentStore}`;
+    let availabilityKey = `available_${currentStore}`; // Default for old stores
     
+    // If store has a slot, use slot-based field
     if (storeObj && storeObj.slot_number) {
       const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
       availabilityKey = `available_store_${slotNumStr}`;
@@ -3945,13 +3778,14 @@ function renderProductGrid() {
   }
   
   // ============================================================
-  // INVENTORY MODE - Checkbox style store availability WITH AUTO-SAVE PRICE
+  // INVENTORY MODE - Checkbox style store availability
   // ============================================================
   if (inventoryMode) {
     filtered.forEach(prod => {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
       
+      // Determine if any store is available (check both old and new systems)
       let anyStoreAvailable = false;
       stores.forEach(s => {
         let field = `available_${s.store_id}`;
@@ -3969,13 +3803,7 @@ function renderProductGrid() {
           <div style="flex: 1; min-width: 150px;">
             <div class="product-name" style="font-weight: 600; font-size: 1rem;">${escapeHtml(prod.name)} ${!anyStoreAvailable ? '🚫' : ''}</div>
             <div class="product-category" style="font-size: 0.8rem; color: #64748b;">${escapeHtml(prod.category)}</div>
-            <div style="display: flex; align-items: center; gap: 6px; margin: 6px 0;">
-              <span style="font-size: 0.85rem; color: #64748b; font-weight: 600;">RM</span>
-              <input type="number" class="price-input-auto" data-id="${prod.id}" 
-                     value="${prod.price.toFixed(2)}" step="0.01" min="0" 
-                     style="width: 110px; padding: 6px 10px; border-radius: 8px; border: 2px solid #cbd5e1; font-size: 1.1rem; font-weight: 700; color: #2c7a4b; text-align: right; background: white; transition: border-color 0.2s, background 0.2s;">
-              <span class="price-save-status" data-id="${prod.id}" style="font-size: 0.7rem; color: #94a3b8; min-width: 60px;">✓ Saved</span>
-            </div>
+            <div class="product-price" style="font-size: 1.1rem; color: #2c7a4b; font-weight: 700;">RM ${prod.price.toFixed(2)}</div>
             <div style="font-size: 0.8rem; margin-top: 4px;">
               📦 Stock: <strong>${prod.stock}</strong>
               ${prod.stock <= 0 ? ' 🔴 OUT OF STOCK' : prod.stock < 5 ? ' ⚠️ Low Stock' : ''}
@@ -3986,7 +3814,10 @@ function renderProductGrid() {
             <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
             
             ${stores.map(store => {
-              let availabilityField = `available_${store.store_id}`;
+              // ✅ Determine which field to use
+              let availabilityField = `available_${store.store_id}`; // Default for old stores
+              
+              // If store has a slot, use slot-based field
               if (store.slot_number) {
                 const slotNumStr = String(store.slot_number).padStart(2, '0');
                 availabilityField = `available_store_${slotNumStr}`;
@@ -3994,6 +3825,7 @@ function renderProductGrid() {
               
               const isAvailable = prod[availabilityField] !== false;
               const storeName = store.name;
+              // Get emoji for store
               let emoji = '🏪';
               if (store.store_id === 'queens') emoji = '🏬';
               else if (store.store_id === 'sunshine') emoji = '☀️';
@@ -4028,15 +3860,17 @@ function renderProductGrid() {
     productGridEl.innerHTML = html;
     productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
     
+    // ✅ Attach inventory mode event listeners
     attachInventoryEvents();
+    
+    // ✅ Attach store availability checkbox events
     attachStoreAvailabilityEvents();
-    attachAutoPriceUpdateEvents();
     
     return;
   }
   
   // ============================================================
-  // NORMAL SALES MODE - Clean display with special offer badges
+  // NORMAL SALES MODE - Clean display, NO badges
   // ============================================================
   filtered.forEach(prod => {
     let additionalClass = '';
@@ -4044,30 +3878,11 @@ function renderProductGrid() {
       additionalClass = 'out-of-stock-card';
     }
     
-    // ✅ Add special badge based on category
-    let specialBadge = '';
-    let badgeColor = '';
-    let badgeText = '';
-    
-    if (prod.category === "100ML PERFUME EDP" || prod.category === "50ML PERFUME EDP") {
-      badgeColor = '#dc2626';
-      badgeText = 'RM 1 OFFER';
-    } else if (prod.category === "15ML PERFUME EDP") {
-      badgeColor = '#059669';
-      badgeText = 'RM 10 OFFER';
-    } else if (prod.category === "CAR AROMATIC") {
-      badgeColor = '#8b5cf6';
-      badgeText = 'RM 5 OFFER';
-    }
-    
-    if (badgeText) {
-      specialBadge = ` <span style="background:${badgeColor}; color:white; font-size:0.6rem; padding:2px 8px; border-radius:10px; margin-left:4px; font-weight:600;">${badgeText}</span>`;
-    }
-    
+    // No availability badge in sales mode
     const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
     
     html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
-      <div class="product-name">${escapeHtml(prod.name)}${specialBadge}</div>
+      <div class="product-name">${escapeHtml(prod.name)}</div>
       <div class="product-category">${escapeHtml(prod.category)}</div>
       <div class="product-price">RM ${prod.price.toFixed(2)}</div>
       <div class="product-stock">${stockStatus}</div>
@@ -4093,237 +3908,7 @@ function renderProductGrid() {
 // ============================================================
 // HELPER FUNCTIONS FOR INVENTORY MODE
 // ============================================================
-// ==================== AUTO-SAVE PRICE UPDATE FUNCTIONS ====================
 
-// ==================== AUTO-SAVE PRICE UPDATE FUNCTIONS ====================
-
-// Debounce map for price saves
-const priceDebounceMap = {};
-
-function attachAutoPriceUpdateEvents() {
-  document.querySelectorAll('.price-input-auto').forEach(input => {
-    const productId = input.dataset.id;
-    
-    // Remove old listeners to prevent duplicates
-    if (input._priceInputHandler) {
-      input.removeEventListener('input', input._priceInputHandler);
-    }
-    if (input._priceBlurHandler) {
-      input.removeEventListener('blur', input._priceBlurHandler);
-    }
-    if (input._priceKeydownHandler) {
-      input.removeEventListener('keydown', input._priceKeydownHandler);
-    }
-    
-    // Create new handlers
-    input._priceInputHandler = function(e) {
-      const product = products.find(p => p.id == productId);
-      if (!product) return;
-      
-      const newPrice = parseFloat(this.value);
-      
-      // Validate
-      if (isNaN(newPrice) || newPrice < 0) {
-        this.style.borderColor = '#ef4444';
-        this.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
-        updatePriceStatus(productId, false, '⚠️ Invalid');
-        return;
-      }
-      
-      // Remove error state
-      this.style.borderColor = '#cbd5e1';
-      this.style.boxShadow = 'none';
-      
-      // Only trigger save if price changed
-      if (newPrice !== product.price) {
-        updatePriceStatus(productId, false, '⏳ Saving...');
-        debouncePriceSave(productId, this);
-      }
-    };
-    
-    input._priceBlurHandler = function(e) {
-      const product = products.find(p => p.id == productId);
-      if (!product) return;
-      
-      const newPrice = parseFloat(this.value);
-      
-      // Only update if price actually changed and is valid
-      if (!isNaN(newPrice) && newPrice !== product.price && newPrice >= 0) {
-        // Clear any pending debounce and save immediately
-        if (priceDebounceMap[productId]) {
-          clearTimeout(priceDebounceMap[productId]);
-          delete priceDebounceMap[productId];
-        }
-        updateProductPriceAuto(productId, this);
-      } else if (!isNaN(newPrice) && newPrice >= 0) {
-        // Reset display if same or invalid
-        this.value = product.price.toFixed(2);
-        updatePriceStatus(productId, true);
-      }
-    };
-    
-    input._priceKeydownHandler = function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const product = products.find(p => p.id == productId);
-        if (!product) return;
-        
-        const newPrice = parseFloat(this.value);
-        if (!isNaN(newPrice) && newPrice >= 0 && newPrice !== product.price) {
-          // Clear any pending debounce
-          if (priceDebounceMap[productId]) {
-            clearTimeout(priceDebounceMap[productId]);
-            delete priceDebounceMap[productId];
-          }
-          updateProductPriceAuto(productId, this);
-        } else {
-          this.value = product.price.toFixed(2);
-          updatePriceStatus(productId, true);
-        }
-      }
-    };
-    
-    input.addEventListener('input', input._priceInputHandler);
-    input.addEventListener('blur', input._priceBlurHandler);
-    input.addEventListener('keydown', input._priceKeydownHandler);
-  });
-}
-
-function debouncePriceSave(productId, input) {
-  // Clear existing debounce
-  if (priceDebounceMap[productId]) {
-    clearTimeout(priceDebounceMap[productId]);
-    delete priceDebounceMap[productId];
-  }
-  
-  // Set new debounce (500ms delay)
-  priceDebounceMap[productId] = setTimeout(async () => {
-    await updateProductPriceAuto(productId, input);
-    delete priceDebounceMap[productId];
-  }, 500);
-}
-
-async function updateProductPriceAuto(productId, input) {
-  const newPrice = parseFloat(input.value);
-  
-  // Validate
-  if (isNaN(newPrice) || newPrice < 0) {
-    const product = products.find(p => p.id == productId);
-    if (product) {
-      input.value = product.price.toFixed(2);
-      input.style.borderColor = '#ef4444';
-      input.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
-      updatePriceStatus(productId, false, '⚠️ Invalid');
-    }
-    return false;
-  }
-  
-  // Find the product
-  const product = products.find(p => p.id == productId);
-  if (!product) {
-    return false;
-  }
-  
-  // Check if price actually changed
-  const oldPrice = product.price;
-  if (Math.abs(newPrice - oldPrice) < 0.001) {
-    updatePriceStatus(productId, true);
-    return true;
-  }
-  
-  try {
-    // Update in Supabase
-    const { data, error } = await supabase
-      .from('products')
-      .update({ 
-        price: newPrice 
-      })
-      .eq('id', productId)
-      .select();
-    
-    if (error) {
-      throw error;
-    }
-    
-    // Update local product object
-    product.price = newPrice;
-    input.value = newPrice.toFixed(2);
-    
-    // Store the old price for reverting if needed
-    input.dataset.oldPrice = oldPrice;
-    
-    // Show success state
-    input.style.borderColor = '#10b981';
-    input.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.2)';
-    updatePriceStatus(productId, true, '✅ Saved');
-    
-    // Reset border after 1.5 seconds
-    setTimeout(() => {
-      if (input) {
-        input.style.borderColor = '#cbd5e1';
-        input.style.boxShadow = 'none';
-      }
-    }, 1500);
-    
-    // Sync after price update
-    if (window._priceSyncTimeout) {
-      clearTimeout(window._priceSyncTimeout);
-    }
-    window._priceSyncTimeout = setTimeout(async () => {
-      try {
-        await backgroundSync(true);
-      } catch (syncErr) {
-        // Silent fail - don't show errors to user
-      }
-      window._priceSyncTimeout = null;
-    }, 1000);
-    
-    return true;
-    
-  } catch (err) {
-    // Revert the local product price
-    product.price = oldPrice;
-    input.value = oldPrice.toFixed(2);
-    
-    // Show error state
-    input.style.borderColor = '#ef4444';
-    input.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
-    updatePriceStatus(productId, false, '❌ Failed');
-    
-    setTimeout(() => {
-      if (input) {
-        input.style.borderColor = '#cbd5e1';
-        input.style.boxShadow = 'none';
-        updatePriceStatus(productId, true);
-      }
-    }, 3000);
-    
-    return false;
-  }
-}
-
-function updatePriceStatus(productId, isSaved, customMessage = null) {
-  const statusElements = document.querySelectorAll(`.price-save-status[data-id="${productId}"]`);
-  
-  statusElements.forEach(status => {
-    if (customMessage) {
-      status.textContent = customMessage;
-      if (customMessage.includes('✅') || customMessage === '✓ Saved' || customMessage === '✅ Saved') {
-        status.style.color = '#10b981';
-      } else if (customMessage.includes('⚠️') || customMessage.includes('❌')) {
-        status.style.color = '#ef4444';
-      } else if (customMessage.includes('⏳')) {
-        status.style.color = '#f59e0b';
-      }
-    } else if (isSaved) {
-      status.textContent = '✅ Saved';
-      status.style.color = '#10b981';
-    } else {
-      status.textContent = '⏳ Saving...';
-      status.style.color = '#f59e0b';
-    }
-  });
-}
 function attachInventoryEvents() {
   // Stock decrement buttons
   document.querySelectorAll('.dec-stock').forEach(btn => {
@@ -5008,50 +4593,8 @@ function addToCart(product) {
   if (existing) {
     existing.quantity += 1;
     if (existing.freeQuantity > existing.quantity) existing.freeQuantity = existing.quantity;
-    // ✅ If special price was active, check if we need to adjust specialQuantity
-    if (existing.isSpecialOffer && existing.specialPriceActive) {
-      if (existing.specialQuantity > 1) {
-        existing.specialQuantity = 1;
-      }
-    }
-    // ✅ Reset free quantity if it exceeds quantity
-    if (existing.freeQuantity > existing.quantity) {
-      existing.freeQuantity = existing.quantity;
-    }
   } else {
-    // ✅ Check which special offer this product qualifies for
-    let specialPrice = null;
-    let specialLabel = null;
-    let offerType = 'none'; // 'special', 'free', 'none'
-    
-    if (product.category === "100ML PERFUME EDP" || product.category === "50ML PERFUME EDP") {
-      specialPrice = 1;
-      specialLabel = "RM 1";
-      offerType = 'special';
-    } else if (product.category === "15ML PERFUME EDP") {
-      specialPrice = 10;
-      specialLabel = "RM 10";
-      offerType = 'special';
-    } else if (product.category === "CAR AROMATIC") {
-      specialPrice = 5;
-      specialLabel = "RM 5";
-      offerType = 'special';
-    }
-    
-    const isSpecialOffer = specialPrice !== null;
-    
-    cart.push({ 
-      product: { ...product }, 
-      quantity: 1, 
-      freeQuantity: 0,
-      isSpecialOffer: isSpecialOffer,
-      specialPriceActive: false,
-      specialQuantity: 0,
-      specialPrice: specialPrice,
-      specialLabel: specialLabel,
-      offerType: offerType,  // 'special' or 'free' or 'none'
-      offerState: 0  // 0=normal, 1=special, 2=free
-    });
+    cart.push({ product: { ...product }, quantity: 1, freeQuantity: 0 });
   }
   updateCartUI();
   clearPromo();
@@ -5105,173 +4648,32 @@ function updateCartUI() {
   let html = '';
   let subtotal = 0;
   cart.forEach((item, idx) => {
-    // ✅ Calculate effective pricing based on state
-    let regularCount = item.quantity;
-    let specialCount = 0;
-    let freeCount = item.freeQuantity || 0;
-    let specialPrice = item.specialPrice || 1;
-    let regularPrice = item.product.price;
-    let effectivePrice = regularPrice;
-    let itemTotal = 0;
-    
-    // ✅ Check if this is a 3-state item (CAR AROMATIC or 15ML PERFUME EDP)
-    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-    
-    if (isThreeStateItem) {
-      // 3-state cycling
-      if (item.offerState === 1) {
-        // Special price state
-        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-        regularCount = item.quantity - specialCount;
-        const regularTotal = regularCount * regularPrice;
-        const specialTotal = specialCount * specialPrice;
-        itemTotal = regularTotal + specialTotal;
-        effectivePrice = specialPrice;
-      } else if (item.offerState === 2) {
-        // Free gift state - one unit is free
-        freeCount = Math.min(1, item.quantity);
-        const paidCount = item.quantity - freeCount;
-        itemTotal = paidCount * regularPrice;
-        effectivePrice = 0; // Free
-      } else {
-        // Normal state
-        itemTotal = item.quantity * regularPrice;
-        effectivePrice = regularPrice;
-        freeCount = 0;
-      }
-    } else if (item.isSpecialOffer && item.specialPriceActive) {
-      // 2-state items (100ML and 50ML PERFUME EDP)
-      specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-      regularCount = item.quantity - specialCount;
-      const regularTotal = regularCount * regularPrice;
-      const specialTotal = specialCount * specialPrice;
-      itemTotal = regularTotal + specialTotal;
-      effectivePrice = specialPrice;
-      freeCount = 0; // No free items when special is active
-    } else {
-      // Normal items
-      const paidUnits = item.quantity - freeCount;
-      itemTotal = paidUnits * regularPrice;
-      effectivePrice = regularPrice;
-    }
-    
+    const paidUnits = item.quantity - item.freeQuantity;
+    const itemTotal = paidUnits * item.product.price;
     subtotal += itemTotal;
-    
     const categoryDisplay = item.product.category
       ? `<div class="cart-item-category">${escapeHtml(item.product.category)}</div>`
       : '';
-    
-    // ✅ Determine which button to show based on item type
-    let buttonHtml = '';
-    
-    if (isThreeStateItem) {
-      // 3-state button for CAR AROMATIC and 15ML PERFUME EDP
-      let stateText = '';
-      let stateColor = '';
-      let bgColor = '';
-      
-      if (item.offerState === 0) {
-        stateText = `🏷️ ${item.specialLabel}`;
-        stateColor = '#1e293b';
-        bgColor = '#f1f5f9';
-      } else if (item.offerState === 1) {
-        stateText = `🔄 ${item.specialLabel} ✓`;
-        stateColor = 'white';
-        bgColor = getSpecialPriceColor(item.specialPrice);
-      } else if (item.offerState === 2) {
-        stateText = `🎁 FREE ✓`;
-        stateColor = 'white';
-        bgColor = '#f59e0b';
-      }
-      
-      buttonHtml = `
-        <div class="cart-item-special">
-          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}" 
-                  style="${item.offerState > 0 ? `background: ${bgColor}; border-color: ${bgColor}; color: ${stateColor};` : ''}">
-            ${stateText}
-          </button>
-          <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-            ${item.offerState === 0 ? 'Click for special price' : 
-              item.offerState === 1 ? `${item.specialLabel} on 1 unit` : 
-              '1 unit FREE'}
-            (Click to cycle)
-          </span>
-        </div>
-      `;
-    } else if (item.isSpecialOffer) {
-      // 2-state button for 100ML and 50ML PERFUME EDP
-      const isActive = item.specialPriceActive;
-      const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
-      const label = item.specialLabel || `RM ${item.specialPrice}`;
-      const bgColor = getSpecialPriceColor(item.specialPrice);
-      
-      buttonHtml = `
-        <div class="cart-item-special">
-          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}" 
-                  style="${isActive ? `background: ${bgColor}; border-color: ${bgColor}; color: white;` : ''}">
-            ${isActive ? `🔄 ${label} ✓ (${specialCountDisplay} unit)` : `🏷️ AT ${label}`}
-          </button>
-          <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-            ${isActive ? `${specialCountDisplay} unit at ${label}, ${regularCount} at RM ${regularPrice.toFixed(2)}` : `Click for ${label} on 1 unit`}
-          </span>
-        </div>
-      `;
-    } else {
-      // Regular free gift button
-      const freeClass = item.freeQuantity > 0 ? 'active' : '';
-      const buttonText = item.freeQuantity > 0 
-        ? `🎁 ${item.freeQuantity} Free` 
-        : '🎁 Activate Free Gift';
-      buttonHtml = `
-        <div class="cart-item-free">
-          <button class="free-toggle-btn ${freeClass}" data-index="${idx}">${buttonText}</button>
-        </div>
-      `;
-    }
-    
-    // Build price display
-    let priceDisplay = '';
-    let priceColor = '';
-    let specialBadge = '';
-    
-    if (isThreeStateItem) {
-      if (item.offerState === 1) {
-        priceColor = getSpecialPriceColor(item.specialPrice);
-        priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
-        specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
-      } else if (item.offerState === 2) {
-        priceColor = '#f59e0b';
-        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
-        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 FREE</span>`;
-      } else {
-        priceDisplay = `RM ${regularPrice.toFixed(2)}`;
-      }
-    } else if (item.isSpecialOffer && item.specialPriceActive) {
-      priceColor = getSpecialPriceColor(item.specialPrice);
-      priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
-      specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
-    } else {
-      priceDisplay = `RM ${regularPrice.toFixed(2)}`;
-    }
-    
-    const totalDisplay = itemTotal.toFixed(2);
-    
+    const freeClass = item.freeQuantity > 0 ? 'active' : '';
+    const buttonText = item.freeQuantity > 0 
+      ? `🎁 ${item.freeQuantity} Free` 
+      : '🎁 Activate Free Gift';
     html += `
       <div class="cart-item" data-index="${idx}">
         <div class="cart-item-info">
           <div class="cart-item-name">${escapeHtml(item.product.name)}</div>
           ${categoryDisplay}
-          <div class="cart-item-price" style="${(item.offerState > 0 || (item.isSpecialOffer && item.specialPriceActive)) ? `color:${priceColor || '#dc2626'}; font-weight:700;` : ''}">
-            ${priceDisplay}${specialBadge}
-          </div>
+          <div class="cart-item-price">RM ${item.product.price.toFixed(2)}</div>
         </div>
-        ${buttonHtml}
+        <div class="cart-item-free">
+          <button class="free-toggle-btn ${freeClass}" data-index="${idx}">${buttonText}</button>
+        </div>
         <div class="cart-item-qty">
           <button class="qty-btn" data-index="${idx}" data-delta="-1">−</button>
           <span>${item.quantity}</span>
           <button class="qty-btn" data-index="${idx}" data-delta="1">+</button>
         </div>
-        <div class="cart-item-total">RM ${totalDisplay}</div>
+        <div class="cart-item-total">RM ${itemTotal.toFixed(2)}</div>
         <button class="remove-item" data-index="${idx}">✕</button>
       </div>
     `;
@@ -5280,18 +4682,15 @@ function updateCartUI() {
 
   subtotalSpan.innerText = `RM ${subtotal.toFixed(2)}`;
 
-  // Calculate staff discount
   if (staffDiscountActive) {
     staffDiscount = subtotal * 0.10;
   } else {
     staffDiscount = 0;
   }
 
-  // Calculate total with all discounts
   const totalPromoDiscount = buy2Free1Discount + buy3Free1Discount + customDiscount + staffDiscount;
   const total = subtotal - discountAmount - totalPromoDiscount;
 
-  // Update discount rows
   if (discountAmount > 0) {
     discountRow.style.display = 'flex';
     discountAmountSpan.innerText = `RM ${discountAmount.toFixed(2)}`;
@@ -5331,115 +4730,30 @@ function updateCartUI() {
 
   totalSpan.innerText = `RM ${total.toFixed(2)}`;
 
-  // Event listeners
   document.querySelectorAll('.qty-btn').forEach(btn => {
-    btn.removeEventListener('click', handleQtyClick);
-    btn.addEventListener('click', handleQtyClick);
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.index);
+      const delta = parseInt(btn.dataset.delta);
+      if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
+      e.stopPropagation();
+    });
   });
-  
   document.querySelectorAll('.remove-item').forEach(btn => {
-    btn.removeEventListener('click', handleRemoveClick);
-    btn.addEventListener('click', handleRemoveClick);
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.index);
+      if (!isNaN(idx)) removeCartItem(idx);
+      e.stopPropagation();
+    });
   });
-  
   document.querySelectorAll('.free-toggle-btn').forEach(btn => {
-    btn.removeEventListener('click', handleFreeToggle);
-    btn.addEventListener('click', handleFreeToggle);
-  });
-  
-  document.querySelectorAll('.special-price-btn').forEach(btn => {
-    btn.removeEventListener('click', handleSpecialPriceClick);
-    btn.addEventListener('click', handleSpecialPriceClick);
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.index);
+      if (!isNaN(idx)) toggleFreeCount(idx);
+      e.stopPropagation();
+    });
   });
 }
 
-// Helper functions for event handlers
-function handleQtyClick(e) {
-  const idx = parseInt(this.dataset.index);
-  const delta = parseInt(this.dataset.delta);
-  if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
-  e.stopPropagation();
-}
-
-function handleRemoveClick(e) {
-  const idx = parseInt(this.dataset.index);
-  if (!isNaN(idx)) removeCartItem(idx);
-  e.stopPropagation();
-}
-
-function handleFreeToggle(e) {
-  const idx = parseInt(this.dataset.index);
-  if (!isNaN(idx)) toggleFreeCount(idx);
-  e.stopPropagation();
-}
-
-function handleSpecialPriceClick(e) {
-  const idx = parseInt(this.dataset.index);
-  if (!isNaN(idx)) toggleSpecialPrice(idx);
-  e.stopPropagation();
-}
-
-// Helper function to get color based on special price
-function getSpecialPriceColor(specialPrice) {
-  if (specialPrice === 1) return '#dc2626';      // Red for RM 1
-  if (specialPrice === 5) return '#8b5cf6';      // Purple for RM 5
-  if (specialPrice === 10) return '#059669';     // Green for RM 10
-  return '#dc2626'; // Default red
-}
-function toggleSpecialPrice(index) {
-  const item = cart[index];
-  if (!item) return;
-  
-  // ✅ For 100ML and 50ML PERFUME EDP - simple toggle (special on/off)
-  if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
-    // Toggle special price
-    item.specialPriceActive = !item.specialPriceActive;
-    if (item.specialPriceActive) {
-      item.specialQuantity = 1;
-      item.freeQuantity = 0; // Remove any free items
-    } else {
-      item.specialQuantity = 0;
-    }
-    updateCartUI();
-    return;
-  }
-  
-  // ✅ For CAR AROMATIC and 15ML PERFUME EDP - 3-state cycling
-  if (item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP") {
-    // Cycle states: 0=normal → 1=special → 2=free → 0=normal
-    item.offerState = (item.offerState + 1) % 3;
-    
-    if (item.offerState === 0) {
-      // Normal state
-      item.specialPriceActive = false;
-      item.specialQuantity = 0;
-      item.freeQuantity = 0;
-    } else if (item.offerState === 1) {
-      // Special price state (RM 5 or RM 10)
-      item.specialPriceActive = true;
-      item.specialQuantity = 1;
-      item.freeQuantity = 0;
-    } else if (item.offerState === 2) {
-      // Free gift state
-      item.specialPriceActive = false;
-      item.specialQuantity = 0;
-      item.freeQuantity = 1; // One free unit
-    }
-    
-    updateCartUI();
-    return;
-  }
-  
-  // ✅ Default toggle for other items
-  item.specialPriceActive = !item.specialPriceActive;
-  if (item.specialPriceActive) {
-    item.specialQuantity = 1;
-    item.freeQuantity = 0;
-  } else {
-    item.specialQuantity = 0;
-  }
-  updateCartUI();
-}
 function updateQuantity(index, delta) {
   const item = cart[index];
   if (!item) return;
@@ -5449,24 +4763,6 @@ function updateQuantity(index, delta) {
   } else {
     item.quantity = newQty;
     if (item.freeQuantity > newQty) item.freeQuantity = newQty;
-    
-    // ✅ If special price is active, ensure specialQuantity doesn't exceed total quantity
-    if (item.isSpecialOffer && item.specialPriceActive) {
-      if (item.specialQuantity > newQty) {
-        item.specialQuantity = newQty;
-      }
-      if (item.specialQuantity < 1) {
-        item.specialQuantity = 1;
-      }
-    }
-    
-    // ✅ If 3-state item, ensure states are valid
-    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-    if (isThreeStateItem) {
-      if (item.offerState === 2 && item.freeQuantity > newQty) {
-        item.freeQuantity = newQty;
-      }
-    }
   }
   updateCartUI();
   clearPromo();
@@ -5501,23 +4797,12 @@ async function startCheckout() {
     return;
   }
 
-  // ✅ Calculate subtotal with special pricing (mixed pricing)
+  // Calculate subtotal
   let subtotal = 0;
   for (let item of cart) {
-    if (item.isSpecialOffer && item.specialPriceActive) {
-      // ✅ Only ONE unit gets special price, the rest at regular price
-      const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-      const regularCount = item.quantity - specialCount;
-      const regularTotal = regularCount * item.product.price;
-      const specialTotal = specialCount * (item.specialPrice || 1);
-      subtotal += regularTotal + specialTotal;
-    } else {
-      const paidQty = item.quantity - (item.freeQuantity || 0);
-      subtotal += paidQty * item.product.price;
-    }
+    const paidQty = item.quantity - item.freeQuantity;
+    subtotal += paidQty * item.product.price;
   }
-
-  console.log('💰 Cart Subtotal (with special pricing):', subtotal);
 
   // Calculate discounts
   let effectiveStaffDiscount = 0;
@@ -5774,94 +5059,15 @@ async function completeCheckout(paymentMethod, cashReceived) {
     const salesPersonName = selectedOption ? selectedOption.text.split(' (ID:')[0] : '';
     const salesPersonId = salesPersonSelect.value;
 
-    // ✅ Calculate sale items with all special offers
-    const saleItems = cart.map(item => {
-      // ✅ Check which special offer this product qualifies for
-      let specialPrice = null;
-      let specialLabel = null;
-      
-      if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
-        specialPrice = 1;
-        specialLabel = "RM 1";
-      } else if (item.product.category === "15ML PERFUME EDP") {
-        specialPrice = 10;
-        specialLabel = "RM 10";
-      } else if (item.product.category === "CAR AROMATIC") {
-        specialPrice = 5;
-        specialLabel = "RM 5";
-      }
-      
-      const isEligibleForSpecial = specialPrice !== null;
-      const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-      
-      // ✅ Calculate effective price based on state
-      let specialCount = 0;
-      let regularCount = item.quantity;
-      let freeCount = item.freeQuantity || 0;
-      let itemTotal = 0;
-      let isSpecialActive = false;
-      let isFreeActive = false;
-      let effectivePrice = item.product.price;
-      
-      if (isThreeStateItem) {
-        // 3-state cycling for CAR AROMATIC and 15ML PERFUME EDP
-        if (item.offerState === 1) {
-          // Special price state
-          specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-          regularCount = item.quantity - specialCount;
-          const regularTotal = regularCount * item.product.price;
-          const specialTotal = specialCount * specialPrice;
-          itemTotal = regularTotal + specialTotal;
-          isSpecialActive = true;
-          effectivePrice = specialPrice;
-        } else if (item.offerState === 2) {
-          // Free gift state - one unit is free
-          freeCount = Math.min(1, item.quantity);
-          const paidCount = item.quantity - freeCount;
-          itemTotal = paidCount * item.product.price;
-          isFreeActive = true;
-          effectivePrice = 0;
-        } else {
-          // Normal state
-          itemTotal = item.quantity * item.product.price;
-          effectivePrice = item.product.price;
-          freeCount = 0;
-        }
-      } else if (isEligibleForSpecial && item.specialPriceActive) {
-        // 2-state items (100ML and 50ML PERFUME EDP)
-        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-        regularCount = item.quantity - specialCount;
-        const regularTotal = regularCount * item.product.price;
-        const specialTotal = specialCount * specialPrice;
-        itemTotal = regularTotal + specialTotal;
-        isSpecialActive = true;
-        effectivePrice = specialPrice;
-        freeCount = 0;
-      } else {
-        // Normal items
-        const paidQty = item.quantity - freeCount;
-        itemTotal = paidQty * item.product.price;
-        effectivePrice = item.product.price;
-      }
-      
-      return {
-        id: item.product.id,
-        category: item.product.category,
-        name: item.product.name,
-        price: item.product.price,
-        effective_price: isSpecialActive ? specialPrice : (isFreeActive ? 0 : item.product.price),
-        special_label: isSpecialActive ? specialLabel : (isFreeActive ? 'FREE' : null),
-        quantity: item.quantity,
-        regular_quantity: regularCount,
-        special_quantity: specialCount,
-        free_quantity: freeCount,
-        total: itemTotal,
-        is_special_offer: isSpecialActive,
-        is_free_offer: isFreeActive,
-        offer_state: item.offerState || 0,
-        special_price_active: isSpecialActive
-      };
-    });
+    const saleItems = cart.map(item => ({
+      id: item.product.id,
+      category: item.product.category,
+      name: item.product.name,
+      price: item.product.price,
+      quantity: item.quantity,
+      free_quantity: item.freeQuantity,
+      total: (item.quantity - item.freeQuantity) * item.product.price
+    }));
 
     const transaction = {
       transaction_id: transactionId,
@@ -5953,7 +5159,6 @@ async function completeCheckout(paymentMethod, cashReceived) {
         const product = products.find(p => p.id == item.id);
         if (product) {
           const oldStock = product.stock;
-          // ✅ Deduct total quantity (including free items - they still come from stock)
           const newStock = oldStock - item.quantity;
           product.stock = newStock;
           
@@ -5995,6 +5200,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
         console.log('✅ Background sync completed after sale');
       } catch (syncErr) {
         console.warn('⚠️ Background sync failed after sale:', syncErr);
+        // Don't block the flow if sync fails
       }
 
       // ✅ Save to Lucky Draw if eligible
@@ -6010,6 +5216,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
         );
         if (claimed) {
           console.log('✅ Prize claimed successfully!');
+          // Show success message
           await showAlertModal('🎉 Prize Claimed!', 
             `The prize "${pendingPrize.name}" has been successfully claimed.\n` +
             `Receipt: ${pendingPrize.receipt}`
@@ -6021,6 +5228,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
             `Please manually claim the prize using the receipt: ${pendingPrize.receipt}`
           );
         }
+        // Clear pending prize
         pendingPrize = null;
         claimedReceiptInfo = null;
       }
