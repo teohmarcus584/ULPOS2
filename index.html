@@ -2095,6 +2095,301 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 #syncStatus {
   display: none !important;
 }
+/* Auto-save price input styling */
+.price-input-auto {
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.price-input-auto:focus {
+  outline: none;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important;
+  background: #f8fafc;
+}
+
+.price-input-auto:hover {
+  border-color: #94a3b8 !important;
+}
+
+.price-save-status {
+  font-size: 0.7rem;
+  min-width: 70px;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.price-save-status.saving {
+  color: #f59e0b !important;
+  animation: pulse-status 0.8s ease-in-out infinite;
+}
+
+.price-save-status.saved {
+  color: #10b981 !important;
+}
+
+.price-save-status.error {
+  color: #ef4444 !important;
+}
+
+@keyframes pulse-status {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+/* Special Price Button for 100ML PERFUME EDP */
+.special-price-btn {
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #1e293b;
+  min-width: 90px;
+  touch-action: manipulation;
+}
+
+.special-price-btn:hover {
+  background: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.special-price-btn.active {
+  background: #dc2626;
+  color: white;
+  border-color: #dc2626;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.special-price-btn.active:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.special-price-btn:active {
+  transform: scale(0.95);
+}
+
+.special-price-hint {
+  font-size: 0.6rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+/* Special Price Buttons - Different Colors */
+.special-price-btn {
+  border: 2px solid #e2e8f0;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #1e293b;
+  min-width: 90px;
+  touch-action: manipulation;
+  background: #f1f5f9;
+}
+
+.special-price-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.special-price-btn:active {
+  transform: scale(0.95);
+}
+
+.special-price-btn.active {
+  color: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.special-price-btn.active:hover {
+  opacity: 0.9;
+}
+
+.special-price-hint {
+  font-size: 0.6rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* Cart item special styling */
+.cart-item-special {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* Special Price Buttons - 3-state cycling */
+.special-price-btn {
+  border: 2px solid #e2e8f0;
+  border-radius: 30px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #1e293b;
+  min-width: 90px;
+  touch-action: manipulation;
+  background: #f1f5f9;
+}
+
+.special-price-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.special-price-btn:active {
+  transform: scale(0.95);
+}
+
+.special-price-btn.active {
+  color: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.special-price-btn.active:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+/* Free state specific styling */
+.special-price-btn[style*="background: #f59e0b"] {
+  animation: pulse-gold 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 4px 20px rgba(245, 158, 11, 0.6); }
+}
+/* Employee Management - Professional UI */
+#employeeManagementModal .modal-container {
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+
+#employeeManagementModal .modal-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+#employeeFormModal .modal-container {
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+
+#employeeFormModal .modal-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0f172a;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.employee-card {
+  transition: all 0.2s ease;
+}
+
+.employee-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.employee-card .employee-actions button {
+  transition: all 0.2s ease;
+}
+
+.employee-card .employee-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Form inputs focus states */
+#employeeFormModal .modal-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15) !important;
+  outline: none;
+}
+
+#employeeFormModal .modal-input.error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Admin toggle switch style */
+.admin-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-toggle-label:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.admin-toggle-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+/* PIN Toggle Button */
+#togglePinVisibilityBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 8px;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  line-height: 1;
+}
+
+#togglePinVisibilityBtn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+#togglePinVisibilityBtn:active {
+  transform: scale(0.9);
+}
+
+/* PIN Input with toggle */
+#employeePinInput {
+  padding-right: 50px !important;
+}
+
+/* PIN visible state */
+#employeePinInput.pin-visible {
+  letter-spacing: 2px;
+  font-size: 1.2rem;
+}
+
+/* Toggle button when PIN is visible */
+#togglePinVisibilityBtn.pin-visible-btn {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -2243,6 +2538,7 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <button id="sideStockTakeApprovalBtn" class="menu-btn" style="display: none;">✅ Approve Stock Take</button>
     <button id="sideReceiptsBtn" class="menu-btn">📜 Receipts</button>
     <button id="sideDrawerBtn" class="menu-btn">💰 Open Drawer</button>
+	<button id="sideEmployeeBtn" class="menu-btn" style="display: none;">👥 Employees</button>
     <button id="sideChangePinBtn" class="menu-btn">🔑 Change PIN</button>
     <button id="sideStockAlertBtn" class="menu-btn">🔔 Stock Alerts: OFF</button>
     <button id="sideTelegramBtn" class="menu-btn">📱 Telegram Alerts</button>
@@ -2539,6 +2835,85 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <div class="filter-group"><label>Alipay Settlement (Actual)</label><input type="number" id="actualAlipay" class="modal-input" placeholder="Enter actual Alipay settlement" step="0.01"></div>
     <div id="settlementError" style="color:#ef4444; margin: 12px 0; display: none;"></div>
     <div class="modal-buttons"><button id="checkSettlementBtn" class="modal-btn modal-btn-primary">Check</button><button id="recordSettlementBtn" class="modal-btn modal-btn-primary" style="display: none;">Record Settlement</button> <button id="reprintSettlementBtn" class="modal-btn modal-btn-secondary">Settlement History</button><button id="closeSettlementModalBtn" class="modal-btn modal-btn-secondary">Cancel</button></div>
+  </div>
+</div>
+<!-- Employee Management Modal -->
+<div id="employeeManagementModal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 800px;">
+    <span class="close-modal" id="closeEmployeeManagementModal">×</span>
+    <div class="modal-title">👥 Employee Management</div>
+    
+    <!-- Add Employee Button -->
+    <div style="margin-bottom: 20px;">
+      <button id="openAddEmployeeBtn" class="modal-btn modal-btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem; background: linear-gradient(135deg, #059669 0%, #047857 100%); display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <span style="font-size: 1.5rem;">➕</span> Add New Employee
+      </button>
+    </div>
+    
+    <!-- Employee List -->
+    <div style="max-height: 500px; overflow-y: auto;">
+      <h4 style="margin-bottom: 12px;">📋 Current Employees</h4>
+      <div id="employeeListContainer">
+        <div style="text-align:center; padding:20px; color:#94a3b8;">Loading employees...</div>
+      </div>
+    </div>
+    
+    <div class="modal-buttons">
+      <button id="closeEmployeeManagementBtn" class="modal-btn modal-btn-secondary">Close</button>
+    </div>
+  </div>
+</div>
+<!-- Add/Edit Employee Modal -->
+<div id="employeeFormModal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 550px;">
+    <span class="close-modal" id="closeEmployeeFormModal">×</span>
+    <div class="modal-title" id="employeeFormTitle">➕ Add New Employee</div>
+    
+    <div id="employeeFormFields">
+      <!-- Name -->
+      <div class="filter-group" style="margin-bottom: 16px;">
+        <label style="font-weight: 600; color: #1e293b; font-size: 0.95rem;">Full Name <span style="color: #ef4444;">*</span></label>
+        <input type="text" id="employeeNameInput" class="modal-input" placeholder="e.g., John Doe" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem;">
+      </div>
+      
+      <!-- PIN -->
+      <!-- PIN -->
+<div class="filter-group" style="margin-bottom: 16px;">
+  <label style="font-weight: 600; color: #1e293b; font-size: 0.95rem;">PIN Code <span style="color: #ef4444;">*</span></label>
+  <div style="position: relative; display: flex; align-items: center;">
+    <input type="password" id="employeePinInput" class="modal-input" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; letter-spacing: 6px; font-family: monospace; padding-right: 50px;">
+    <button id="togglePinVisibilityBtn" type="button" style="position: absolute; right: 12px; background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #94a3b8; padding: 8px; transition: all 0.2s ease; border-radius: 8px;">
+      👁️
+    </button>
+  </div>
+  <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Enter a 4-digit numeric PIN</div>
+</div>
+      
+      <!-- Store Assignment -->
+      <div class="filter-group" style="margin-bottom: 16px;">
+        <label style="font-weight: 600; color: #1e293b; font-size: 0.95rem;">Assign to Store</label>
+        <select id="employeeStoreSelect" class="modal-input" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 1rem; background: white;">
+          <option value="">-- Select Store (optional) --</option>
+        </select>
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Leave empty for admin users</div>
+      </div>
+      
+      <!-- Admin Toggle -->
+      <div class="filter-group" style="margin-bottom: 16px;">
+        <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px 16px; background: #f8fafc; border-radius: 12px; border: 2px solid #e2e8f0;">
+          <input type="checkbox" id="employeeAdminCheck" style="width: 20px; height: 20px; cursor: pointer; accent-color: #3b82f6;">
+          <span style="font-weight: 500;">👑 Admin Access</span>
+          <span style="font-size: 0.8rem; color: #94a3b8; margin-left: auto;">Grants full system access</span>
+        </label>
+      </div>
+    </div>
+    
+    <div id="employeeFormError" style="color:#ef4444; margin-top: 12px; display: none;"></div>
+    
+    <div class="modal-buttons">
+      <button id="cancelEmployeeFormBtn" class="modal-btn modal-btn-secondary">Cancel</button>
+      <button id="saveEmployeeBtn" class="modal-btn modal-btn-primary" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">💾 Save Employee</button>
+    </div>
   </div>
 </div>
 <!-- Store Management Modal -->
@@ -3026,29 +3401,34 @@ async function switchToEmployee(newEmployee) {
 function applyRoleBasedUI() {
   if (!currentEmployee) return;
 
+  // Admin mode class on body
   if (currentEmployee.isAdmin) {
     document.body.classList.add('admin-mode');
   } else {
     document.body.classList.remove('admin-mode');
   }
 
+  // Side menu buttons - Inventory and Collection (Admin only)
   const sideInventory = document.getElementById('sideInventoryBtn');
   const sideCollection = document.getElementById('sideCollectionBtn');
+  const sideEmployee = document.getElementById('sideEmployeeBtn');
+  const sideStockTakeApproval = document.getElementById('sideStockTakeApprovalBtn');
+  
   if (currentEmployee.isAdmin) {
     if (sideInventory) sideInventory.style.display = 'flex';
     if (sideCollection) sideCollection.style.display = 'flex';
+    if (sideEmployee) sideEmployee.style.display = 'flex';
+    if (sideStockTakeApproval) sideStockTakeApproval.style.display = 'flex';
     storeSelect.disabled = false;
   } else {
     if (sideInventory) sideInventory.style.display = 'none';
     if (sideCollection) sideCollection.style.display = 'none';
+    if (sideEmployee) sideEmployee.style.display = 'none';
+    if (sideStockTakeApproval) sideStockTakeApproval.style.display = 'none';
     storeSelect.disabled = true;
   }
 
-  const approvalBtn = document.getElementById('sideStockTakeApprovalBtn');
-  if (approvalBtn) {
-    approvalBtn.style.display = currentEmployee?.isAdmin ? 'flex' : 'none';
-  }
-
+  // Report Modal - Store and Employee filters (Admin only)
   const reportStoreFilter = document.getElementById('reportStoreFilterGroup');
   const employeeFilterGroup = document.getElementById('employeeFilterGroup');
   if (currentEmployee.isAdmin) {
@@ -3059,6 +3439,7 @@ function applyRoleBasedUI() {
     if (employeeFilterGroup) employeeFilterGroup.style.display = 'none';
   }
 
+  // Report Modal - Payment breakdown rows (Admin only)
   const paymentRows = document.querySelectorAll('#adminReportModal .stat-item.breakdown');
   if (currentEmployee.isAdmin) {
     paymentRows.forEach(row => row.style.display = 'flex');
@@ -3066,6 +3447,7 @@ function applyRoleBasedUI() {
     paymentRows.forEach(row => row.style.display = 'none');
   }
 
+  // Settlement Modal - Store select (Admin only)
   const settlementStoreSelect = document.getElementById('settlementStoreSelect');
   if (settlementStoreSelect) {
     if (!currentEmployee.isAdmin) {
@@ -3076,6 +3458,7 @@ function applyRoleBasedUI() {
     }
   }
 
+  // Settlement Modal - System totals display
   const systemTotalsDiv = document.getElementById('systemTotalsDisplay');
   if (systemTotalsDiv) {
     if (!currentEmployee.isAdmin) {
@@ -3097,6 +3480,87 @@ function applyRoleBasedUI() {
     }
   }
 
+  // Receipts Modal - Employee filter (Admin only)
+  const receiptsEmpFilter = document.getElementById('receiptsEmployeeFilter');
+  const receiptsStoreFilter = document.getElementById('receiptsStoreFilterGroup');
+  if (receiptsEmpFilter && receiptsStoreFilter) {
+    if (currentEmployee.isAdmin) {
+      receiptsEmpFilter.style.display = 'flex';
+      receiptsStoreFilter.style.display = 'flex';
+    } else {
+      receiptsEmpFilter.style.display = 'none';
+      receiptsStoreFilter.style.display = 'flex';
+    }
+  }
+
+  // Receipts Store Select - Disable for non-admin
+  const receiptsStore = document.getElementById('receiptsStoreSelect');
+  if (receiptsStore) {
+    if (!currentEmployee.isAdmin) {
+      receiptsStore.value = currentStore;
+      receiptsStore.disabled = true;
+    } else {
+      receiptsStore.disabled = false;
+    }
+  }
+
+  // Store Management Button (Inventory mode)
+  const manageStoresBtn = document.getElementById('manageStoresBtn');
+  if (manageStoresBtn) {
+    manageStoresBtn.style.display = (currentEmployee.isAdmin && inventoryMode) ? 'inline-flex' : 'none';
+  }
+
+  // Store Filter Toggle Button (Inventory mode)
+  const storeFilterBtn = document.getElementById('storeFilterToggleBtn');
+  if (storeFilterBtn) {
+    if (inventoryMode) {
+      storeFilterBtn.style.display = 'inline-flex';
+    } else {
+      storeFilterBtn.style.display = 'none';
+    }
+  }
+
+  // Low Stock Toggle Button (Inventory mode)
+  const lowStockBtn = document.getElementById('lowStockToggleBtn');
+  if (lowStockBtn) {
+    if (inventoryMode) {
+      lowStockBtn.style.display = 'inline-flex';
+    } else {
+      lowStockBtn.style.display = 'none';
+    }
+  }
+
+  // Edit Product Header Button (Inventory mode)
+  const editProductBtn = document.getElementById('editProductHeaderBtn');
+  if (editProductBtn) {
+    editProductBtn.style.display = inventoryMode ? 'inline-flex' : 'none';
+  }
+
+  // Non-Admin Stats Cards in Report
+  const nonAdminStatsCards = document.getElementById('nonAdminStatsCards');
+  const nonAdminDateRange = document.getElementById('nonAdminDateRange');
+  if (nonAdminStatsCards && nonAdminDateRange) {
+    if (!currentEmployee.isAdmin) {
+      nonAdminStatsCards.style.display = 'block';
+      nonAdminDateRange.style.display = 'block';
+      // Hide payment breakdown for non-admin
+      const allBreakdownRows = document.querySelectorAll('#adminReportModal .stat-item.breakdown');
+      allBreakdownRows.forEach(row => {
+        const labelSpan = row.querySelector('span:first-child');
+        if (labelSpan) {
+          const text = labelSpan.innerText.trim();
+          if (text.includes('Cash') || text.includes('Card') || text.includes('QR Pay') || text.includes('Alipay')) {
+            row.style.display = 'none';
+          }
+        }
+      });
+    } else {
+      nonAdminStatsCards.style.display = 'none';
+      nonAdminDateRange.style.display = 'none';
+    }
+  }
+
+  // Report Modal - Refresh if open
   const reportModal = document.getElementById('adminReportModal');
   if (reportModal && reportModal.style.display === 'flex') {
     if (window.preloadedReportCache) window.preloadedReportCache = null;
@@ -3105,6 +3569,67 @@ function applyRoleBasedUI() {
     setTimeout(() => {
       openReportsModal();
     }, 50);
+  }
+
+  // Receipts Modal - Update if open
+  const receiptsModal = document.getElementById('receiptsModal');
+  if (receiptsModal && receiptsModal.style.display === 'flex') {
+    // Re-populate employee dropdown for admin
+    if (currentEmployee.isAdmin) {
+      populateReceiptsEmployeeDropdown();
+    }
+    // Refresh receipts
+    updateReceipts();
+  }
+
+  // Employee Name Header
+  document.getElementById('employeeNameHeader').innerText = `👤 ${currentEmployee.name}`;
+
+  // Update sold by select if needed
+  if (soldBySelectCart && currentEmployee) {
+    // Make sure the current employee is selected in the dropdown
+    const options = soldBySelectCart.querySelectorAll('option');
+    let found = false;
+    for (const opt of options) {
+      if (opt.value == currentEmployee.id) {
+        opt.selected = true;
+        found = true;
+        break;
+      }
+    }
+    if (!found && options.length > 0) {
+      // If not found, try to add it
+      const option = document.createElement('option');
+      option.value = currentEmployee.id;
+      option.textContent = `${currentEmployee.name} (ID: ${currentEmployee.id})`;
+      soldBySelectCart.appendChild(option);
+      soldBySelectCart.value = currentEmployee.id;
+    }
+  }
+}
+
+// Helper function to populate receipts employee dropdown
+async function populateReceiptsEmployeeDropdown() {
+  const select = document.getElementById('receiptsEmployeeSelect');
+  if (!select) return;
+  
+  const currentValue = select.value;
+  select.innerHTML = '<option value="all">All Employees</option>';
+  
+  try {
+    const employees = await loadAndCacheEmployees();
+    employees.forEach(emp => {
+      const option = document.createElement('option');
+      option.value = emp.id;
+      option.textContent = `${emp.name} (ID: ${emp.id})`;
+      select.appendChild(option);
+    });
+    
+    if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+      select.value = currentValue;
+    }
+  } catch (err) {
+    console.error('Error populating employee dropdown:', err);
   }
 }
 
@@ -3303,7 +3828,21 @@ function getDistanceFromLatLon(lat1, lon1, lat2, lon2) {
 // ============================================================
 // AUTO-SELECT ON LOAD (Dynamic Stores)
 // ============================================================
-
+// Monitor changes to selectedCustomer
+const originalSetSelectedCustomer = Object.getOwnPropertyDescriptor(window, 'selectedCustomer');
+Object.defineProperty(window, 'selectedCustomer', {
+  get: function() { return this._selectedCustomer; },
+  set: function(value) {
+    console.log('🔄 selectedCustomer changed:', {
+      from: this._selectedCustomer,
+      to: value,
+      stack: new Error().stack
+    });
+    this._selectedCustomer = value;
+  },
+  configurable: true
+});
+window._selectedCustomer = null;
 // Auto-select store on load
 (async function autoSelectOnLoad() {
   loadAndCacheEmployees().catch(console.warn);
@@ -3634,12 +4173,11 @@ function renderProductGrid() {
   if (selectedCategory === 'all' && !inventoryMode && !searchTerm) {
     let categories = [...new Set(products.map(p => p.category))];
     
-    // Apply store filter to categories - ✅ FIXED for both old and new stores
+    // Apply store filter to categories
     if (storeFilterActive && !showAllProductsInInventory) {
       const storeObj = stores.find(s => s.store_id === currentStore);
-      let availabilityKey = `available_${currentStore}`; // Default for old stores
+      let availabilityKey = `available_${currentStore}`;
       
-      // If store has a slot, use slot-based field
       if (storeObj && storeObj.slot_number) {
         const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
         availabilityKey = `available_store_${slotNumStr}`;
@@ -3703,13 +4241,11 @@ function renderProductGrid() {
   // Apply ALL filters
   let filtered = products.slice();
   
-  // 1. Store filter (only in normal mode, not when "Show All" is active)
-  // ✅ FIXED for both old and new stores
+  // 1. Store filter
   if (storeFilterActive && !showAllProductsInInventory && !inventoryMode) {
     const storeObj = stores.find(s => s.store_id === currentStore);
-    let availabilityKey = `available_${currentStore}`; // Default for old stores
+    let availabilityKey = `available_${currentStore}`;
     
-    // If store has a slot, use slot-based field
     if (storeObj && storeObj.slot_number) {
       const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
       availabilityKey = `available_store_${slotNumStr}`;
@@ -3778,14 +4314,13 @@ function renderProductGrid() {
   }
   
   // ============================================================
-  // INVENTORY MODE - Checkbox style store availability
+  // INVENTORY MODE - Checkbox style store availability WITH AUTO-SAVE PRICE
   // ============================================================
   if (inventoryMode) {
     filtered.forEach(prod => {
       const isLowStock = prod.stock < LOW_STOCK_THRESHOLD;
       const lowStockClass = isLowStock ? 'low-stock-card' : '';
       
-      // Determine if any store is available (check both old and new systems)
       let anyStoreAvailable = false;
       stores.forEach(s => {
         let field = `available_${s.store_id}`;
@@ -3803,7 +4338,13 @@ function renderProductGrid() {
           <div style="flex: 1; min-width: 150px;">
             <div class="product-name" style="font-weight: 600; font-size: 1rem;">${escapeHtml(prod.name)} ${!anyStoreAvailable ? '🚫' : ''}</div>
             <div class="product-category" style="font-size: 0.8rem; color: #64748b;">${escapeHtml(prod.category)}</div>
-            <div class="product-price" style="font-size: 1.1rem; color: #2c7a4b; font-weight: 700;">RM ${prod.price.toFixed(2)}</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin: 6px 0;">
+              <span style="font-size: 0.85rem; color: #64748b; font-weight: 600;">RM</span>
+              <input type="number" class="price-input-auto" data-id="${prod.id}" 
+                     value="${prod.price.toFixed(2)}" step="0.01" min="0" 
+                     style="width: 110px; padding: 6px 10px; border-radius: 8px; border: 2px solid #cbd5e1; font-size: 1.1rem; font-weight: 700; color: #2c7a4b; text-align: right; background: white; transition: border-color 0.2s, background 0.2s;">
+              <span class="price-save-status" data-id="${prod.id}" style="font-size: 0.7rem; color: #94a3b8; min-width: 60px;">✓ Saved</span>
+            </div>
             <div style="font-size: 0.8rem; margin-top: 4px;">
               📦 Stock: <strong>${prod.stock}</strong>
               ${prod.stock <= 0 ? ' 🔴 OUT OF STOCK' : prod.stock < 5 ? ' ⚠️ Low Stock' : ''}
@@ -3814,10 +4355,7 @@ function renderProductGrid() {
             <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">AVAILABLE AT</div>
             
             ${stores.map(store => {
-              // ✅ Determine which field to use
-              let availabilityField = `available_${store.store_id}`; // Default for old stores
-              
-              // If store has a slot, use slot-based field
+              let availabilityField = `available_${store.store_id}`;
               if (store.slot_number) {
                 const slotNumStr = String(store.slot_number).padStart(2, '0');
                 availabilityField = `available_store_${slotNumStr}`;
@@ -3825,7 +4363,6 @@ function renderProductGrid() {
               
               const isAvailable = prod[availabilityField] !== false;
               const storeName = store.name;
-              // Get emoji for store
               let emoji = '🏪';
               if (store.store_id === 'queens') emoji = '🏬';
               else if (store.store_id === 'sunshine') emoji = '☀️';
@@ -3860,17 +4397,15 @@ function renderProductGrid() {
     productGridEl.innerHTML = html;
     productGridEl.className = viewMode === 'grid' ? 'product-grid' : 'product-list';
     
-    // ✅ Attach inventory mode event listeners
     attachInventoryEvents();
-    
-    // ✅ Attach store availability checkbox events
     attachStoreAvailabilityEvents();
+    attachAutoPriceUpdateEvents();
     
     return;
   }
   
   // ============================================================
-  // NORMAL SALES MODE - Clean display, NO badges
+  // NORMAL SALES MODE - Clean display with special offer badges
   // ============================================================
   filtered.forEach(prod => {
     let additionalClass = '';
@@ -3878,11 +4413,30 @@ function renderProductGrid() {
       additionalClass = 'out-of-stock-card';
     }
     
-    // No availability badge in sales mode
+    // ✅ Add special badge based on category
+    let specialBadge = '';
+    let badgeColor = '';
+    let badgeText = '';
+    
+    if (prod.category === "100ML PERFUME EDP" || prod.category === "50ML PERFUME EDP") {
+      badgeColor = '#dc2626';
+      badgeText = 'RM 1 OFFER';
+    } else if (prod.category === "15ML PERFUME EDP") {
+      badgeColor = '#059669';
+      badgeText = 'RM 10 OFFER';
+    } else if (prod.category === "CAR AROMATIC") {
+      badgeColor = '#8b5cf6';
+      badgeText = 'RM 5 OFFER';
+    }
+    
+    if (badgeText) {
+      specialBadge = ` <span style="background:${badgeColor}; color:white; font-size:0.6rem; padding:2px 8px; border-radius:10px; margin-left:4px; font-weight:600;">${badgeText}</span>`;
+    }
+    
     const stockStatus = prod.stock <= 0 ? '🔴 Out of Stock' : `📦 Stock: ${prod.stock}`;
     
     html += `<div class="product-card ${additionalClass}" data-id="${prod.id}">
-      <div class="product-name">${escapeHtml(prod.name)}</div>
+      <div class="product-name">${escapeHtml(prod.name)}${specialBadge}</div>
       <div class="product-category">${escapeHtml(prod.category)}</div>
       <div class="product-price">RM ${prod.price.toFixed(2)}</div>
       <div class="product-stock">${stockStatus}</div>
@@ -3908,7 +4462,237 @@ function renderProductGrid() {
 // ============================================================
 // HELPER FUNCTIONS FOR INVENTORY MODE
 // ============================================================
+// ==================== AUTO-SAVE PRICE UPDATE FUNCTIONS ====================
 
+// ==================== AUTO-SAVE PRICE UPDATE FUNCTIONS ====================
+
+// Debounce map for price saves
+const priceDebounceMap = {};
+
+function attachAutoPriceUpdateEvents() {
+  document.querySelectorAll('.price-input-auto').forEach(input => {
+    const productId = input.dataset.id;
+    
+    // Remove old listeners to prevent duplicates
+    if (input._priceInputHandler) {
+      input.removeEventListener('input', input._priceInputHandler);
+    }
+    if (input._priceBlurHandler) {
+      input.removeEventListener('blur', input._priceBlurHandler);
+    }
+    if (input._priceKeydownHandler) {
+      input.removeEventListener('keydown', input._priceKeydownHandler);
+    }
+    
+    // Create new handlers
+    input._priceInputHandler = function(e) {
+      const product = products.find(p => p.id == productId);
+      if (!product) return;
+      
+      const newPrice = parseFloat(this.value);
+      
+      // Validate
+      if (isNaN(newPrice) || newPrice < 0) {
+        this.style.borderColor = '#ef4444';
+        this.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
+        updatePriceStatus(productId, false, '⚠️ Invalid');
+        return;
+      }
+      
+      // Remove error state
+      this.style.borderColor = '#cbd5e1';
+      this.style.boxShadow = 'none';
+      
+      // Only trigger save if price changed
+      if (newPrice !== product.price) {
+        updatePriceStatus(productId, false, '⏳ Saving...');
+        debouncePriceSave(productId, this);
+      }
+    };
+    
+    input._priceBlurHandler = function(e) {
+      const product = products.find(p => p.id == productId);
+      if (!product) return;
+      
+      const newPrice = parseFloat(this.value);
+      
+      // Only update if price actually changed and is valid
+      if (!isNaN(newPrice) && newPrice !== product.price && newPrice >= 0) {
+        // Clear any pending debounce and save immediately
+        if (priceDebounceMap[productId]) {
+          clearTimeout(priceDebounceMap[productId]);
+          delete priceDebounceMap[productId];
+        }
+        updateProductPriceAuto(productId, this);
+      } else if (!isNaN(newPrice) && newPrice >= 0) {
+        // Reset display if same or invalid
+        this.value = product.price.toFixed(2);
+        updatePriceStatus(productId, true);
+      }
+    };
+    
+    input._priceKeydownHandler = function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const product = products.find(p => p.id == productId);
+        if (!product) return;
+        
+        const newPrice = parseFloat(this.value);
+        if (!isNaN(newPrice) && newPrice >= 0 && newPrice !== product.price) {
+          // Clear any pending debounce
+          if (priceDebounceMap[productId]) {
+            clearTimeout(priceDebounceMap[productId]);
+            delete priceDebounceMap[productId];
+          }
+          updateProductPriceAuto(productId, this);
+        } else {
+          this.value = product.price.toFixed(2);
+          updatePriceStatus(productId, true);
+        }
+      }
+    };
+    
+    input.addEventListener('input', input._priceInputHandler);
+    input.addEventListener('blur', input._priceBlurHandler);
+    input.addEventListener('keydown', input._priceKeydownHandler);
+  });
+}
+
+function debouncePriceSave(productId, input) {
+  // Clear existing debounce
+  if (priceDebounceMap[productId]) {
+    clearTimeout(priceDebounceMap[productId]);
+    delete priceDebounceMap[productId];
+  }
+  
+  // Set new debounce (500ms delay)
+  priceDebounceMap[productId] = setTimeout(async () => {
+    await updateProductPriceAuto(productId, input);
+    delete priceDebounceMap[productId];
+  }, 500);
+}
+
+async function updateProductPriceAuto(productId, input) {
+  const newPrice = parseFloat(input.value);
+  
+  // Validate
+  if (isNaN(newPrice) || newPrice < 0) {
+    const product = products.find(p => p.id == productId);
+    if (product) {
+      input.value = product.price.toFixed(2);
+      input.style.borderColor = '#ef4444';
+      input.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
+      updatePriceStatus(productId, false, '⚠️ Invalid');
+    }
+    return false;
+  }
+  
+  // Find the product
+  const product = products.find(p => p.id == productId);
+  if (!product) {
+    return false;
+  }
+  
+  // Check if price actually changed
+  const oldPrice = product.price;
+  if (Math.abs(newPrice - oldPrice) < 0.001) {
+    updatePriceStatus(productId, true);
+    return true;
+  }
+  
+  try {
+    // Update in Supabase
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        price: newPrice 
+      })
+      .eq('id', productId)
+      .select();
+    
+    if (error) {
+      throw error;
+    }
+    
+    // Update local product object
+    product.price = newPrice;
+    input.value = newPrice.toFixed(2);
+    
+    // Store the old price for reverting if needed
+    input.dataset.oldPrice = oldPrice;
+    
+    // Show success state
+    input.style.borderColor = '#10b981';
+    input.style.boxShadow = '0 0 0 4px rgba(16, 185, 129, 0.2)';
+    updatePriceStatus(productId, true, '✅ Saved');
+    
+    // Reset border after 1.5 seconds
+    setTimeout(() => {
+      if (input) {
+        input.style.borderColor = '#cbd5e1';
+        input.style.boxShadow = 'none';
+      }
+    }, 1500);
+    
+    // Sync after price update
+    if (window._priceSyncTimeout) {
+      clearTimeout(window._priceSyncTimeout);
+    }
+    window._priceSyncTimeout = setTimeout(async () => {
+      try {
+        await backgroundSync(true);
+      } catch (syncErr) {
+        // Silent fail - don't show errors to user
+      }
+      window._priceSyncTimeout = null;
+    }, 1000);
+    
+    return true;
+    
+  } catch (err) {
+    // Revert the local product price
+    product.price = oldPrice;
+    input.value = oldPrice.toFixed(2);
+    
+    // Show error state
+    input.style.borderColor = '#ef4444';
+    input.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.15)';
+    updatePriceStatus(productId, false, '❌ Failed');
+    
+    setTimeout(() => {
+      if (input) {
+        input.style.borderColor = '#cbd5e1';
+        input.style.boxShadow = 'none';
+        updatePriceStatus(productId, true);
+      }
+    }, 3000);
+    
+    return false;
+  }
+}
+
+function updatePriceStatus(productId, isSaved, customMessage = null) {
+  const statusElements = document.querySelectorAll(`.price-save-status[data-id="${productId}"]`);
+  
+  statusElements.forEach(status => {
+    if (customMessage) {
+      status.textContent = customMessage;
+      if (customMessage.includes('✅') || customMessage === '✓ Saved' || customMessage === '✅ Saved') {
+        status.style.color = '#10b981';
+      } else if (customMessage.includes('⚠️') || customMessage.includes('❌')) {
+        status.style.color = '#ef4444';
+      } else if (customMessage.includes('⏳')) {
+        status.style.color = '#f59e0b';
+      }
+    } else if (isSaved) {
+      status.textContent = '✅ Saved';
+      status.style.color = '#10b981';
+    } else {
+      status.textContent = '⏳ Saving...';
+      status.style.color = '#f59e0b';
+    }
+  });
+}
 function attachInventoryEvents() {
   // Stock decrement buttons
   document.querySelectorAll('.dec-stock').forEach(btn => {
@@ -4592,9 +5376,62 @@ function addToCart(product) {
   const existing = cart.find(item => item.product.id === product.id);
   if (existing) {
     existing.quantity += 1;
-    if (existing.freeQuantity > existing.quantity) existing.freeQuantity = existing.quantity;
+    
+    // ✅ For 2-state items (100ML/50ML PERFUME EDP), keep free count proportional
+    const isTwoStateItem = existing.product.category === "100ML PERFUME EDP" || existing.product.category === "50ML PERFUME EDP";
+    if (isTwoStateItem) {
+      // Keep free count, but don't exceed quantity
+      if (existing.freeQuantity > existing.quantity) {
+        existing.freeQuantity = existing.quantity;
+      }
+    } else {
+      // For other items, reset free count if it exceeds quantity
+      if (existing.freeQuantity > existing.quantity) {
+        existing.freeQuantity = existing.quantity;
+      }
+    }
+    
+    // ✅ If special price was active, check if we need to adjust specialQuantity
+    if (existing.isSpecialOffer && existing.specialPriceActive) {
+      if (existing.specialQuantity > 1) {
+        existing.specialQuantity = 1;
+      }
+    }
   } else {
-    cart.push({ product: { ...product }, quantity: 1, freeQuantity: 0 });
+    // ✅ Check which special offer this product qualifies for
+    let specialPrice = null;
+    let specialLabel = null;
+    let offerType = 'none'; // 'special', 'free', 'none'
+    
+    // ✅ 100ML and 50ML PERFUME EDP → FREE GIFT only (no RM 1 special)
+    if (product.category === "100ML PERFUME EDP" || product.category === "50ML PERFUME EDP") {
+      specialPrice = 0;  // Free
+      specialLabel = "FREE GIFT";
+      offerType = 'free';
+    } else if (product.category === "15ML PERFUME EDP") {
+      specialPrice = 10;
+      specialLabel = "RM 10";
+      offerType = 'special';
+    } else if (product.category === "CAR AROMATIC") {
+      specialPrice = 5;
+      specialLabel = "RM 5";
+      offerType = 'special';
+    }
+    
+    const isSpecialOffer = specialPrice !== null;
+    
+    cart.push({ 
+      product: { ...product }, 
+      quantity: 1, 
+      freeQuantity: 0,
+      isSpecialOffer: isSpecialOffer,
+      specialPriceActive: false,
+      specialQuantity: 0,
+      specialPrice: specialPrice,
+      specialLabel: specialLabel,
+      offerType: offerType,
+      offerState: 0
+    });
   }
   updateCartUI();
   clearPromo();
@@ -4611,7 +5448,8 @@ function clearCart() {
   staffDiscount = 0;
   claimedReceiptInfo = null;
   pendingPrize = null;
-  selectedCustomer = null;
+  // ✅ DON'T reset selectedCustomer here
+  // selectedCustomer = null;  // ← REMOVE THIS LINE
   updateCustomerDisplay();
   updateCartUI();
 }
@@ -4648,32 +5486,220 @@ function updateCartUI() {
   let html = '';
   let subtotal = 0;
   cart.forEach((item, idx) => {
-    const paidUnits = item.quantity - item.freeQuantity;
-    const itemTotal = paidUnits * item.product.price;
+    // ✅ Calculate effective pricing based on state
+    let regularCount = item.quantity;
+    let specialCount = 0;
+    let freeCount = item.freeQuantity || 0;
+    let specialPrice = item.specialPrice || 1;
+    let regularPrice = item.product.price;
+    let effectivePrice = regularPrice;
+    let itemTotal = 0;
+    
+    // ✅ Check if this is a 3-state item (CAR AROMATIC or 15ML PERFUME EDP)
+    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+    
+    // ✅ Check if this is a 2-state item (100ML or 50ML PERFUME EDP) - normal ↔ free only
+    const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
+    
+    if (isThreeStateItem) {
+      // 3-state cycling: normal → special → free → normal
+      if (item.offerState === 1) {
+        // Special price state
+        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+        regularCount = item.quantity - specialCount;
+        const regularTotal = regularCount * regularPrice;
+        const specialTotal = specialCount * specialPrice;
+        itemTotal = regularTotal + specialTotal;
+        effectivePrice = specialPrice;
+      } else if (item.offerState === 2) {
+        // Free gift state - one unit is free
+        freeCount = Math.min(1, item.quantity);
+        const paidCount = item.quantity - freeCount;
+        itemTotal = paidCount * regularPrice;
+        effectivePrice = 0; // Free
+      } else {
+        // Normal state
+        itemTotal = item.quantity * regularPrice;
+        effectivePrice = regularPrice;
+        freeCount = 0;
+      }
+    } else if (isTwoStateItem) {
+      // ✅ 2-state: normal ↔ free only (no special price)
+      // freeCount can be 0, 1, 2, etc. up to quantity
+      const maxFree = item.quantity;
+      freeCount = Math.min(item.freeQuantity || 0, maxFree);
+      const paidCount = item.quantity - freeCount;
+      itemTotal = paidCount * regularPrice;
+      effectivePrice = regularPrice;
+    } else if (item.isSpecialOffer && item.specialPriceActive) {
+      // 2-state items with special price (for other items)
+      specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+      regularCount = item.quantity - specialCount;
+      const regularTotal = regularCount * regularPrice;
+      const specialTotal = specialCount * specialPrice;
+      itemTotal = regularTotal + specialTotal;
+      effectivePrice = specialPrice;
+      freeCount = 0;
+    } else {
+      // Normal items
+      const paidUnits = item.quantity - freeCount;
+      itemTotal = paidUnits * regularPrice;
+      effectivePrice = regularPrice;
+    }
+    
     subtotal += itemTotal;
+    
     const categoryDisplay = item.product.category
       ? `<div class="cart-item-category">${escapeHtml(item.product.category)}</div>`
       : '';
-    const freeClass = item.freeQuantity > 0 ? 'active' : '';
-    const buttonText = item.freeQuantity > 0 
-      ? `🎁 ${item.freeQuantity} Free` 
-      : '🎁 Activate Free Gift';
+    
+    // ✅ Determine which button to show based on item type
+    let buttonHtml = '';
+    
+    if (isTwoStateItem) {
+      // ✅ 2-state button with free count shown ON the button (no separate indicator)
+      const freeCountDisplay = item.freeQuantity || 0;
+      const maxFree = item.quantity;
+      
+      if (freeCountDisplay > 0) {
+        // Show "Remove Free (X/Y)" on the button
+        const freeText = freeCountDisplay === maxFree ? `All ${freeCountDisplay} Free` : `${freeCountDisplay}/${maxFree} Free`;
+        buttonHtml = `
+          <div class="cart-item-special">
+            <button class="special-price-btn active" data-index="${idx}" 
+                    style="background: #f59e0b; border-color: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); padding: 6px 16px; font-size: 0.9rem;">
+              🎁 Remove Free (${freeText})
+            </button>
+          </div>
+        `;
+      } else {
+        // Show "Mark as Free (X available)" on the button
+        buttonHtml = `
+          <div class="cart-item-special">
+            <button class="special-price-btn" data-index="${idx}" 
+                    style="background: #f1f5f9; border-color: #e2e8f0; color: #1e293b; padding: 6px 16px; font-size: 0.9rem;">
+              ✨ Mark as Free (${maxFree} avail)
+            </button>
+          </div>
+        `;
+      }
+    } else if (isThreeStateItem) {
+      // 3-state button for CAR AROMATIC and 15ML PERFUME EDP
+      let stateText = '';
+      let stateColor = '';
+      let bgColor = '';
+      
+      if (item.offerState === 0) {
+        stateText = `🏷️ ${item.specialLabel}`;
+        stateColor = '#1e293b';
+        bgColor = '#f1f5f9';
+      } else if (item.offerState === 1) {
+        stateText = `🔄 ${item.specialLabel} ✓`;
+        stateColor = 'white';
+        bgColor = getSpecialPriceColor(item.specialPrice);
+      } else if (item.offerState === 2) {
+        stateText = `🎁 FREE ✓`;
+        stateColor = 'white';
+        bgColor = '#f59e0b';
+      }
+      
+      buttonHtml = `
+        <div class="cart-item-special">
+          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}" 
+                  style="${item.offerState > 0 ? `background: ${bgColor}; border-color: ${bgColor}; color: ${stateColor};` : ''}">
+            ${stateText}
+          </button>
+          <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
+            ${item.offerState === 0 ? 'Click for special price' : 
+              item.offerState === 1 ? `${item.specialLabel} on 1 unit` : 
+              '1 unit FREE'}
+            (Click to cycle)
+          </span>
+        </div>
+      `;
+    } else if (item.isSpecialOffer) {
+      // Other items with special offer
+      const isActive = item.specialPriceActive;
+      const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
+      const label = item.specialLabel || `RM ${item.specialPrice}`;
+      const bgColor = getSpecialPriceColor(item.specialPrice);
+      
+      buttonHtml = `
+        <div class="cart-item-special">
+          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}" 
+                  style="${isActive ? `background: ${bgColor}; border-color: ${bgColor}; color: white;` : ''}">
+            ${isActive ? `🔄 ${label} ✓ (${specialCountDisplay} unit)` : `🏷️ AT ${label}`}
+          </button>
+          <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
+            ${isActive ? `${specialCountDisplay} unit at ${label}, ${regularCount} at RM ${regularPrice.toFixed(2)}` : `Click for ${label} on 1 unit`}
+          </span>
+        </div>
+      `;
+    } else {
+      // Regular free gift button
+      const freeClass = item.freeQuantity > 0 ? 'active' : '';
+      const buttonText = item.freeQuantity > 0 
+        ? `🎁 ${item.freeQuantity} Free` 
+        : '🎁 Activate Free Gift';
+      buttonHtml = `
+        <div class="cart-item-free">
+          <button class="free-toggle-btn ${freeClass}" data-index="${idx}">${buttonText}</button>
+        </div>
+      `;
+    }
+    
+    // Build price display
+    let priceDisplay = '';
+    let priceColor = '';
+    let specialBadge = '';
+    
+    if (isTwoStateItem) {
+      // ✅ 2-state: normal or free
+      if (freeCount > 0) {
+        priceColor = '#f59e0b';
+        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 ${freeCount} FREE</span>`;
+      } else {
+        priceDisplay = `RM ${regularPrice.toFixed(2)}`;
+      }
+    } else if (isThreeStateItem) {
+      if (item.offerState === 1) {
+        priceColor = getSpecialPriceColor(item.specialPrice);
+        priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
+      } else if (item.offerState === 2) {
+        priceColor = '#f59e0b';
+        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 FREE</span>`;
+      } else {
+        priceDisplay = `RM ${regularPrice.toFixed(2)}`;
+      }
+    } else if (item.isSpecialOffer && item.specialPriceActive) {
+      priceColor = getSpecialPriceColor(item.specialPrice);
+      priceDisplay = `${specialCount} x ${item.specialLabel} + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
+      specialBadge = ` <span style="font-size:0.7rem; color:${priceColor}; background:${priceColor}22; padding:2px 8px; border-radius:10px;">SPECIAL</span>`;
+    } else {
+      priceDisplay = `RM ${regularPrice.toFixed(2)}`;
+    }
+    
+    const totalDisplay = itemTotal.toFixed(2);
+    
     html += `
       <div class="cart-item" data-index="${idx}">
         <div class="cart-item-info">
           <div class="cart-item-name">${escapeHtml(item.product.name)}</div>
           ${categoryDisplay}
-          <div class="cart-item-price">RM ${item.product.price.toFixed(2)}</div>
+          <div class="cart-item-price" style="${(freeCount > 0 || item.offerState > 0 || (item.isSpecialOffer && item.specialPriceActive)) ? `color:${priceColor || '#dc2626'}; font-weight:700;` : ''}">
+            ${priceDisplay}${specialBadge}
+          </div>
         </div>
-        <div class="cart-item-free">
-          <button class="free-toggle-btn ${freeClass}" data-index="${idx}">${buttonText}</button>
-        </div>
+        ${buttonHtml}
         <div class="cart-item-qty">
           <button class="qty-btn" data-index="${idx}" data-delta="-1">−</button>
           <span>${item.quantity}</span>
           <button class="qty-btn" data-index="${idx}" data-delta="1">+</button>
         </div>
-        <div class="cart-item-total">RM ${itemTotal.toFixed(2)}</div>
+        <div class="cart-item-total">RM ${totalDisplay}</div>
         <button class="remove-item" data-index="${idx}">✕</button>
       </div>
     `;
@@ -4682,15 +5708,18 @@ function updateCartUI() {
 
   subtotalSpan.innerText = `RM ${subtotal.toFixed(2)}`;
 
+  // Calculate staff discount
   if (staffDiscountActive) {
     staffDiscount = subtotal * 0.10;
   } else {
     staffDiscount = 0;
   }
 
+  // Calculate total with all discounts
   const totalPromoDiscount = buy2Free1Discount + buy3Free1Discount + customDiscount + staffDiscount;
   const total = subtotal - discountAmount - totalPromoDiscount;
 
+  // Update discount rows
   if (discountAmount > 0) {
     discountRow.style.display = 'flex';
     discountAmountSpan.innerText = `RM ${discountAmount.toFixed(2)}`;
@@ -4730,30 +5759,125 @@ function updateCartUI() {
 
   totalSpan.innerText = `RM ${total.toFixed(2)}`;
 
+  // Event listeners
   document.querySelectorAll('.qty-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      const delta = parseInt(btn.dataset.delta);
-      if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleQtyClick);
+    btn.addEventListener('click', handleQtyClick);
   });
+  
   document.querySelectorAll('.remove-item').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      if (!isNaN(idx)) removeCartItem(idx);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleRemoveClick);
+    btn.addEventListener('click', handleRemoveClick);
   });
+  
   document.querySelectorAll('.free-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const idx = parseInt(btn.dataset.index);
-      if (!isNaN(idx)) toggleFreeCount(idx);
-      e.stopPropagation();
-    });
+    btn.removeEventListener('click', handleFreeToggle);
+    btn.addEventListener('click', handleFreeToggle);
+  });
+  
+  document.querySelectorAll('.special-price-btn').forEach(btn => {
+    btn.removeEventListener('click', handleSpecialPriceClick);
+    btn.addEventListener('click', handleSpecialPriceClick);
   });
 }
 
+// Helper functions for event handlers
+function handleQtyClick(e) {
+  const idx = parseInt(this.dataset.index);
+  const delta = parseInt(this.dataset.delta);
+  if (!isNaN(idx) && !isNaN(delta)) updateQuantity(idx, delta);
+  e.stopPropagation();
+}
+
+function handleRemoveClick(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) removeCartItem(idx);
+  e.stopPropagation();
+}
+
+function handleFreeToggle(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) toggleFreeCount(idx);
+  e.stopPropagation();
+}
+
+function handleSpecialPriceClick(e) {
+  const idx = parseInt(this.dataset.index);
+  if (!isNaN(idx)) toggleSpecialPrice(idx);
+  e.stopPropagation();
+}
+
+// Helper function to get color based on special price
+function getSpecialPriceColor(specialPrice) {
+  if (specialPrice === 1) return '#dc2626';      // Red for RM 1
+  if (specialPrice === 5) return '#8b5cf6';      // Purple for RM 5
+  if (specialPrice === 10) return '#059669';     // Green for RM 10
+  return '#dc2626'; // Default red
+}
+function toggleSpecialPrice(index) {
+  const item = cart[index];
+  if (!item) return;
+  
+  // ✅ For 100ML and 50ML PERFUME EDP - cycle free items one by one
+  if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
+    const currentFree = item.freeQuantity || 0;
+    const maxFree = item.quantity;
+    
+    if (currentFree >= maxFree) {
+      // All items are free → reset to 0 free
+      item.freeQuantity = 0;
+      item.offerState = 0;
+    } else {
+      // Add one more free item
+      item.freeQuantity = currentFree + 1;
+      item.offerState = 2;
+    }
+    
+    // Ensure freeQuantity doesn't exceed quantity
+    if (item.freeQuantity > item.quantity) {
+      item.freeQuantity = item.quantity;
+    }
+    
+    updateCartUI();
+    return;
+  }
+  
+  // ✅ For CAR AROMATIC and 15ML PERFUME EDP - 3-state cycling
+  if (item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP") {
+    // Cycle states: 0=normal → 1=special → 2=free → 0=normal
+    item.offerState = (item.offerState + 1) % 3;
+    
+    if (item.offerState === 0) {
+      // Normal state
+      item.specialPriceActive = false;
+      item.specialQuantity = 0;
+      item.freeQuantity = 0;
+    } else if (item.offerState === 1) {
+      // Special price state (RM 5 or RM 10)
+      item.specialPriceActive = true;
+      item.specialQuantity = 1;
+      item.freeQuantity = 0;
+    } else if (item.offerState === 2) {
+      // Free gift state - one unit free
+      item.specialPriceActive = false;
+      item.specialQuantity = 0;
+      item.freeQuantity = 1; // One free unit
+    }
+    
+    updateCartUI();
+    return;
+  }
+  
+  // ✅ Default toggle for other items
+  item.specialPriceActive = !item.specialPriceActive;
+  if (item.specialPriceActive) {
+    item.specialQuantity = 1;
+    item.freeQuantity = 0;
+  } else {
+    item.specialQuantity = 0;
+  }
+  updateCartUI();
+}
 function updateQuantity(index, delta) {
   const item = cart[index];
   if (!item) return;
@@ -4763,6 +5887,24 @@ function updateQuantity(index, delta) {
   } else {
     item.quantity = newQty;
     if (item.freeQuantity > newQty) item.freeQuantity = newQty;
+    
+    // ✅ If special price is active, ensure specialQuantity doesn't exceed total quantity
+    if (item.isSpecialOffer && item.specialPriceActive) {
+      if (item.specialQuantity > newQty) {
+        item.specialQuantity = newQty;
+      }
+      if (item.specialQuantity < 1) {
+        item.specialQuantity = 1;
+      }
+    }
+    
+    // ✅ If 3-state item, ensure states are valid
+    const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+    if (isThreeStateItem) {
+      if (item.offerState === 2 && item.freeQuantity > newQty) {
+        item.freeQuantity = newQty;
+      }
+    }
   }
   updateCartUI();
   clearPromo();
@@ -4797,12 +5939,23 @@ async function startCheckout() {
     return;
   }
 
-  // Calculate subtotal
+  // ✅ Calculate subtotal with special pricing (mixed pricing)
   let subtotal = 0;
   for (let item of cart) {
-    const paidQty = item.quantity - item.freeQuantity;
-    subtotal += paidQty * item.product.price;
+    if (item.isSpecialOffer && item.specialPriceActive) {
+      // ✅ Only ONE unit gets special price, the rest at regular price
+      const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+      const regularCount = item.quantity - specialCount;
+      const regularTotal = regularCount * item.product.price;
+      const specialTotal = specialCount * (item.specialPrice || 1);
+      subtotal += regularTotal + specialTotal;
+    } else {
+      const paidQty = item.quantity - (item.freeQuantity || 0);
+      subtotal += paidQty * item.product.price;
+    }
   }
+
+  console.log('💰 Cart Subtotal (with special pricing):', subtotal);
 
   // Calculate discounts
   let effectiveStaffDiscount = 0;
@@ -4933,6 +6086,7 @@ function showPaymentModal(totalAmount) {
 async function saveTransactionToSheet(transaction) {
   try {
     console.log('💾 Saving transaction:', transaction.transaction_id);
+    console.log('📋 Customer ID:', transaction.customer_id);
     
     // 1. Save to transactions table
     const { data, error } = await supabase
@@ -4951,7 +6105,7 @@ async function saveTransactionToSheet(transaction) {
         refunded: transaction.refunded || false,
         refund_of: transaction.refund_of || '',
         original_payment_method: transaction.original_payment_method || '',
-        customer_id: transaction.customer_id || '',
+        customer_id: transaction.customer_id || '',  // ✅ Make sure this is saved
         points_awarded: transaction.points_awarded || 0,
         discount: transaction.discount || 0,
         buy2_free1_discount: transaction.buy2_free1_discount || 0,
@@ -5006,30 +6160,6 @@ async function saveTransactionToSheet(transaction) {
       }
     }
     
-    // ✅ REMOVE THIS SECTION - It's causing the error!
-    // The stock is already updated in completeCheckout()
-    /*
-    console.log('📦 Updating stock in Supabase...');
-    for (const item of transaction.items || []) {
-      const product = products.find(p => p.id == item.id);
-      if (product) {
-        const stockColumn = `stock_${currentStore}`;
-        const newStock = product.stock;
-        
-        const { error: stockError } = await supabase
-          .from('products')
-          .update({ [stockColumn]: newStock })
-          .eq('id', item.id);
-        
-        if (stockError) {
-          console.error(`❌ Error updating stock for ${item.name}:`, stockError);
-        } else {
-          console.log(`✅ Stock updated for ${item.name}: ${newStock}`);
-        }
-      }
-    }
-    */
-    
     return true;
     
   } catch (err) {
@@ -5059,16 +6189,106 @@ async function completeCheckout(paymentMethod, cashReceived) {
     const salesPersonName = selectedOption ? selectedOption.text.split(' (ID:')[0] : '';
     const salesPersonId = salesPersonSelect.value;
 
-    const saleItems = cart.map(item => ({
-      id: item.product.id,
-      category: item.product.category,
-      name: item.product.name,
-      price: item.product.price,
-      quantity: item.quantity,
-      free_quantity: item.freeQuantity,
-      total: (item.quantity - item.freeQuantity) * item.product.price
-    }));
+    // ✅ Get customer data
+    const customerToUse = selectedCustomer || window.selectedCustomer;
+    let sessionCustomer = null;
+    if (!customerToUse) {
+      try {
+        const saved = sessionStorage.getItem('selectedCustomer');
+        if (saved) {
+          sessionCustomer = JSON.parse(saved);
+          console.log('🔄 Found customer in sessionStorage:', sessionCustomer);
+        }
+      } catch(e) {}
+    }
+    const finalCustomer = customerToUse || sessionCustomer;
+    
+    // ✅ Get customer phone number and ID
+    const customerPhone = finalCustomer ? finalCustomer.phone : null;
+    const customerId = finalCustomer ? finalCustomer.id : null;
 
+    // ✅ Calculate sale items with all special offers
+    const saleItems = cart.map(item => {
+      let specialPrice = null;
+      let specialLabel = null;
+      
+      if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
+        specialPrice = 1;
+        specialLabel = "RM 1";
+      } else if (item.product.category === "15ML PERFUME EDP") {
+        specialPrice = 10;
+        specialLabel = "RM 10";
+      } else if (item.product.category === "CAR AROMATIC") {
+        specialPrice = 5;
+        specialLabel = "RM 5";
+      }
+      
+      const isEligibleForSpecial = specialPrice !== null;
+      const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
+      
+      let specialCount = 0;
+      let regularCount = item.quantity;
+      let freeCount = item.freeQuantity || 0;
+      let itemTotal = 0;
+      let isSpecialActive = false;
+      let isFreeActive = false;
+      let effectivePrice = item.product.price;
+      
+      if (isThreeStateItem) {
+        if (item.offerState === 1) {
+          specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+          regularCount = item.quantity - specialCount;
+          const regularTotal = regularCount * item.product.price;
+          const specialTotal = specialCount * specialPrice;
+          itemTotal = regularTotal + specialTotal;
+          isSpecialActive = true;
+          effectivePrice = specialPrice;
+        } else if (item.offerState === 2) {
+          freeCount = Math.min(1, item.quantity);
+          const paidCount = item.quantity - freeCount;
+          itemTotal = paidCount * item.product.price;
+          isFreeActive = true;
+          effectivePrice = 0;
+        } else {
+          itemTotal = item.quantity * item.product.price;
+          effectivePrice = item.product.price;
+          freeCount = 0;
+        }
+      } else if (isEligibleForSpecial && item.specialPriceActive) {
+        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+        regularCount = item.quantity - specialCount;
+        const regularTotal = regularCount * item.product.price;
+        const specialTotal = specialCount * specialPrice;
+        itemTotal = regularTotal + specialTotal;
+        isSpecialActive = true;
+        effectivePrice = specialPrice;
+        freeCount = 0;
+      } else {
+        const paidQty = item.quantity - freeCount;
+        itemTotal = paidQty * item.product.price;
+        effectivePrice = item.product.price;
+      }
+      
+      return {
+        id: item.product.id,
+        category: item.product.category,
+        name: item.product.name,
+        price: item.product.price,
+        effective_price: isSpecialActive ? specialPrice : (isFreeActive ? 0 : item.product.price),
+        special_label: isSpecialActive ? specialLabel : (isFreeActive ? 'FREE' : null),
+        quantity: item.quantity,
+        regular_quantity: regularCount,
+        special_quantity: specialCount,
+        free_quantity: freeCount,
+        total: itemTotal,
+        is_special_offer: isSpecialActive,
+        is_free_offer: isFreeActive,
+        offer_state: item.offerState || 0,
+        special_price_active: isSpecialActive
+      };
+    });
+
+    // ✅ Build transaction with BOTH customer_id AND customer_phone
     const transaction = {
       transaction_id: transactionId,
       items: saleItems,
@@ -5082,13 +6302,21 @@ async function completeCheckout(paymentMethod, cashReceived) {
       custom_discount: customDiscount || 0,
       staff_discount: staffDiscount || 0,
       prize_claimed: claimedReceiptInfo || null,
-      customer_id: selectedCustomer ? selectedCustomer.id : null,
+      customer_id: customerId,
+      customer_phone: customerPhone,
       store: currentStore,
       employee_id: currentEmployee.id,
       employee_name: currentEmployee.name,
       sales_person_name: salesPersonName || '',
       sales_person_id: salesPersonId || ''
     };
+
+    console.log('💾 Transaction with customer:', {
+      transaction_id: transactionId,
+      customer_id: customerId,
+      customer_phone: customerPhone,
+      total: totalAmount
+    });
 
     // Print receipt
     let receiptPrinted = false;
@@ -5133,19 +6361,17 @@ async function completeCheckout(paymentMethod, cashReceived) {
       }
     }
 
-    clearCart();
-
+    // ✅ SAVE TRANSACTION FIRST
     showLoading('Processing transaction...');
     const success = await saveTransactionToSheet(transaction);
     hideLoading();
 
     if (success) {
-      // ✅ STOCK UPDATE - USING SLOT-BASED COLUMNS
+      // ✅ STOCK UPDATE
       console.log('🔄 Updating stock for items...');
       
-      // Find the current store's slot number
       const currentStoreObj = stores.find(s => s.store_id === currentStore);
-      let stockColumn = `stock_${currentStore}`; // Fallback for old stores
+      let stockColumn = `stock_${currentStore}`;
       
       if (currentStoreObj && currentStoreObj.slot_number) {
         const slotNumStr = String(currentStoreObj.slot_number).padStart(2, '0');
@@ -5161,11 +6387,8 @@ async function completeCheckout(paymentMethod, cashReceived) {
           const oldStock = product.stock;
           const newStock = oldStock - item.quantity;
           product.stock = newStock;
-          
-          // Update the store-specific stock column
           product[stockColumn] = newStock;
           
-          // ✅ Update in Supabase using the correct column
           const updateData = {};
           updateData[stockColumn] = newStock;
           
@@ -5187,36 +6410,40 @@ async function completeCheckout(paymentMethod, cashReceived) {
         }
       }
 
-      // ✅ SAVE TO LOCAL STORAGE
       localStorage.setItem(`products_${currentStore}`, JSON.stringify({
         timestamp: Date.now(),
         products: products
       }));
 
-      // ✅ SYNC AFTER SUCCESSFUL SALE
       console.log('🔄 Syncing data after sale...');
       try {
         await backgroundSync(true);
         console.log('✅ Background sync completed after sale');
       } catch (syncErr) {
         console.warn('⚠️ Background sync failed after sale:', syncErr);
-        // Don't block the flow if sync fails
       }
 
-      // ✅ Save to Lucky Draw if eligible
-      await saveToLuckyDraw(transaction);
+      // ✅ SAVE TO LUCKY DRAW WITH PHONE NUMBER
+      console.log('🎲 Saving to Lucky Draw with customer phone:', customerPhone);
+      await saveToLuckyDraw(transaction, customerPhone);
 
-      // ✅ CLAIM PRIZE AFTER SALE (if there was a pending prize)
+      // ============================================================
+      // ✅ CLAIM PRIZE AFTER SALE - BEFORE CLEARING CART
+      // ============================================================
       if (pendingPrize) {
         console.log('🎯 Claiming prize after sale...');
+        console.log('📋 Receipt:', pendingPrize.receipt);
+        console.log('📋 Value:', pendingPrize.value);
+        console.log('📋 Name:', pendingPrize.name);
+        
         const claimed = await claimPrizeAfterSale(
-          pendingPrize.receipt, 
-          pendingPrize.value, 
+          pendingPrize.receipt,
+          pendingPrize.value,
           totalAmount
         );
+        
         if (claimed) {
           console.log('✅ Prize claimed successfully!');
-          // Show success message
           await showAlertModal('🎉 Prize Claimed!', 
             `The prize "${pendingPrize.name}" has been successfully claimed.\n` +
             `Receipt: ${pendingPrize.receipt}`
@@ -5228,32 +6455,178 @@ async function completeCheckout(paymentMethod, cashReceived) {
             `Please manually claim the prize using the receipt: ${pendingPrize.receipt}`
           );
         }
-        // Clear pending prize
         pendingPrize = null;
         claimedReceiptInfo = null;
-      }
-
-      // ✅ UPDATE CUSTOMER POINTS
-      if (selectedCustomer) {
-        try {
-          const pointsEarned = Math.floor(totalAmount / 10);
-          const newPoints = (selectedCustomer.points || 0) + pointsEarned;
-          await supabase
-            .from('customers')
-            .update({ points: newPoints })
-            .eq('phone', selectedCustomer.phone);
-          selectedCustomer.points = newPoints;
-          updateCustomerDisplay();
-          console.log(`✅ Added ${pointsEarned} points to customer`);
-        } catch (err) {
-          console.warn('Failed to update customer points:', err);
+      } else {
+        console.log('ℹ️ No pendingPrize found - checking if prize needs to be claimed...');
+        
+        // ✅ Check if there's a lucky draw entry that needs to be claimed
+        const { data: luckyData, error: luckyError } = await supabase
+          .from('lucky_draw_prizes')
+          .select('*')
+          .eq('receipt', transactionId)
+          .maybeSingle();
+        
+        if (luckyError) {
+          console.error('❌ Error checking lucky draw:', luckyError);
+        } else if (luckyData && luckyData.claimed === false) {
+          console.log('🎯 Found unclaimed prize for this transaction, claiming now...');
+          console.log('📋 Prize:', luckyData.prize_label);
+          console.log('📋 Store:', luckyData.store);
+          
+          const claimed = await claimPrizeAfterSale(
+            transactionId,
+            luckyData.discount_value || 38,
+            totalAmount
+          );
+          
+          if (claimed) {
+            console.log('✅ Prize claimed successfully!');
+            await showAlertModal('🎉 Prize Claimed!', 
+              `The prize "${luckyData.prize_label}" has been successfully claimed.\n` +
+              `Receipt: ${transactionId}`
+            );
+          } else {
+            console.warn('⚠️ Prize claim failed for:', transactionId);
+            await showAlertModal('⚠️ Prize Not Claimed', 
+              `Transaction saved, but the prize could not be claimed.\n` +
+              `Please manually claim the prize using the receipt: ${transactionId}`
+            );
+          }
+        } else if (luckyData && luckyData.claimed === true) {
+          console.log('✅ Prize already claimed for this transaction');
+        } else {
+          console.log('ℹ️ No lucky draw entry found for this transaction');
         }
       }
-      
-      // ✅ Re-render product grid to show updated stock
-      renderProductGrid();
 
-      // ✅ Show success message
+      // ============================================================
+      // ✅ CLEAR CART AFTER PRIZE IS CLAIMED
+      // ============================================================
+      clearCart();
+
+      // ✅ UPDATE CUSTOMER POINTS
+      console.log('🔍 DEBUG: About to update customer points');
+      console.log('🔍 customerId:', customerId);
+      console.log('🔍 customerPhone:', customerPhone);
+      console.log('🔍 totalAmount:', totalAmount);
+      
+      if (customerPhone) {
+        try {
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('id, points, name, phone')
+            .eq('phone', customerPhone)
+            .maybeSingle();
+          
+          if (customerError) {
+            console.error('❌ Error finding customer:', customerError);
+            throw customerError;
+          }
+          
+          if (!customerData) {
+            console.warn('⚠️ Customer not found with phone:', customerPhone);
+            if (customerId) {
+              console.log('🔄 Trying to find by ID:', customerId);
+              const { data: idData, error: idError } = await supabase
+                .from('customers')
+                .select('id, points, name, phone')
+                .eq('id', customerId)
+                .maybeSingle();
+              
+              if (idError || !idData) {
+                throw new Error('Customer not found by phone or ID');
+              }
+              customerData = idData;
+            } else {
+              throw new Error('Customer not found');
+            }
+          }
+          
+          console.log('✅ Customer found:', customerData);
+          
+          const pointsEarned = Math.floor(totalAmount);
+          console.log('========================================');
+          console.log('⭐ CUSTOMER POINTS UPDATE START');
+          console.log('👤 Customer:', customerData.name);
+          console.log('📱 Phone:', customerData.phone);
+          console.log('🆔 ID:', customerData.id);
+          console.log('💰 Total Amount:', totalAmount);
+          console.log('⭐ Points to Earn:', pointsEarned);
+          
+          const currentPoints = customerData.points || 0;
+          const newPoints = currentPoints + pointsEarned;
+          
+          console.log('📊 Current points:', currentPoints);
+          console.log('📊 New points:', newPoints);
+          
+          const { data: updateData, error: updateError } = await supabase
+            .from('customers')
+            .update({ points: newPoints })
+            .eq('id', customerData.id)
+            .select();
+          
+          if (updateError) {
+            console.error('❌ Error updating customer points:', updateError);
+            throw updateError;
+          }
+          
+          console.log('✅ Supabase update response:', updateData);
+          
+          const { data: verifyData, error: verifyError } = await supabase
+            .from('customers')
+            .select('id, points')
+            .eq('id', customerData.id)
+            .maybeSingle();
+          
+          if (verifyError) {
+            console.error('❌ Error verifying points:', verifyError);
+          } else {
+            console.log('✅ Verified points:', verifyData);
+          }
+          
+          const updatedCustomer = {
+            ...customerData,
+            points: newPoints
+          };
+          
+          if (selectedCustomer) {
+            selectedCustomer.points = newPoints;
+            selectedCustomer.id = customerData.id;
+            try {
+              sessionStorage.setItem('selectedCustomer', JSON.stringify(selectedCustomer));
+            } catch(e) {}
+          }
+          if (window.selectedCustomer) {
+            window.selectedCustomer.points = newPoints;
+            window.selectedCustomer.id = customerData.id;
+          }
+          
+          updateCustomerDisplay();
+          
+          console.log('✅ Points updated successfully!');
+          console.log('⭐ New total points:', newPoints);
+          console.log('========================================');
+          
+          await showAlertModal('⭐ Points Earned!', 
+            `${customerData.name || 'Customer'} earned ${pointsEarned} points!\n` +
+            `Total points: ${newPoints}`
+          );
+          
+        } catch (err) {
+          console.error('❌ Failed to update customer points:', err);
+          await showAlertModal('⚠️ Points Update Failed', 
+            `Transaction completed but points update failed.\n` +
+            `Error: ${err.message || 'Unknown error'}\n` +
+            `Please contact support to have points added manually.`
+          );
+        }
+      } else {
+        console.log('ℹ️ No customer selected, skipping points update');
+      }
+      
+      renderProductGrid();
+      
       await showAlertModal('✅ Transaction Complete!', 
         `Transaction ID: ${transaction.transaction_id}\n` +
         `Total: RM ${totalAmount.toFixed(2)}\n` +
@@ -5262,12 +6635,9 @@ async function completeCheckout(paymentMethod, cashReceived) {
       );
 
     } else {
-      // ❌ Transaction failed - save to pending
       console.warn('⚠️ Transaction failed, saving to pending...');
       pendingSales.push(transaction);
       localStorage.setItem('pendingSales', JSON.stringify(pendingSales));
-      
-      // ✅ Try to sync pending sales immediately
       await syncPendingSales();
       
       await showAlertModal('⚠️ Offline Mode', 
@@ -5297,25 +6667,32 @@ function processClaimBarcode() {
 
 // ==================== LUCKY DRAW FUNCTIONS ====================
 
-async function saveToLuckyDraw(transaction) {
+async function saveToLuckyDraw(transaction, customerPhone = null) {
   try {
     console.log('🎲 SAVE TO LUCKY DRAW CALLED!');
     console.log('Transaction total:', transaction.total);
+    console.log('Customer phone:', customerPhone);
+    console.log('🏪 Store from transaction:', transaction.store);
+    console.log('🏪 Current store:', currentStore);
     
     // Check if transaction qualifies for lucky draw
-    const qualifies = transaction.total >= 10;
+    const qualifies = transaction.total >= 5;
     
     if (!qualifies) {
-      console.log('❌ Transaction does not qualify for lucky draw (below RM 100)');
+      console.log('❌ Transaction does not qualify for lucky draw (below RM 5)');
       return false;
     }
     
     console.log('✅ Transaction qualifies for Lucky Draw!');
     
+    // ✅ Get the correct store - use transaction.store first
+    const storeForLuckyDraw = transaction.store || currentStore || 'queens';
+    console.log('🏪 Using store for Lucky Draw:', storeForLuckyDraw);
+    
     // Check if this transaction already has a lucky draw entry
     const { data: existing, error: checkError } = await supabase
       .from('lucky_draw_prizes')
-      .select('id, prize_label, discount_value')
+      .select('id, prize_label, discount_value, store')
       .eq('receipt', transaction.transaction_id)
       .maybeSingle();
     
@@ -5329,20 +6706,49 @@ async function saveToLuckyDraw(transaction) {
     // If already exists, show the print modal directly
     if (existing) {
       console.log('Lucky draw entry already exists for this transaction');
-      console.log('Prize:', existing.prize_label, 'Value:', existing.discount_value);
+      console.log('Store in existing entry:', existing.store);
       
-      // Show the print modal with prize info
+      // ✅ If the store is wrong, update it!
+      if (existing.store !== storeForLuckyDraw) {
+        console.log('🔄 Updating store from', existing.store, 'to', storeForLuckyDraw);
+        const { error: updateError } = await supabase
+          .from('lucky_draw_prizes')
+          .update({ store: storeForLuckyDraw })
+          .eq('receipt', transaction.transaction_id);
+        
+        if (updateError) {
+          console.error('❌ Error updating store:', updateError);
+        } else {
+          console.log('✅ Store updated successfully!');
+        }
+      }
+      
       document.getElementById('luckyDrawReceiptNumber').innerText = transaction.transaction_id;
       document.getElementById('luckyDrawPrizeLabel').innerText = existing.prize_label || 'RM 38 FREE GIFT';
       document.getElementById('luckyDrawPrintModal').style.display = 'flex';
       return true;
     }
     
-    // Show the lucky draw modal (with Go to Lucky Draw button)
-    console.log('✅ Showing Lucky Draw modal - customer needs to spin');
+    // ✅ BUILD THE URL WITH STORE PARAMETER
+    let luckyUrl = `https://teohmarcus584.github.io/salesanalysis/?receipt=${transaction.transaction_id}`;
+    if (customerPhone) {
+      luckyUrl += `&phone=${encodeURIComponent(customerPhone)}`;
+    }
+    // ✅ CRITICAL: Add store parameter
+    luckyUrl += `&store=${encodeURIComponent(storeForLuckyDraw)}`;
+    
+    console.log('🔗 Opening Lucky Draw URL:', luckyUrl);
+    
+    // Show the lucky draw modal
     const txIdSpan = document.getElementById('luckyTxId');
     if (txIdSpan) {
       txIdSpan.innerText = transaction.transaction_id;
+    }
+    
+    // ✅ Store the URL for the button
+    const openBtn = document.getElementById('openLuckyDrawBtn');
+    if (openBtn) {
+      openBtn.dataset.url = luckyUrl;
     }
     
     const luckyModal = document.getElementById('luckyDrawModal');
@@ -5357,13 +6763,66 @@ async function saveToLuckyDraw(transaction) {
     return false;
   }
 }
+async function debugLuckyDraw(receiptNumber) {
+  console.log('🔍 DEBUGGING LUCKY DRAW FOR:', receiptNumber);
+  
+  // 1. Check lucky_draw_prizes table
+  const { data: luckyData, error: luckyError } = await supabase
+    .from('lucky_draw_prizes')
+    .select('*')
+    .eq('receipt', receiptNumber)
+    .maybeSingle();
+  
+  if (luckyError) {
+    console.error('❌ Error checking lucky_draw_prizes:', luckyError);
+  }
+  
+  if (!luckyData) {
+    console.log('❌ No entry found in lucky_draw_prizes for receipt:', receiptNumber);
+  } else {
+    console.log('📋 lucky_draw_prizes entry:');
+    console.log('  - ID:', luckyData.id);
+    console.log('  - Receipt:', luckyData.receipt);
+    console.log('  - Prize:', luckyData.prize_label);
+    console.log('  - Store:', luckyData.store);
+    console.log('  - Claimed:', luckyData.claimed);
+    console.log('  - Claimed At:', luckyData.claimed_at);
+  }
+  
+  // 2. Check transactions table
+  const { data: txData, error: txError } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('transaction_id', receiptNumber)
+    .maybeSingle();
+  
+  if (txError) {
+    console.error('❌ Error checking transactions:', txError);
+  }
+  
+  if (!txData) {
+    console.log('❌ No transaction found for receipt:', receiptNumber);
+  } else {
+    console.log('📋 Transaction found:');
+    console.log('  - Store:', txData.store);
+    console.log('  - Total:', txData.total);
+    console.log('  - Customer:', txData.customer_phone);
+  }
+  
+  return { luckyDraw: luckyData, transaction: txData };
+}
 
+// Call from console: debugLuckyDraw('QUE00123456')
 // ==================== LUCKY DRAW EVENT LISTENERS ====================
 
 
 // Open Lucky Draw link AND show print modal with auto-print
+// Open Lucky Draw link with phone number
 document.getElementById('openLuckyDrawBtn').addEventListener('click', function() {
   const txId = document.getElementById('luckyTxId').innerText;
+  
+  // ✅ Get the URL from data attribute (which now includes store)
+  const url = this.dataset.url || `https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`;
   
   if (!txId || txId === '') {
     showAlertModal('Error', 'No transaction ID found.');
@@ -5373,18 +6832,18 @@ document.getElementById('openLuckyDrawBtn').addEventListener('click', function()
   // Store the transaction ID globally
   window._luckyDrawTransactionId = txId;
   
-  // Open the Lucky Draw page in a new tab
-  window.open(`https://teohmarcus584.github.io/salesanalysis/?receipt=${txId}`, '_blank');
+  // ✅ Open the Lucky Draw page with the URL (includes store and phone if available)
+  window.open(url, '_blank');
   
   // Close the lucky draw modal
   document.getElementById('luckyDrawModal').style.display = 'none';
   
-  // ✅ Show the print modal with a message
+  // Show the print modal with a message
   document.getElementById('luckyDrawReceiptNumber').innerText = txId;
   document.getElementById('luckyDrawPrizeLabel').innerText = '🎰 Waiting for spin result...';
   document.getElementById('luckyDrawPrintModal').style.display = 'flex';
   
-  // ✅ Auto-print will happen when prize is found
+  // Start checking for the lucky draw result
   checkForLuckyDrawResult(txId);
 });
 
@@ -5473,7 +6932,6 @@ document.getElementById('printPrizeVoucherBtn').addEventListener('click', async 
 // Check for Lucky Draw Result (polling)
 // ==================== LUCKY DRAW CHECK FUNCTION ====================
 
-// Check for Lucky Draw Result (polling with auto-print)
 function checkForLuckyDrawResult(txId) {
   // Clear any existing interval
   if (window._luckyDrawCheckInterval) {
@@ -5489,7 +6947,7 @@ function checkForLuckyDrawResult(txId) {
     try {
       const { data, error } = await supabase
         .from('lucky_draw_prizes')
-        .select('prize_label, discount_value')
+        .select('prize_label, discount_value, store, claimed')  // ✅ Include store
         .eq('receipt', txId)
         .maybeSingle();
       
@@ -5501,10 +6959,12 @@ function checkForLuckyDrawResult(txId) {
       if (data) {
         // Found the prize - update the print modal
         console.log('✅ Lucky draw prize found!', data);
+        console.log('🏪 Store in lucky draw:', data.store);
+        
         document.getElementById('luckyDrawReceiptNumber').innerText = txId;
         document.getElementById('luckyDrawPrizeLabel').innerText = data.prize_label || 'RM 38 FREE GIFT';
         
-        // ✅ Auto-print the voucher without waiting for button click
+        // ✅ Auto-print the voucher
         console.log('🖨️ Auto-printing voucher...');
         
         // Close the print modal
@@ -6594,7 +8054,9 @@ async function processRefund(transactionId, store) {
       custom_discount: -(transaction.custom_discount || 0),
       staff_discount: -(transaction.staff_discount || 0),
       settled: false,
-      refunded: false
+      refunded: false,
+      customer_id: transaction.customer_id || null,
+      customer_phone: transaction.customer_phone || null
     };
 
     // Save refund to transactions
@@ -6614,6 +8076,159 @@ async function processRefund(transactionId, store) {
       .from('transactions')
       .update({ refunded: true })
       .eq('transaction_id', transactionId);
+
+    // ✅ ============================================================
+    // ✅ VOID/DELETE LUCKY DRAW PRIZE
+    // ✅ ============================================================
+    
+    console.log('🎲 Checking for lucky draw prize to void...');
+    
+    try {
+      // Check if there's a lucky draw entry for this transaction
+      const { data: luckyDrawData, error: luckyDrawError } = await supabase
+        .from('lucky_draw_prizes')
+        .select('*')
+        .eq('receipt', transactionId)
+        .maybeSingle();
+      
+      if (luckyDrawError) {
+        console.error('❌ Error checking lucky draw:', luckyDrawError);
+      } else if (luckyDrawData) {
+        console.log('🎲 Lucky draw entry found for transaction:', transactionId);
+        console.log('🎲 Prize:', luckyDrawData.prize_label);
+        console.log('🎲 Status:', luckyDrawData.claimed ? 'Claimed' : 'Not Claimed');
+        
+        // ✅ Option 1: Delete the lucky draw entry permanently
+        const { error: deleteError } = await supabase
+          .from('lucky_draw_prizes')
+          .delete()
+          .eq('receipt', transactionId);
+        
+        if (deleteError) {
+          console.error('❌ Error deleting lucky draw:', deleteError);
+          
+          // ✅ Option 2: If delete fails, try marking as voided (if column exists)
+          // If you have a 'voided' or 'refunded' column in lucky_draw_prizes:
+          /*
+          const { error: updateError } = await supabase
+            .from('lucky_draw_prizes')
+            .update({ 
+              voided: true, 
+              voided_at: new Date().toISOString(),
+              voided_by: currentEmployee.name,
+              voided_reason: 'Transaction refunded'
+            })
+            .eq('receipt', transactionId);
+          
+          if (updateError) {
+            console.error('❌ Error voiding lucky draw:', updateError);
+          } else {
+            console.log('✅ Lucky draw prize voided successfully');
+          }
+          */
+        } else {
+          console.log('✅ Lucky draw prize deleted successfully for transaction:', transactionId);
+          
+          // Send notification
+          if (telegramAccounts) {
+            const message = `🎲 LUCKY DRAW VOIDED\n` +
+                           `Transaction: ${transactionId}\n` +
+                           `Prize: ${luckyDrawData.prize_label || 'Unknown'}\n` +
+                           `Reason: Refunded\n` +
+                           `By: ${currentEmployee?.name || 'Unknown'}\n` +
+                           `Time: ${new Date().toLocaleString()}`;
+            sendTelegramMessage(message);
+          }
+        }
+      } else {
+        console.log('ℹ️ No lucky draw entry found for transaction:', transactionId);
+      }
+    } catch (err) {
+      console.error('❌ Lucky draw void error:', err);
+      await showAlertModal('⚠️ Lucky Draw Void Warning',
+        `Refund processed but lucky draw could not be voided.\n\n` +
+        `Error: ${err.message}\n` +
+        `Please manually void the lucky draw entry for receipt: ${transactionId}`
+      );
+    }
+
+    // ✅ ============================================================
+    // ✅ DEDUCT CUSTOMER POINTS DURING REFUND
+    // ✅ ============================================================
+    
+    const customerPhone = transaction.customer_phone;
+    const customerId = transaction.customer_id;
+    
+    console.log('🔍 Checking for customer points deduction:', { customerPhone, customerId });
+    
+    if (customerPhone || customerId) {
+      try {
+        let query = supabase.from('customers').select('id, points, name, phone');
+        
+        if (customerPhone) {
+          query = query.eq('phone', customerPhone);
+        } else if (customerId) {
+          query = query.eq('id', customerId);
+        }
+        
+        const { data: customerData, error: customerError } = await query.maybeSingle();
+        
+        if (customerError) {
+          console.error('❌ Error finding customer:', customerError);
+        } else if (customerData) {
+          const originalAmount = Math.abs(transaction.total);
+          const pointsToDeduct = Math.floor(originalAmount);
+          const currentPoints = customerData.points || 0;
+          const newPoints = Math.max(0, currentPoints - pointsToDeduct);
+          
+          console.log('========================================');
+          console.log('⭐ CUSTOMER POINTS DEDUCTION START');
+          console.log('👤 Customer:', customerData.name);
+          console.log('📱 Phone:', customerData.phone);
+          console.log('💰 Refund Amount:', originalAmount.toFixed(2));
+          console.log('⭐ Points to Deduct:', pointsToDeduct);
+          console.log('📊 Current points:', currentPoints);
+          console.log('📊 New points:', newPoints);
+          
+          const { error: updateError } = await supabase
+            .from('customers')
+            .update({ points: newPoints })
+            .eq('id', customerData.id);
+          
+          if (updateError) {
+            console.error('❌ Error deducting points:', updateError);
+            await showAlertModal('⚠️ Points Deduction Failed',
+              `Refund processed but points could not be deducted.\n\n` +
+              `Error: ${updateError.message}\n` +
+              `Please manually adjust customer points.`
+            );
+          } else {
+            console.log('✅ Points deducted successfully!');
+            console.log(`⭐ New total points: ${newPoints}`);
+            console.log('========================================');
+            
+            if (selectedCustomer && selectedCustomer.id === customerData.id) {
+              selectedCustomer.points = newPoints;
+              try {
+                sessionStorage.setItem('selectedCustomer', JSON.stringify(selectedCustomer));
+              } catch(e) {}
+              updateCustomerDisplay();
+            }
+          }
+        } else {
+          console.log('ℹ️ No customer found for this transaction, skipping points deduction');
+        }
+      } catch (err) {
+        console.error('❌ Points deduction error:', err);
+        await showAlertModal('⚠️ Points Deduction Warning',
+          `Refund processed but points deduction failed.\n\n` +
+          `Error: ${err.message}\n` +
+          `Please manually adjust customer points if needed.`
+        );
+      }
+    } else {
+      console.log('ℹ️ No customer associated with this transaction, skipping points deduction');
+    }
 
     // ✅ IRS Reporting for refunds (Card and Alipay)
     if (transaction.payment_method === 'Card' || transaction.payment_method === 'Alipay') {
@@ -6666,9 +8281,8 @@ async function processRefund(transactionId, store) {
     // ✅ RESTORE STOCK - USING SLOT-BASED COLUMNS
     console.log('🔄 Restoring stock for refund...');
     
-    // Find the store's slot number
     const storeObj = stores.find(s => s.store_id === store);
-    let stockColumn = `stock_${store}`; // Fallback for old stores
+    let stockColumn = `stock_${store}`;
     
     if (storeObj && storeObj.slot_number) {
       const slotNumStr = String(storeObj.slot_number).padStart(2, '0');
@@ -6678,15 +8292,13 @@ async function processRefund(transactionId, store) {
       console.log(`📦 Using fallback stock column for refund: ${stockColumn}`);
     }
     
-    // Track which products were updated
     const updatedProducts = [];
     
     for (const item of transaction.items) {
       if (item.quantity > 0) {
-        // Get current stock from Supabase
         const { data: product, error: pError } = await supabase
           .from('products')
-          .select('*')  // Get all columns
+          .select('*')
           .eq('id', item.id)
           .single();
         
@@ -6694,7 +8306,6 @@ async function processRefund(transactionId, store) {
           const currentStock = parseInt(product[stockColumn]) || 0;
           const newStock = currentStock + item.quantity;
           
-          // Update stock in Supabase
           const updateData = {};
           updateData[stockColumn] = newStock;
           
@@ -6710,7 +8321,6 @@ async function processRefund(transactionId, store) {
             updatedProducts.push({ id: item.id, name: item.name, newStock: newStock });
           }
           
-          // Update local product
           const localProduct = products.find(p => p.id == item.id);
           if (localProduct) {
             localProduct.stock = newStock;
@@ -6775,7 +8385,6 @@ async function processRefund(transactionId, store) {
       await updateAdminReport(true);
     }
     
-    // ✅ Re-render product grid to show updated stock
     renderProductGrid();
     
   } catch (err) {
@@ -7302,7 +8911,333 @@ function setSettlementFieldsEnabled(enabled) {
   const checkBtn = document.getElementById('checkSettlementBtn');
   if (checkBtn) checkBtn.disabled = !enabled;
 }
+// ==================== EMPLOYEE MANAGEMENT ====================
 
+// Open Employee Management Modal
+function openEmployeeManagementModal() {
+  document.getElementById('employeeManagementModal').style.display = 'flex';
+  renderEmployeeList();
+}
+
+// Close Employee Management Modal
+function closeEmployeeManagementModal() {
+  document.getElementById('employeeManagementModal').style.display = 'none';
+}
+
+// Render Employee List
+async function renderEmployeeList() {
+  const container = document.getElementById('employeeListContainer');
+  if (!container) return;
+  
+  container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">🔄 Loading employees...</div>';
+  
+  try {
+    const employees = await loadAndCacheEmployees(true);
+    
+    if (!employees || employees.length === 0) {
+      container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No employees found.</div>';
+      return;
+    }
+    
+    // Sort by name
+    const sorted = [...employees].sort((a, b) => a.name.localeCompare(b.name));
+    
+    let html = '';
+    for (const emp of sorted) {
+      const isAdmin = emp.isAdmin || emp.is_admin || false;
+      const storeName = emp.store ? getStoreName(emp.store) : 'All Stores';
+      const storeEmoji = emp.store ? getStoreEmoji(emp.store) : '🌍';
+      const isCurrent = currentEmployee && currentEmployee.id === emp.id;
+      
+      html += `
+        <div style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid ${isCurrent ? '#3b82f6' : '#e2e8f0'}; ${isCurrent ? 'border-left: 4px solid #3b82f6;' : ''}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+            <div style="flex: 1; min-width: 150px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <strong style="font-size: 1.1rem;">${escapeHtml(emp.name)}</strong>
+                ${isAdmin ? '<span style="background: #8b5cf6; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">👑 ADMIN</span>' : ''}
+                ${isCurrent ? '<span style="background: #3b82f6; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">CURRENT</span>' : ''}
+              </div>
+              <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                🆔 ID: ${emp.id} | 🔑 PIN: ${emp.pin}
+              </div>
+              <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">
+                ${storeEmoji} ${storeName}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${!isCurrent ? `<button class="switch-employee-btn" data-id="${emp.id}" style="background: #3b82f6; color: white; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">🔄 Switch</button>` : ''}
+              <button class="edit-employee-btn" data-id="${emp.id}" style="background: #f1f5f9; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">✏️ Edit</button>
+              ${!isCurrent && !isAdmin ? `<button class="delete-employee-btn" data-id="${emp.id}" style="background: #fee2e2; color: #dc2626; border: none; border-radius: 20px; padding: 6px 14px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">🗑️ Delete</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    container.innerHTML = html;
+    
+    // Event listeners for buttons
+    document.querySelectorAll('.switch-employee-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const empId = parseInt(btn.dataset.id);
+        const employee = cachedEmployees.find(e => e.id === empId);
+        if (employee) {
+          await switchToEmployee(employee);
+          renderEmployeeList();
+          closeEmployeeManagementModal();
+        }
+      });
+    });
+    
+    document.querySelectorAll('.edit-employee-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const empId = parseInt(btn.dataset.id);
+        const employee = cachedEmployees.find(e => e.id === empId);
+        if (employee) {
+          openEmployeeFormModal(employee);
+        }
+      });
+    });
+    
+    document.querySelectorAll('.delete-employee-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const empId = parseInt(btn.dataset.id);
+        const employee = cachedEmployees.find(e => e.id === empId);
+        if (employee) {
+          const confirmed = await showConfirmModal('Delete Employee', `Are you sure you want to delete employee "${employee.name}"? This action cannot be undone.`);
+          if (confirmed) {
+            await deleteEmployee(empId);
+          }
+        }
+      });
+    });
+    
+  } catch (err) {
+    console.error('Error rendering employees:', err);
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load employees.</div>';
+  }
+}
+
+// Open Employee Form Modal (Add or Edit)
+function openEmployeeFormModal(employee = null) {
+  const modal = document.getElementById('employeeFormModal');
+  const title = document.getElementById('employeeFormTitle');
+  const nameInput = document.getElementById('employeeNameInput');
+  const pinInput = document.getElementById('employeePinInput');
+  const storeSelect = document.getElementById('employeeStoreSelect');
+  const adminCheck = document.getElementById('employeeAdminCheck');
+  const saveBtn = document.getElementById('saveEmployeeBtn');
+  const errorDiv = document.getElementById('employeeFormError');
+  
+  // Clear error
+  errorDiv.style.display = 'none';
+  errorDiv.innerText = '';
+  
+  // Populate store dropdown
+  populateEmployeeStoreSelect();
+  
+  if (employee) {
+    // Edit mode
+    title.innerText = '✏️ Edit Employee';
+    saveBtn.innerText = '💾 Update Employee';
+    nameInput.value = employee.name || '';
+    pinInput.value = employee.pin || '';
+    storeSelect.value = employee.store || '';
+    adminCheck.checked = employee.isAdmin || employee.is_admin || false;
+    
+    // Store employee ID for update
+    saveBtn.dataset.employeeId = employee.id;
+  } else {
+    // Add mode
+    title.innerText = '➕ Add New Employee';
+    saveBtn.innerText = '💾 Save Employee';
+    nameInput.value = '';
+    pinInput.value = '';
+    storeSelect.value = '';
+    adminCheck.checked = false;
+    delete saveBtn.dataset.employeeId;
+  }
+  
+  modal.style.display = 'flex';
+  setTimeout(() => nameInput.focus(), 300);
+}
+
+// Close Employee Form Modal
+function closeEmployeeFormModal() {
+  document.getElementById('employeeFormModal').style.display = 'none';
+}
+
+// Populate Store Dropdown in Employee Form
+function populateEmployeeStoreSelect() {
+  const select = document.getElementById('employeeStoreSelect');
+  if (!select) return;
+  
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">-- Select Store (optional) --</option>';
+  
+  const activeStores = stores.filter(s => s.is_active !== false);
+  activeStores.forEach(store => {
+    const option = document.createElement('option');
+    option.value = store.store_id;
+    option.textContent = store.name;
+    select.appendChild(option);
+  });
+  
+  // Add "All Stores" option
+  const allOption = document.createElement('option');
+  allOption.value = '';
+  allOption.textContent = '🌍 All Stores (Admin)';
+  select.prepend(allOption);
+  
+  // Restore previous selection
+  if (currentValue) {
+    select.value = currentValue;
+  }
+}
+
+// Save Employee (Add or Update)
+async function saveEmployee() {
+  const nameInput = document.getElementById('employeeNameInput');
+  const pinInput = document.getElementById('employeePinInput');
+  const storeSelect = document.getElementById('employeeStoreSelect');
+  const adminCheck = document.getElementById('employeeAdminCheck');
+  const saveBtn = document.getElementById('saveEmployeeBtn');
+  const errorDiv = document.getElementById('employeeFormError');
+  
+  const name = nameInput.value.trim();
+  const pin = pinInput.value.trim();
+  const store = storeSelect.value || null;
+  const isAdmin = adminCheck.checked;
+  const employeeId = saveBtn.dataset.employeeId ? parseInt(saveBtn.dataset.employeeId) : null;
+  
+  // Validate
+  if (!name) {
+    errorDiv.innerText = '❌ Employee name is required.';
+    errorDiv.style.display = 'block';
+    nameInput.focus();
+    nameInput.style.borderColor = '#ef4444';
+    return;
+  }
+  
+  if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    errorDiv.innerText = '❌ Please enter a valid 4-digit numeric PIN.';
+    errorDiv.style.display = 'block';
+    pinInput.focus();
+    pinInput.style.borderColor = '#ef4444';
+    return;
+  }
+  
+  // Check for duplicate PIN (if adding or changing PIN)
+  const existingEmployee = cachedEmployees.find(e => e.pin === pin && e.id !== employeeId);
+  if (existingEmployee) {
+    errorDiv.innerText = `❌ PIN "${pin}" is already assigned to ${existingEmployee.name}.`;
+    errorDiv.style.display = 'block';
+    pinInput.focus();
+    pinInput.style.borderColor = '#ef4444';
+    return;
+  }
+  
+  // Check for duplicate name
+  const existingName = cachedEmployees.find(e => e.name.toLowerCase() === name.toLowerCase() && e.id !== employeeId);
+  if (existingName) {
+    errorDiv.innerText = `❌ Employee "${name}" already exists.`;
+    errorDiv.style.display = 'block';
+    nameInput.focus();
+    nameInput.style.borderColor = '#ef4444';
+    return;
+  }
+  
+  // Reset error styles
+  nameInput.style.borderColor = '#e2e8f0';
+  pinInput.style.borderColor = '#e2e8f0';
+  errorDiv.style.display = 'none';
+  
+  showLoading(employeeId ? 'Updating employee...' : 'Adding employee...');
+  
+  try {
+    const employeeData = {
+      name: name,
+      pin: pin,
+      store: isAdmin ? null : store,
+      is_admin: isAdmin
+    };
+    
+    let result;
+    
+    if (employeeId) {
+      // Update existing employee
+      const { data, error } = await supabase
+        .from('employees')
+        .update(employeeData)
+        .eq('id', employeeId)
+        .select();
+      
+      if (error) throw error;
+      result = data;
+      
+      // Update current employee if it's the logged-in user
+      if (currentEmployee && currentEmployee.id === employeeId) {
+        currentEmployee.name = name;
+        currentEmployee.pin = pin;
+        currentEmployee.isAdmin = isAdmin;
+        document.getElementById('employeeNameHeader').innerText = `👤 ${currentEmployee.name}`;
+      }
+      
+      await showAlertModal('✅ Employee Updated', `Employee "${name}" has been updated successfully.`);
+    } else {
+      // Add new employee
+      const { data, error } = await supabase
+        .from('employees')
+        .insert([employeeData])
+        .select();
+      
+      if (error) throw error;
+      result = data;
+      
+      await showAlertModal('✅ Employee Added', `Employee "${name}" has been added successfully.`);
+    }
+    
+    // Refresh employee cache
+    await loadAndCacheEmployees(true);
+    renderEmployeeList();
+    closeEmployeeFormModal();
+    closeEmployeeManagementModal();
+    
+  } catch (err) {
+    console.error('Error saving employee:', err);
+    errorDiv.innerText = `❌ Failed to ${employeeId ? 'update' : 'add'} employee: ${err.message}`;
+    errorDiv.style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+}
+
+// Delete Employee
+async function deleteEmployee(employeeId) {
+  showLoading('Deleting employee...');
+  
+  try {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', employeeId);
+    
+    if (error) throw error;
+    
+    // Refresh employee cache
+    await loadAndCacheEmployees(true);
+    renderEmployeeList();
+    
+    await showAlertModal('✅ Employee Deleted', 'Employee has been deleted successfully.');
+    
+  } catch (err) {
+    console.error('Error deleting employee:', err);
+    await showAlertModal('❌ Error', `Failed to delete employee: ${err.message}`);
+  } finally {
+    hideLoading();
+  }
+}
 async function openSettlementModal() {
   const modal = document.getElementById('settlementModal');
   modal.style.display = 'flex';
@@ -7984,7 +9919,49 @@ async function loadCollectionHistory(fromDate = null, toDate = null) {
     historyContainer.innerHTML = '<div style="text-align: center; color: #ef4444;">Failed to load history.</div>';
   }
 }
+// ==================== PIN VISIBILITY TOGGLE ====================
 
+let pinVisible = false;
+
+function togglePinVisibility() {
+  const pinInput = document.getElementById('employeePinInput');
+  const toggleBtn = document.getElementById('togglePinVisibilityBtn');
+  
+  if (!pinInput || !toggleBtn) return;
+  
+  pinVisible = !pinVisible;
+  
+  if (pinVisible) {
+    pinInput.type = 'text';
+    toggleBtn.innerHTML = '🙈';
+    toggleBtn.style.color = '#3b82f6';
+    toggleBtn.style.background = 'rgba(59, 130, 246, 0.1)';
+  } else {
+    pinInput.type = 'password';
+    toggleBtn.innerHTML = '👁️';
+    toggleBtn.style.color = '#94a3b8';
+    toggleBtn.style.background = 'transparent';
+  }
+  
+  // Keep focus on the input
+  pinInput.focus();
+}
+
+// Auto-hide PIN after 5 seconds of inactivity
+let pinHideTimeout = null;
+
+function resetPinHideTimer() {
+  if (pinHideTimeout) {
+    clearTimeout(pinHideTimeout);
+  }
+  if (pinVisible) {
+    pinHideTimeout = setTimeout(() => {
+      if (pinVisible) {
+        togglePinVisibility();
+      }
+    }, 5000); // Hide after 5 seconds
+  }
+}
 // ==================== CUSTOMER FUNCTIONS ====================
 
 async function fetchCustomerByPhone(phone) {
@@ -8005,6 +9982,15 @@ async function fetchCustomerByPhone(phone) {
 
 async function saveCustomer(customerData) {
   try {
+    // ✅ Ensure points is a number
+    const points = parseInt(customerData.points) || 0;
+    
+    console.log('💾 Saving customer:', {
+      phone: customerData.phone,
+      name: customerData.name,
+      points: points
+    });
+    
     const { data, error } = await supabase
       .from('customers')
       .upsert([{
@@ -8012,12 +9998,17 @@ async function saveCustomer(customerData) {
         name: customerData.name || '',
         email: customerData.email || '',
         birthday: customerData.birthday || null,
-        points: customerData.points || 0
+        points: points
       }], { onConflict: 'phone' })
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error saving customer:', error);
+      throw error;
+    }
+    
+    console.log('✅ Customer saved:', data);
     return data;
   } catch (err) {
     console.error('Error saving customer:', err);
@@ -8026,21 +10017,33 @@ async function saveCustomer(customerData) {
 }
 
 function updateCustomerDisplay() {
+  const display = document.getElementById('customerInfoDisplay');
+  if (!display) return;
+  
   if (selectedCustomer) {
-    customerInfoDisplay.innerHTML = `
+    display.innerHTML = `
       <div class="customer-info">
         <div class="customer-name">👤 ${escapeHtml(selectedCustomer.name || 'Customer')} (${escapeHtml(selectedCustomer.phone)})</div>
         <div class="customer-points">⭐ Points: ${selectedCustomer.points || 0}</div>
-        <button id="removeCustomerBtn">Remove</button>
+        <button id="removeCustomerBtn" class="cart-header-btn" style="font-size:0.7rem; padding:2px 10px;">Remove</button>
       </div>
     `;
-    customerInfoDisplay.style.display = 'block';
-    document.getElementById('removeCustomerBtn').addEventListener('click', () => {
-      selectedCustomer = null;
-      updateCustomerDisplay();
-    });
+    display.style.display = 'block';
+    
+    const removeBtn = document.getElementById('removeCustomerBtn');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        selectedCustomer = null;
+        window.selectedCustomer = null;
+        try {
+          sessionStorage.removeItem('selectedCustomer');
+        } catch(e) {}
+        updateCustomerDisplay();
+        console.log('👤 Customer removed');
+      });
+    }
   } else {
-    customerInfoDisplay.style.display = 'none';
+    display.style.display = 'none';
   }
 }
 
@@ -8080,6 +10083,27 @@ async function findCustomer() {
   const customer = await fetchCustomerByPhone(phone);
   hideLoading();
   if (customer) {
+    // ✅ Ensure points is a number
+    customer.points = parseInt(customer.points) || 0;
+    
+    console.log('✅ Customer found:', {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      points: customer.points
+    });
+    
+    // ✅ Set BOTH the global and local variables
+    window.selectedCustomer = customer;
+    selectedCustomer = customer;
+    
+    // ✅ Also store in sessionStorage for persistence
+    try {
+      sessionStorage.setItem('selectedCustomer', JSON.stringify(customer));
+    } catch(e) {
+      console.warn('Could not save to sessionStorage:', e);
+    }
+    
     document.getElementById('customerStep1').style.display = 'none';
     document.getElementById('customerStep2').style.display = 'block';
     document.getElementById('customerPhone2').value = customer.phone;
@@ -8092,8 +10116,11 @@ async function findCustomer() {
     }
     document.getElementById('customerBirthday').value = birthdayValue;
     document.getElementById('customerPoints').value = customer.points || 0;
-    selectedCustomer = customer;
     updateCustomerDisplay();
+    
+    console.log('✅ selectedCustomer set to:', selectedCustomer);
+    console.log('✅ window.selectedCustomer set to:', window.selectedCustomer);
+    
     await showAlertModal('Customer Found', `Customer ${customer.name || 'found'} with ${customer.points || 0} points.`);
   } else {
     document.getElementById('customerStep1').style.display = 'none';
@@ -8101,6 +10128,10 @@ async function findCustomer() {
     document.getElementById('customerPhone2').value = phone;
     document.getElementById('customerPoints').value = '0';
     selectedCustomer = null;
+    window.selectedCustomer = null;
+    try {
+      sessionStorage.removeItem('selectedCustomer');
+    } catch(e) {}
     showCustomerError('Customer not found. Fill in details and click Save to create new customer.');
   }
 }
@@ -8119,15 +10150,46 @@ async function saveCustomerFromModal() {
   const customer = await saveCustomer({ phone, name, email, birthday, points });
   hideLoading();
   if (customer) {
+    // ✅ Set BOTH the global and local variables
+    window.selectedCustomer = customer;
     selectedCustomer = customer;
+    
+    // ✅ Store in sessionStorage for persistence
+    try {
+      sessionStorage.setItem('selectedCustomer', JSON.stringify(customer));
+    } catch(e) {
+      console.warn('Could not save to sessionStorage:', e);
+    }
+    
     updateCustomerDisplay();
     document.getElementById('customerModal').style.display = 'none';
+    console.log('✅ Customer saved and selected:', selectedCustomer);
     await showAlertModal('Success', `Customer ${customer.name || 'saved'} successfully.`);
   } else {
     showCustomerError('Failed to save customer. Check connection.');
   }
 }
+// ==================== RESTORE CUSTOMER FROM SESSION ====================
 
+function restoreCustomerFromSession() {
+  try {
+    const saved = sessionStorage.getItem('selectedCustomer');
+    if (saved) {
+      const customer = JSON.parse(saved);
+      console.log('🔄 Restored customer from session:', customer);
+      window.selectedCustomer = customer;
+      selectedCustomer = customer;
+      updateCustomerDisplay();
+      return true;
+    }
+  } catch(e) {
+    console.warn('Could not restore customer from session:', e);
+  }
+  return false;
+}
+
+// ✅ Call it immediately after defining the function
+restoreCustomerFromSession();
 function showCustomerError(msg) {
   const errorDiv = document.getElementById('customerError');
   errorDiv.innerText = msg;
@@ -8351,63 +10413,68 @@ function applyPrizeToCart() {
 }
 
 async function claimPrizeAfterSale(receipt, prizeValue, finalTotal) {
-  try {
-    console.log('========================================');
-    console.log('🎯 CLAIM PRIZE FUNCTION CALLED!');
-    console.log('📋 Receipt:', receipt);
-    console.log('📋 Prize Value:', prizeValue);
-    console.log('========================================');
-    
-    // ✅ Check if already claimed
-    const { data: checkData, error: checkError } = await supabase
-      .from('lucky_draw_prizes')
-      .select('claimed, id, prize_label')
-      .eq('receipt', receipt)
-      .maybeSingle();
-    
-    if (checkError) {
-      console.error('❌ Error checking prize status:', checkError);
-      return false;
-    }
-    
-    console.log('📋 Found prize data:', checkData);
-    
-    if (!checkData) {
-      console.error('❌ No prize found for receipt:', receipt);
-      return false;
-    }
-    
-    if (checkData.claimed === true) {
-      console.log('⚠️ Prize already claimed! ID:', checkData.id);
-      return true;
-    }
-    
-    // ✅ Update the lucky_draw_prizes table - mark as claimed
-    console.log('🔄 Updating prize to claimed=true...');
-    const { data, error } = await supabase
-      .from('lucky_draw_prizes')
-      .update({
-        claimed: true,
-        claimed_at: new Date().toISOString()
-      })
-      .eq('receipt', receipt)
-      .select();
-    
-    if (error) {
-      console.error('❌ Error marking prize as claimed:', error);
-      return false;
-    }
-    
-    console.log('✅ Prize marked as claimed successfully!');
-    console.log('📋 Updated data:', data);
-    console.log('========================================');
-    return true;
-    
-  } catch (err) {
-    console.error('❌ Error claiming prize:', err);
-    console.log('========================================');
+  console.log('========================================');
+  console.log('🎯 CLAIM PRIZE FUNCTION CALLED!');
+  console.log('📋 Receipt to claim:', receipt);
+  console.log('📋 Prize Value:', prizeValue);
+  console.log('📋 Final Total:', finalTotal);
+  console.log('========================================');
+  
+  // ✅ Check if the receipt exists
+  const { data: existing, error: checkError } = await supabase
+    .from('lucky_draw_prizes')
+    .select('*')
+    .eq('receipt', receipt)
+    .maybeSingle();
+  
+  if (checkError) {
+    console.error('❌ Error checking prize:', checkError);
     return false;
   }
+  
+  if (!existing) {
+    console.error('❌ NO PRIZE FOUND for receipt:', receipt);
+    console.log('🔍 Receipt from pendingPrize:', receipt);
+    console.log('🔍 Tip: Check if the receipt number matches exactly');
+    return false;
+  }
+  
+  console.log('📋 Found prize:', {
+    id: existing.id,
+    receipt: existing.receipt,
+    prize: existing.prize_label,
+    store: existing.store,
+    claimed: existing.claimed
+  });
+  
+  // ✅ If already claimed, return true
+  if (existing.claimed === true) {
+    console.log('⚠️ Prize already claimed!');
+    return true;
+  }
+  
+  // ✅ UPDATE the prize
+  console.log('🔄 UPDATING prize to claimed=true...');
+  
+  const { data, error } = await supabase
+    .from('lucky_draw_prizes')
+    .update({ 
+      claimed: true, 
+      claimed_at: new Date().toISOString()
+    })
+    .eq('receipt', receipt)
+    .select();
+  
+  if (error) {
+    console.error('❌ UPDATE ERROR:', error);
+    console.error('❌ Error details:', error.message);
+    return false;
+  }
+  
+  console.log('✅ UPDATE SUCCESSFUL!');
+  console.log('📋 Updated data:', data);
+  console.log('========================================');
+  return true;
 }
 
 // ==================== TELEGRAM FUNCTIONS ====================
@@ -11781,6 +13848,56 @@ function toggleInventoryMode() {
   refreshCategoryHighlighting();
   renderProductGrid();
 }
+function openEmployeeFormModal(employee = null) {
+  const modal = document.getElementById('employeeFormModal');
+  const title = document.getElementById('employeeFormTitle');
+  const nameInput = document.getElementById('employeeNameInput');
+  const pinInput = document.getElementById('employeePinInput');
+  const storeSelect = document.getElementById('employeeStoreSelect');
+  const adminCheck = document.getElementById('employeeAdminCheck');
+  const saveBtn = document.getElementById('saveEmployeeBtn');
+  const errorDiv = document.getElementById('employeeFormError');
+  
+  // Clear error
+  errorDiv.style.display = 'none';
+  errorDiv.innerText = '';
+  
+  // Reset PIN visibility
+  if (pinVisible) {
+    togglePinVisibility();
+  }
+  if (pinHideTimeout) {
+    clearTimeout(pinHideTimeout);
+  }
+  
+  // Populate store dropdown
+  populateEmployeeStoreSelect();
+  
+  if (employee) {
+    // Edit mode
+    title.innerText = '✏️ Edit Employee';
+    saveBtn.innerText = '💾 Update Employee';
+    nameInput.value = employee.name || '';
+    pinInput.value = employee.pin || '';
+    storeSelect.value = employee.store || '';
+    adminCheck.checked = employee.isAdmin || employee.is_admin || false;
+    
+    // Store employee ID for update
+    saveBtn.dataset.employeeId = employee.id;
+  } else {
+    // Add mode
+    title.innerText = '➕ Add New Employee';
+    saveBtn.innerText = '💾 Save Employee';
+    nameInput.value = '';
+    pinInput.value = '';
+    storeSelect.value = '';
+    adminCheck.checked = false;
+    delete saveBtn.dataset.employeeId;
+  }
+  
+  modal.style.display = 'flex';
+  setTimeout(() => nameInput.focus(), 300);
+}
 async function bulkUpdateStock(productUpdates) {
   // productUpdates: [{ productId, newStock, delta }]
   if (!productUpdates || productUpdates.length === 0) return;
@@ -11992,6 +14109,88 @@ function populateEditProductSelect() {
 }
 
 // This should be in your DOMContentLoaded event listener
+// PIN visibility toggle
+document.getElementById('togglePinVisibilityBtn')?.addEventListener('click', function(e) {
+  e.preventDefault();
+  togglePinVisibility();
+  resetPinHideTimer();
+});
+
+// Auto-hide PIN when user clicks away or types
+document.getElementById('employeePinInput')?.addEventListener('input', function() {
+  resetPinHideTimer();
+});
+
+document.getElementById('employeePinInput')?.addEventListener('blur', function() {
+  // Hide PIN when input loses focus
+  if (pinVisible) {
+    togglePinVisibility();
+  }
+  if (pinHideTimeout) {
+    clearTimeout(pinHideTimeout);
+  }
+});
+
+// Also reset when modal closes
+document.getElementById('closeEmployeeFormModal')?.addEventListener('click', function() {
+  if (pinVisible) {
+    togglePinVisibility();
+  }
+  if (pinHideTimeout) {
+    clearTimeout(pinHideTimeout);
+  }
+});
+
+document.getElementById('cancelEmployeeFormBtn')?.addEventListener('click', function() {
+  if (pinVisible) {
+    togglePinVisibility();
+  }
+  if (pinHideTimeout) {
+    clearTimeout(pinHideTimeout);
+  }
+});
+// Employee Management
+document.getElementById('sideEmployeeBtn')?.addEventListener('click', wrapMenuAction(() => {
+  if (!currentEmployee?.isAdmin) {
+    showAlertModal('Access Denied', 'Only administrators can manage employees.');
+    return;
+  }
+  openEmployeeManagementModal();
+}));
+
+// Close Employee Management Modal
+document.getElementById('closeEmployeeManagementModal')?.addEventListener('click', closeEmployeeManagementModal);
+document.getElementById('closeEmployeeManagementBtn')?.addEventListener('click', closeEmployeeManagementModal);
+
+// Open Add Employee Modal
+document.getElementById('openAddEmployeeBtn')?.addEventListener('click', () => {
+  openEmployeeFormModal();
+});
+
+// Close Employee Form Modal
+document.getElementById('closeEmployeeFormModal')?.addEventListener('click', closeEmployeeFormModal);
+document.getElementById('cancelEmployeeFormBtn')?.addEventListener('click', closeEmployeeFormModal);
+
+// Save Employee
+document.getElementById('saveEmployeeBtn')?.addEventListener('click', saveEmployee);
+
+// Close modals on overlay click
+document.getElementById('employeeManagementModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('employeeManagementModal')) {
+    closeEmployeeManagementModal();
+  }
+});
+
+document.getElementById('employeeFormModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('employeeFormModal')) {
+    closeEmployeeFormModal();
+  }
+});
+
+// PIN input - only allow numbers and max 4 digits
+document.getElementById('employeePinInput')?.addEventListener('input', function() {
+  this.value = this.value.replace(/\D/g, '').slice(0, 4);
+});
 document.getElementById('editProductSelect')?.addEventListener('change', function() {
   const productId = this.value;
   const errorDiv = document.getElementById('addProductError');
@@ -13355,6 +15554,7 @@ async function processBarcode() {
 // ==================== EVENT LISTENERS ====================
 
 document.addEventListener('DOMContentLoaded', function() {
+ restoreCustomerFromSession();
   // Store select
   if (storeSelect) {
     storeSelect.addEventListener('change', async () => {
