@@ -9439,22 +9439,28 @@ async function printSettlementReport(store, date, totals) {
 
 async function fetchSettlementsForStore(store) {
   try {
-    console.log(`🔍 Fetching settlements for store: ${store}`);
+    console.log(`🔍 Fetching settlements for store: "${store}"`);
     
-    // ✅ Get ALL settlements for this store, not just the latest ones
+    // ✅ Validate store parameter
+    if (!store || store === '' || store === 'all') {
+      console.warn('⚠️ fetchSettlementsForStore called with invalid store:', store);
+      return [];
+    }
+    
+    // ✅ Get ALL settlements for THIS SPECIFIC STORE ONLY
     const { data, error } = await supabase
       .from('settlements')
       .select('*')
-      .eq('store', store)
+      .eq('store', store)       // ✅ FILTER BY SPECIFIC STORE
       .order('date', { ascending: false })
-      .limit(100); // Get last 100 settlements
+      .limit(100);
     
     if (error) {
       console.error('❌ fetchSettlementsForStore error:', error);
       throw error;
     }
     
-    console.log(`✅ Found ${data?.length || 0} settlements for ${store}`);
+    console.log(`✅ Found ${data?.length || 0} settlements for store "${store}"`);
     return data || [];
   } catch (err) {
     console.error('❌ fetchSettlementsForStore error:', err);
@@ -9467,13 +9473,48 @@ async function showReprintSettlementModal() {
   const select = document.getElementById('settlementDateSelect');
   const errorDiv = document.getElementById('reprintSettlementError');
   
-  // Determine which store to use
+  // ✅ FIX: Determine store reliably
   let store = currentStore;
+  
+  // For non-admin, always use their assigned store
   if (!currentEmployee?.isAdmin) {
+    store = initialStore || currentStore;
+  }
+  
+  // ✅ FALLBACK: If store is still empty, use the store dropdown value
+  if (!store || store === '') {
+    const storeSelect = document.getElementById('storeSelect');
+    if (storeSelect && storeSelect.value) {
+      store = storeSelect.value;
+    }
+  }
+  
+  // ✅ FINAL FALLBACK: Use initialStore
+  if (!store || store === '') {
     store = initialStore;
   }
   
   console.log(`📋 Opening settlement history for store: ${store}`);
+  console.log(`   currentStore: ${currentStore}`);
+  console.log(`   initialStore: ${initialStore}`);
+  console.log(`   isAdmin: ${currentEmployee?.isAdmin}`);
+  
+  // If STILL no store, show error
+  if (!store || store === '') {
+    select.innerHTML = '<option value="">❌ Store not determined</option>';
+    errorDiv.innerText = 'Could not determine which store to load. Please refresh and try again.';
+    errorDiv.style.display = 'block';
+    modal.style.display = 'flex';
+    return;
+  }
+  
+  // ✅ Update the modal title to show which store
+  const storeObj = stores.find(s => s.store_id === store);
+  const storeName = storeObj ? storeObj.name : store;
+  const titleEl = modal.querySelector('.modal-title');
+  if (titleEl) {
+    titleEl.innerHTML = `📋 Settlement History <span style="font-size: 0.9rem; color: #64748b; font-weight: 400;">(${storeName})</span>`;
+  }
   
   // Show loading state
   select.innerHTML = '<option value="">🔄 Loading settlements...</option>';
@@ -9481,11 +9522,13 @@ async function showReprintSettlementModal() {
   modal.style.display = 'flex';
   
   try {
-    // ✅ Fetch BOTH existing settlements AND unsettled transaction dates
+    // ✅ Fetch BOTH existing settlements AND unsettled transaction dates FOR THIS STORE
     const [settlements, unsettledDates] = await Promise.all([
       fetchSettlementsForStore(store),
       fetchUnsettledTransactionDates(store)
     ]);
+    
+    console.log(`📊 Store "${store}": ${settlements.length} settlements, ${unsettledDates.length} pending dates`);
     
     // Build a map of existing settlements by date
     const settlementByDate = {};
@@ -9583,13 +9626,13 @@ async function showReprintSettlementModal() {
     }
     
     if (!hasAnyRecords) {
-      select.innerHTML = '<option value="">📭 No settlements or pending transactions found</option>';
+      select.innerHTML = `<option value="">📭 No settlements or pending transactions found for ${storeName}</option>`;
       updateSettlementActionButton();
       return;
     }
     
     select.innerHTML = options;
-    console.log(`✅ Populated ${select.options.length} options (settlements + pending)`);
+    console.log(`✅ Populated ${select.options.length} options for ${store}`);
     
     // Auto-select the first one
     if (select.options.length > 0) {
@@ -9665,15 +9708,21 @@ function updateSettlementActionButton() {
 
 async function fetchUnsettledTransactionDates(store) {
   try {
-    console.log(`🔍 Fetching unsettled transaction dates for store: ${store}`);
+    console.log(`🔍 Fetching unsettled transaction dates for store: "${store}"`);
     
-    // Get ALL transactions for this store that are NOT settled
+    // ✅ CRITICAL: Validate store parameter
+    if (!store || store === '' || store === 'all') {
+      console.warn('⚠️ fetchUnsettledTransactionDates called with invalid store:', store);
+      return [];
+    }
+    
+    // Get ALL unsettled transactions for THIS SPECIFIC STORE ONLY
     const { data, error } = await supabase
       .from('transactions')
-      .select('timestamp, total, payment_method, settled, refunded')
-      .eq('store', store)
-      .eq('settled', false)
-      .eq('refunded', false)
+      .select('timestamp, total, payment_method, settled, refunded, store')
+      .eq('store', store)       // ✅ FILTER BY SPECIFIC STORE
+      .eq('settled', false)     // ✅ Only unsettled
+      .eq('refunded', false)    // ✅ Exclude refunds
       .order('timestamp', { ascending: false });
     
     if (error) {
@@ -9682,8 +9731,20 @@ async function fetchUnsettledTransactionDates(store) {
     }
     
     if (!data || data.length === 0) {
-      console.log('✅ No unsettled transactions found');
+      console.log(`✅ No unsettled transactions found for store "${store}"`);
       return [];
+    }
+    
+    console.log(`📊 Found ${data.length} unsettled transactions for store "${store}"`);
+    
+    // ✅ SAFETY: Double-check that all returned transactions belong to this store
+    const wrongStore = data.filter(tx => tx.store !== store);
+    if (wrongStore.length > 0) {
+      console.error(`❌ DATA LEAK DETECTED: ${wrongStore.length} transactions from other stores!`);
+      console.error('Wrong store transactions:', wrongStore.map(t => t.store));
+      // Filter them out manually as a safety measure
+      data = data.filter(tx => tx.store === store);
+      console.log(`✅ Filtered down to ${data.length} transactions for "${store}"`);
     }
     
     // Group by date (using MYT timezone)
@@ -9726,7 +9787,7 @@ async function fetchUnsettledTransactionDates(store) {
     // Convert to array, sorted by date descending
     const result = Object.values(dateGroups).sort((a, b) => b.date.localeCompare(a.date));
     
-    console.log(`✅ Found ${result.length} unsettled date(s):`, result.map(r => r.date));
+    console.log(`✅ Store "${store}" has ${result.length} unsettled date(s):`, result.map(r => r.date));
     return result;
     
   } catch (err) {
@@ -9860,8 +9921,36 @@ async function reprintSelectedSettlement() {
 }
 
 async function openSettlementForDate(store, date) {
-  console.log(`📝 Opening settlement modal for store: ${store}, date: ${date}`);
+  console.log(`📝 Opening settlement modal for store: "${store}", date: ${date}`);
   
+  // ============================================================
+  // ✅ STEP 1: VALIDATE STORE PARAMETER
+  // ============================================================
+  if (!store || store === '' || store === 'all') {
+    console.error('❌ Invalid store passed to openSettlementForDate:', store);
+    await showAlertModal('Error', 'Invalid store. Please refresh and try again.');
+    return;
+  }
+  
+  // ============================================================
+  // ✅ STEP 2: VALIDATE DATE PARAMETER
+  // ============================================================
+  if (!date || date === '') {
+    console.error('❌ Invalid date passed to openSettlementForDate:', date);
+    await showAlertModal('Error', 'Invalid date. Please try again.');
+    return;
+  }
+  
+  // ============================================================
+  // ✅ STEP 3: VERIFY STORE EXISTS
+  // ============================================================
+  const storeObj = stores.find(s => s.store_id === store);
+  const storeName = storeObj ? storeObj.name : store;
+  console.log(`   Store name: ${storeName}`);
+  
+  // ============================================================
+  // ✅ STEP 4: SHOW MODAL + RESET UI
+  // ============================================================
   const modal = document.getElementById('settlementModal');
   modal.style.display = 'flex';
   
@@ -9888,7 +9977,21 @@ async function openSettlementForDate(store, date) {
   document.getElementById('actualAlipay').value = '';
   document.getElementById('pettyCashFloat').value = '0.00';
   
-  // Show loading
+  // Set clean placeholders
+  document.getElementById('actualCash').placeholder = 'Enter cash amount';
+  document.getElementById('actualCard').placeholder = 'Enter card amount';
+  document.getElementById('actualQR').placeholder = 'Enter QR amount';
+  document.getElementById('actualAlipay').placeholder = 'Enter Alipay amount';
+  
+  // Clear error field styling
+  ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('error-field');
+  });
+  
+  // ============================================================
+  // ✅ STEP 5: SHOW LOADING MESSAGE
+  // ============================================================
   let loadingMsg = document.getElementById('settlementLoadingMsg');
   if (!loadingMsg) {
     loadingMsg = document.createElement('div');
@@ -9907,37 +10010,61 @@ async function openSettlementForDate(store, date) {
   `;
   loadingMsg.style.display = 'block';
   
+  // ============================================================
+  // ✅ STEP 6: FETCH UNSETTLED TRANSACTIONS FOR THIS STORE + DATE
+  // ============================================================
   try {
-    // Fetch totals for this specific date
+    // Build date range (MYT timezone UTC+8)
     const startDate = new Date(date + 'T00:00:00+08:00');
     const endDate = new Date(date + 'T23:59:59+08:00');
+    
+    console.log(`🔍 Fetching transactions for store "${store}" on ${date}`);
+    console.log(`   Range: ${startDate.toISOString()} → ${endDate.toISOString()}`);
     
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('store', store)
-      .eq('settled', false)
-      .eq('refunded', false)
-      .gt('total', 0)
+      .eq('store', store)                // ✅ FILTER BY SPECIFIC STORE
+      .eq('settled', false)              // ✅ Only unsettled
+      .eq('refunded', false)             // ✅ Exclude refunds
+      .gt('total', 0)                    // ✅ Only positive totals
       .gte('timestamp', startDate.toISOString())
       .lte('timestamp', endDate.toISOString());
     
     if (error) throw error;
     
+    // ✅ Safety check: Verify all transactions belong to the correct store
+    const wrongStoreTx = (data || []).filter(tx => tx.store !== store);
+    if (wrongStoreTx.length > 0) {
+      console.warn(`⚠️ Found ${wrongStoreTx.length} transactions from other stores. Filtering them out.`);
+    }
+    
+    const validTransactions = (data || []).filter(tx => tx.store === store);
+    
+    console.log(`✅ Found ${validTransactions.length} unsettled transactions for "${store}" on ${date}`);
+    
+    // ============================================================
+    // ✅ STEP 7: CALCULATE TOTALS BY PAYMENT METHOD
+    // ============================================================
     let cashTotal = 0;
     let cardTotal = 0;
     let qrTotal = 0;
     let alipayTotal = 0;
     let totalItems = 0;
     
-    (data || []).forEach(tx => {
+    validTransactions.forEach(tx => {
       const total = parseFloat(tx.total) || 0;
       const payment = (tx.payment_method || '').toLowerCase();
       
-      if (payment === 'cash') cashTotal += total;
-      else if (payment === 'card') cardTotal += total;
-      else if (payment === 'qr pay' || payment === 'qr') qrTotal += total;
-      else if (payment === 'alipay') alipayTotal += total;
+      if (payment === 'cash') {
+        cashTotal += total;
+      } else if (payment === 'card') {
+        cardTotal += total;
+      } else if (payment === 'qr pay' || payment === 'qr') {
+        qrTotal += total;
+      } else if (payment === 'alipay') {
+        alipayTotal += total;
+      }
       
       if (tx.items && Array.isArray(tx.items)) {
         tx.items.forEach(item => {
@@ -9948,7 +10075,19 @@ async function openSettlementForDate(store, date) {
     
     const netTotal = cashTotal + cardTotal + qrTotal + alipayTotal;
     
-    // Update the UI with system totals
+    console.log(`💰 Totals for "${store}" on ${date}:`, {
+      cash: cashTotal,
+      card: cardTotal,
+      qr: qrTotal,
+      alipay: alipayTotal,
+      net: netTotal,
+      transactions: validTransactions.length,
+      items: totalItems
+    });
+    
+    // ============================================================
+    // ✅ STEP 8: UPDATE UI WITH SYSTEM TOTALS
+    // ============================================================
     document.getElementById('sysCash').innerText = `RM ${cashTotal.toFixed(2)}`;
     document.getElementById('sysCard').innerText = `RM ${cardTotal.toFixed(2)}`;
     document.getElementById('sysQR').innerText = `RM ${qrTotal.toFixed(2)}`;
@@ -9956,7 +10095,9 @@ async function openSettlementForDate(store, date) {
     document.getElementById('sysRefund').innerText = `RM 0.00`;
     document.getElementById('sysNetTotal').innerText = `RM ${netTotal.toFixed(2)}`;
     
-    // Pre-fill actual values with system values
+    // ============================================================
+    // ✅ STEP 9: PRE-FILL ACTUAL VALUES WITH SYSTEM VALUES
+    // ============================================================
     document.getElementById('actualCash').value = cashTotal.toFixed(2);
     document.getElementById('actualCard').value = cardTotal.toFixed(2);
     document.getElementById('actualQR').value = qrTotal.toFixed(2);
@@ -9964,13 +10105,17 @@ async function openSettlementForDate(store, date) {
     
     // Enable fields
     ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'].forEach(id => {
-      document.getElementById(id).disabled = false;
+      const el = document.getElementById(id);
+      if (el) el.disabled = false;
     });
+    
     document.getElementById('checkSettlementBtn').disabled = false;
     document.getElementById('recordSettlementBtn').style.display = 'block';
     document.getElementById('checkSettlementBtn').style.display = 'none';
     
-    // Store data for recording
+    // ============================================================
+    // ✅ STEP 10: STORE DATA FOR RECORDING
+    // ============================================================
     window._settlementData = {
       store: store,
       date: date,
@@ -9986,22 +10131,48 @@ async function openSettlementForDate(store, date) {
       alipayActual: alipayTotal
     };
     
+    console.log('✅ Settlement data prepared:', window._settlementData);
+    
+    // ============================================================
+    // ✅ STEP 11: HIDE LOADING + SHOW INFO MESSAGE
+    // ============================================================
     loadingMsg.style.display = 'none';
     
-    // Show info message
     const errorDiv = document.getElementById('settlementError');
-    errorDiv.innerHTML = `
-      ⚠️ <strong>Settling for ${date}</strong><br>
-      <span style="font-size: 0.85rem;">${data.length} unsettled transaction(s) found. Please verify the amounts and click "Record Settlement".</span>
-    `;
-    errorDiv.style.display = 'block';
-    errorDiv.style.color = '#f59e0b';
-    errorDiv.style.background = '#fffbeb';
-    errorDiv.style.padding = '12px';
-    errorDiv.style.borderRadius = '12px';
+    
+    if (validTransactions.length === 0) {
+      // No transactions found — show warning
+      errorDiv.innerHTML = `
+        ⚠️ <strong>No unsettled transactions found</strong> for <strong>${storeName}</strong> on <strong>${date}</strong>.<br>
+        <span style="font-size: 0.85rem;">This date may have already been settled or has no sales.</span>
+      `;
+      errorDiv.style.display = 'block';
+      errorDiv.style.color = '#92400e';
+      errorDiv.style.background = '#fffbeb';
+      errorDiv.style.padding = '12px';
+      errorDiv.style.borderRadius = '12px';
+      errorDiv.style.borderLeft = '4px solid #f59e0b';
+      
+      // Disable record button since there's nothing to settle
+      document.getElementById('recordSettlementBtn').style.display = 'none';
+      document.getElementById('checkSettlementBtn').style.display = 'none';
+    } else {
+      // Transactions found — show info
+      errorDiv.innerHTML = `
+        ⚠️ <strong>Settling for ${date}</strong> — Store: <strong>${storeName}</strong><br>
+        <span style="font-size: 0.85rem;">${validTransactions.length} unsettled transaction(s) • ${totalItems} items • Net: RM ${netTotal.toFixed(2)}</span><br>
+        <span style="font-size: 0.85rem; color: #64748b;">Verify the amounts and click "Record Settlement" to confirm.</span>
+      `;
+      errorDiv.style.display = 'block';
+      errorDiv.style.color = '#92400e';
+      errorDiv.style.background = '#fffbeb';
+      errorDiv.style.padding = '12px';
+      errorDiv.style.borderRadius = '12px';
+      errorDiv.style.borderLeft = '4px solid #f59e0b';
+    }
     
   } catch (err) {
-    console.error('Error loading settlement for date:', err);
+    console.error('❌ Error loading settlement for date:', err);
     loadingMsg.style.display = 'none';
     await showAlertModal('Error', 'Failed to load settlement data for this date: ' + err.message);
   }
