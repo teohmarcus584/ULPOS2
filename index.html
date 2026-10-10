@@ -9716,13 +9716,28 @@ async function fetchUnsettledTransactionDates(store) {
       return [];
     }
     
-    // Get ALL unsettled transactions for THIS SPECIFIC STORE ONLY
+    // ✅ Get TODAY's date string in MYT timezone (UTC+8)
+    const now = new Date();
+    const mytNow = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const todayStr = mytNow.toISOString().split('T')[0];
+    
+    console.log(`   Today (MYT): ${todayStr} (will be EXCLUDED from pending list)`);
+    
+    // ✅ Compute END of YESTERDAY in MYT (23:59:59 yesterday)
+    // We only want transactions BEFORE today
+    const todayStartMYT = new Date(todayStr + 'T00:00:00+08:00');
+    const yesterdayEndISO = new Date(todayStartMYT.getTime() - 1).toISOString();
+    
+    console.log(`   Fetching unsettled transactions BEFORE: ${yesterdayEndISO}`);
+    
+    // Get ALL unsettled transactions for THIS SPECIFIC STORE, EXCLUDING today
     const { data, error } = await supabase
       .from('transactions')
       .select('timestamp, total, payment_method, settled, refunded, store')
-      .eq('store', store)       // ✅ FILTER BY SPECIFIC STORE
-      .eq('settled', false)     // ✅ Only unsettled
-      .eq('refunded', false)    // ✅ Exclude refunds
+      .eq('store', store)                          // ✅ FILTER BY SPECIFIC STORE
+      .eq('settled', false)                        // ✅ Only unsettled
+      .eq('refunded', false)                       // ✅ Exclude refunds
+      .lte('timestamp', yesterdayEndISO)           // ✅ EXCLUDE TODAY (only past dates)
       .order('timestamp', { ascending: false });
     
     if (error) {
@@ -9731,30 +9746,36 @@ async function fetchUnsettledTransactionDates(store) {
     }
     
     if (!data || data.length === 0) {
-      console.log(`✅ No unsettled transactions found for store "${store}"`);
+      console.log(`✅ No past unsettled transactions found for store "${store}"`);
       return [];
     }
     
-    console.log(`📊 Found ${data.length} unsettled transactions for store "${store}"`);
+    console.log(`📊 Found ${data.length} past unsettled transactions for store "${store}"`);
     
     // ✅ SAFETY: Double-check that all returned transactions belong to this store
     const wrongStore = data.filter(tx => tx.store !== store);
     if (wrongStore.length > 0) {
       console.error(`❌ DATA LEAK DETECTED: ${wrongStore.length} transactions from other stores!`);
       console.error('Wrong store transactions:', wrongStore.map(t => t.store));
-      // Filter them out manually as a safety measure
-      data = data.filter(tx => tx.store === store);
-      console.log(`✅ Filtered down to ${data.length} transactions for "${store}"`);
     }
+    
+    // Filter to only correct store
+    const validData = data.filter(tx => tx.store === store);
     
     // Group by date (using MYT timezone)
     const dateGroups = {};
     
-    data.forEach(tx => {
+    validData.forEach(tx => {
       const txDate = new Date(tx.timestamp);
       // Convert to MYT (UTC+8) date string
       const mytDate = new Date(txDate.getTime() + (8 * 60 * 60 * 1000));
       const dateKey = mytDate.toISOString().split('T')[0];
+      
+      // ✅ SKIP today (extra safety check)
+      if (dateKey === todayStr) {
+        console.log(`   ⏭️ Skipping today's date: ${dateKey}`);
+        return;
+      }
       
       if (!dateGroups[dateKey]) {
         dateGroups[dateKey] = {
@@ -9787,7 +9808,7 @@ async function fetchUnsettledTransactionDates(store) {
     // Convert to array, sorted by date descending
     const result = Object.values(dateGroups).sort((a, b) => b.date.localeCompare(a.date));
     
-    console.log(`✅ Store "${store}" has ${result.length} unsettled date(s):`, result.map(r => r.date));
+    console.log(`✅ Store "${store}" has ${result.length} past unsettled date(s):`, result.map(r => r.date));
     return result;
     
   } catch (err) {
