@@ -9512,7 +9512,6 @@ async function showReprintSettlementModal() {
           day: 'numeric'
         });
         
-        // Check if there's also a settlement record for this date (partial)
         const existingSettlement = settlementByDate[dateInfo.date];
         const status = existingSettlement 
           ? (existingSettlement.collected ? '✅ Collected' : '⏳ Recorded')
@@ -9521,7 +9520,6 @@ async function showReprintSettlementModal() {
         const totalAmount = (dateInfo.cashTotal || 0) + (dateInfo.cardTotal || 0) + 
                            (dateInfo.qrTotal || 0) + (dateInfo.alipayTotal || 0);
         
-        // Create a pseudo-settlement object for pending dates
         const pendingData = existingSettlement || {
           id: null,
           date: dateInfo.date,
@@ -9549,7 +9547,6 @@ async function showReprintSettlementModal() {
     
     // ✅ 2. Add existing settlements (excluding dates already shown as pending)
     const settledDates = settlements.filter(s => {
-      // Only include settlements that aren't already in the unsettled list
       if (!s.date) return false;
       return !unsettledDates.some(u => u.date === s.date);
     });
@@ -9587,6 +9584,7 @@ async function showReprintSettlementModal() {
     
     if (!hasAnyRecords) {
       select.innerHTML = '<option value="">📭 No settlements or pending transactions found</option>';
+      updateSettlementActionButton();
       return;
     }
     
@@ -9598,11 +9596,70 @@ async function showReprintSettlementModal() {
       select.selectedIndex = 0;
     }
     
+    // ✅ Remove old listener to prevent duplicates
+    select.removeEventListener('change', updateSettlementActionButton);
+    
+    // ✅ Add listener for future changes
+    select.addEventListener('change', updateSettlementActionButton);
+    
+    // ✅ Update button text immediately
+    updateSettlementActionButton();
+    
   } catch (err) {
     console.error('❌ Error loading settlements:', err);
     select.innerHTML = '<option value="">❌ Error loading settlements</option>';
     errorDiv.innerText = 'Failed to load settlement history. Please try again.';
     errorDiv.style.display = 'block';
+  }
+}
+
+function updateSettlementActionButton() {
+  const select = document.getElementById('settlementDateSelect');
+  const actionBtn = document.getElementById('confirmReprintSettlementBtn');
+  const errorDiv = document.getElementById('reprintSettlementError');
+  
+  if (!select || !actionBtn) return;
+  
+  const selectedOption = select.options[select.selectedIndex];
+  
+  // No valid selection
+  if (!selectedOption || !selectedOption.value || selectedOption.value === '') {
+    actionBtn.innerHTML = '🖨️ Reprint';
+    actionBtn.style.background = '#2c7a4b';
+    actionBtn.style.color = 'white';
+    if (errorDiv) errorDiv.style.display = 'none';
+    return;
+  }
+  
+  const isPending = selectedOption.dataset.isPending === 'true';
+  
+  if (isPending) {
+    // ✅ Pending settlement → show "Settle Now" button
+    actionBtn.innerHTML = '✅ Settle Now';
+    actionBtn.style.background = '#2c7a4b';  // Green
+    actionBtn.style.color = 'white';
+    
+    // Show hint message
+    if (errorDiv) {
+      errorDiv.innerHTML = '⚠️ This date has <strong>unsettled transactions</strong>. Click <strong>"Settle Now"</strong> to open the settlement form for this date.';
+      errorDiv.style.display = 'block';
+      errorDiv.style.color = '#92400e';
+      errorDiv.style.background = '#fffbeb';
+      errorDiv.style.padding = '10px 14px';
+      errorDiv.style.borderRadius = '10px';
+      errorDiv.style.borderLeft = '4px solid #f59e0b';
+      errorDiv.style.fontSize = '0.9rem';
+    }
+  } else {
+    // ✅ Existing settlement → show "Reprint" button
+    actionBtn.innerHTML = '🖨️ Reprint';
+    actionBtn.style.background = '#2c7a4b';  // Green
+    actionBtn.style.color = 'white';
+    
+    // Hide hint
+    if (errorDiv) {
+      errorDiv.style.display = 'none';
+    }
   }
 }
 
@@ -9710,9 +9767,27 @@ async function reprintSelectedSettlement() {
   
   console.log('📋 Selected:', { isPending, settlementData });
   
-  // ✅ If it's a PENDING date (no settlement record yet), open settlement modal for that date
+  // ============================================================
+  // ✅ PENDING DATE → Open settlement modal for that specific date
+  // ============================================================
   if (isPending) {
     console.log(`📝 Opening settlement for pending date: ${settlementData.date}`);
+    
+    // Show confirmation dialog
+    const confirmed = await showConfirmModal(
+      '💰 Settle Now',
+      `<div style="text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 12px;">📅</div>
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 8px;">
+          Settle for ${settlementData.date}?
+        </div>
+        <div style="color: #64748b; font-size: 0.9rem;">
+          This will open the Daily Settlement form pre-filled with the system totals for this date.
+        </div>
+      </div>`
+    );
+    
+    if (!confirmed) return;
     
     // Close the reprint modal
     document.getElementById('reprintSettlementModal').style.display = 'none';
@@ -9722,7 +9797,9 @@ async function reprintSelectedSettlement() {
     return;
   }
   
-  // ✅ Otherwise, reprint the existing settlement
+  // ============================================================
+  // ✅ EXISTING SETTLEMENT → Reprint it
+  // ============================================================
   const date = settlementData.date;
   
   // Build totals object for printing
