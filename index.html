@@ -9979,7 +9979,6 @@ async function openSettlementForDate(store, date) {
   const storeSelect = document.getElementById('settlementStoreSelect');
   if (storeSelect) {
     storeSelect.value = store;
-    // Disable for non-admin
     if (!currentEmployee?.isAdmin) {
       storeSelect.disabled = true;
     }
@@ -9998,7 +9997,7 @@ async function openSettlementForDate(store, date) {
   document.getElementById('actualAlipay').value = '';
   document.getElementById('pettyCashFloat').value = '0.00';
   
-  // Set clean placeholders
+  // Clean placeholders
   document.getElementById('actualCash').placeholder = 'Enter cash amount';
   document.getElementById('actualCard').placeholder = 'Enter card amount';
   document.getElementById('actualQR').placeholder = 'Enter QR amount';
@@ -10045,21 +10044,16 @@ async function openSettlementForDate(store, date) {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .eq('store', store)                // ✅ FILTER BY SPECIFIC STORE
-      .eq('settled', false)              // ✅ Only unsettled
-      .eq('refunded', false)             // ✅ Exclude refunds
-      .gt('total', 0)                    // ✅ Only positive totals
+      .eq('store', store)
+      .eq('settled', false)
+      .eq('refunded', false)
+      .gt('total', 0)
       .gte('timestamp', startDate.toISOString())
       .lte('timestamp', endDate.toISOString());
     
     if (error) throw error;
     
-    // ✅ Safety check: Verify all transactions belong to the correct store
-    const wrongStoreTx = (data || []).filter(tx => tx.store !== store);
-    if (wrongStoreTx.length > 0) {
-      console.warn(`⚠️ Found ${wrongStoreTx.length} transactions from other stores. Filtering them out.`);
-    }
-    
+    // Safety: Verify all transactions belong to correct store
     const validTransactions = (data || []).filter(tx => tx.store === store);
     
     console.log(`✅ Found ${validTransactions.length} unsettled transactions for "${store}" on ${date}`);
@@ -10077,15 +10071,10 @@ async function openSettlementForDate(store, date) {
       const total = parseFloat(tx.total) || 0;
       const payment = (tx.payment_method || '').toLowerCase();
       
-      if (payment === 'cash') {
-        cashTotal += total;
-      } else if (payment === 'card') {
-        cardTotal += total;
-      } else if (payment === 'qr pay' || payment === 'qr') {
-        qrTotal += total;
-      } else if (payment === 'alipay') {
-        alipayTotal += total;
-      }
+      if (payment === 'cash') cashTotal += total;
+      else if (payment === 'card') cardTotal += total;
+      else if (payment === 'qr pay' || payment === 'qr') qrTotal += total;
+      else if (payment === 'alipay') alipayTotal += total;
       
       if (tx.items && Array.isArray(tx.items)) {
         tx.items.forEach(item => {
@@ -10107,7 +10096,7 @@ async function openSettlementForDate(store, date) {
     });
     
     // ============================================================
-    // ✅ STEP 8: UPDATE UI WITH SYSTEM TOTALS
+    // ✅ STEP 8: UPDATE UI WITH SYSTEM TOTALS (for reference)
     // ============================================================
     document.getElementById('sysCash').innerText = `RM ${cashTotal.toFixed(2)}`;
     document.getElementById('sysCard').innerText = `RM ${cardTotal.toFixed(2)}`;
@@ -10117,12 +10106,18 @@ async function openSettlementForDate(store, date) {
     document.getElementById('sysNetTotal').innerText = `RM ${netTotal.toFixed(2)}`;
     
     // ============================================================
-    // ✅ STEP 9: PRE-FILL ACTUAL VALUES WITH SYSTEM VALUES
+    // ✅ STEP 9: DO NOT PRE-FILL — Leave actual fields EMPTY
     // ============================================================
-    document.getElementById('actualCash').value = cashTotal.toFixed(2);
-    document.getElementById('actualCard').value = cardTotal.toFixed(2);
-    document.getElementById('actualQR').value = qrTotal.toFixed(2);
-    document.getElementById('actualAlipay').value = alipayTotal.toFixed(2);
+    document.getElementById('actualCash').value = '';
+    document.getElementById('actualCard').value = '';
+    document.getElementById('actualQR').value = '';
+    document.getElementById('actualAlipay').value = '';
+    
+    // Clean placeholders
+    document.getElementById('actualCash').placeholder = 'Enter actual cash amount';
+    document.getElementById('actualCard').placeholder = 'Enter actual card amount';
+    document.getElementById('actualQR').placeholder = 'Enter actual QR amount';
+    document.getElementById('actualAlipay').placeholder = 'Enter actual Alipay amount';
     
     // Enable fields
     ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'].forEach(id => {
@@ -10135,7 +10130,7 @@ async function openSettlementForDate(store, date) {
     document.getElementById('checkSettlementBtn').style.display = 'none';
     
     // ============================================================
-    // ✅ STEP 10: STORE DATA FOR RECORDING
+    // ✅ STEP 10: STORE DATA FOR RECORDING (system values only)
     // ============================================================
     window._settlementData = {
       store: store,
@@ -10146,13 +10141,13 @@ async function openSettlementForDate(store, date) {
       qrSystem: qrTotal,
       alipaySystem: alipayTotal,
       refundSystem: 0,
-      cashActual: cashTotal,
-      cardActual: cardTotal,
-      qrActual: qrTotal,
-      alipayActual: alipayTotal
+      cashActual: 0,      // ← Will be filled when user enters
+      cardActual: 0,      // ← Will be filled when user enters
+      qrActual: 0,        // ← Will be filled when user enters
+      alipayActual: 0     // ← Will be filled when user enters
     };
     
-    console.log('✅ Settlement data prepared:', window._settlementData);
+    console.log('✅ Settlement data prepared (actual values empty):', window._settlementData);
     
     // ============================================================
     // ✅ STEP 11: HIDE LOADING + SHOW INFO MESSAGE
@@ -10162,7 +10157,6 @@ async function openSettlementForDate(store, date) {
     const errorDiv = document.getElementById('settlementError');
     
     if (validTransactions.length === 0) {
-      // No transactions found — show warning
       errorDiv.innerHTML = `
         ⚠️ <strong>No unsettled transactions found</strong> for <strong>${storeName}</strong> on <strong>${date}</strong>.<br>
         <span style="font-size: 0.85rem;">This date may have already been settled or has no sales.</span>
@@ -10174,15 +10168,13 @@ async function openSettlementForDate(store, date) {
       errorDiv.style.borderRadius = '12px';
       errorDiv.style.borderLeft = '4px solid #f59e0b';
       
-      // Disable record button since there's nothing to settle
       document.getElementById('recordSettlementBtn').style.display = 'none';
       document.getElementById('checkSettlementBtn').style.display = 'none';
     } else {
-      // Transactions found — show info
       errorDiv.innerHTML = `
         ⚠️ <strong>Settling for ${date}</strong> — Store: <strong>${storeName}</strong><br>
         <span style="font-size: 0.85rem;">${validTransactions.length} unsettled transaction(s) • ${totalItems} items • Net: RM ${netTotal.toFixed(2)}</span><br>
-        <span style="font-size: 0.85rem; color: #64748b;">Verify the amounts and click "Record Settlement" to confirm.</span>
+        <span style="font-size: 0.85rem; color: #64748b;">Please enter the <strong>actual counted amounts</strong> for each payment method.</span>
       `;
       errorDiv.style.display = 'block';
       errorDiv.style.color = '#92400e';
