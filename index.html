@@ -9473,7 +9473,7 @@ async function showReprintSettlementModal() {
     store = initialStore;
   }
   
-  console.log(`📋 Opening reprint modal for store: ${store}`);
+  console.log(`📋 Opening settlement history for store: ${store}`);
   
   // Show loading state
   select.innerHTML = '<option value="">🔄 Loading settlements...</option>';
@@ -9481,55 +9481,117 @@ async function showReprintSettlementModal() {
   modal.style.display = 'flex';
   
   try {
-    const settlements = await fetchSettlementsForStore(store);
+    // ✅ Fetch BOTH existing settlements AND unsettled transaction dates
+    const [settlements, unsettledDates] = await Promise.all([
+      fetchSettlementsForStore(store),
+      fetchUnsettledTransactionDates(store)
+    ]);
     
-    if (!settlements || settlements.length === 0) {
-      select.innerHTML = '<option value="">📭 No previous settlements found</option>';
-      return;
-    }
-    
-    console.log(`📋 Found ${settlements.length} settlements to display`);
-    
-    // Build the options list
-    let options = '';
-    let hasValidSettlements = false;
-    
-    settlements.forEach((s, index) => {
-      // Make sure we have valid data
-      if (!s.date) return;
-      
-      hasValidSettlements = true;
-      const displayDate = new Date(s.date).toLocaleDateString('en-MY', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-      
-      const employee = s.employee_name ? ` by ${s.employee_name}` : '';
-      const cashTotal = parseFloat(s.cash_actual) || 0;
-      const cardTotal = parseFloat(s.card_actual) || 0;
-      const qrTotal = parseFloat(s.qr_actual) || 0;
-      const alipayTotal = parseFloat(s.alipay_actual) || 0;
-      const total = cashTotal + cardTotal + qrTotal + alipayTotal;
-      
-      const status = s.collected === true ? '✅ Collected' : '⏳ Pending';
-      
-      // Store the full settlement data as JSON
-      const settlementJson = JSON.stringify(s).replace(/"/g, '&quot;');
-      
-      options += `<option value="${s.id}" data-settlement='${settlementJson}'>
-        ${displayDate}${employee} - RM ${total.toFixed(2)} (${status})
-      </option>`;
+    // Build a map of existing settlements by date
+    const settlementByDate = {};
+    settlements.forEach(s => {
+      if (s.date) {
+        settlementByDate[s.date] = s;
+      }
     });
     
-    if (!hasValidSettlements) {
-      select.innerHTML = '<option value="">📭 No valid settlements found</option>';
+    // Build options
+    let options = '';
+    let hasAnyRecords = false;
+    
+    // ✅ 1. Add unsettled dates first (highlighted in red/pending)
+    if (unsettledDates && unsettledDates.length > 0) {
+      options += `<optgroup label="⚠️ PENDING SETTLEMENT (${unsettledDates.length} dates)">`;
+      
+      unsettledDates.forEach(dateInfo => {
+        hasAnyRecords = true;
+        const displayDate = new Date(dateInfo.date + 'T00:00:00').toLocaleDateString('en-MY', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        // Check if there's also a settlement record for this date (partial)
+        const existingSettlement = settlementByDate[dateInfo.date];
+        const status = existingSettlement 
+          ? (existingSettlement.collected ? '✅ Collected' : '⏳ Recorded')
+          : '🔴 Not Settled';
+        
+        const totalAmount = (dateInfo.cashTotal || 0) + (dateInfo.cardTotal || 0) + 
+                           (dateInfo.qrTotal || 0) + (dateInfo.alipayTotal || 0);
+        
+        // Create a pseudo-settlement object for pending dates
+        const pendingData = existingSettlement || {
+          id: null,
+          date: dateInfo.date,
+          store: store,
+          _isPending: true,
+          _unsettledCount: dateInfo.transactionCount,
+          _cashTotal: dateInfo.cashTotal,
+          _cardTotal: dateInfo.cardTotal,
+          _qrTotal: dateInfo.qrTotal,
+          _alipayTotal: dateInfo.alipayTotal
+        };
+        
+        const settlementJson = JSON.stringify(pendingData).replace(/"/g, '&quot;');
+        
+        options += `<option value="${existingSettlement ? existingSettlement.id : 'pending_' + dateInfo.date}" 
+                    data-settlement='${settlementJson}'
+                    data-is-pending="${!existingSettlement}"
+                    style="color: #dc2626; font-weight: 600;">
+          🔴 ${displayDate} - ${dateInfo.transactionCount} txns (RM ${totalAmount.toFixed(2)}) - NOT SETTLED
+        </option>`;
+      });
+      
+      options += `</optgroup>`;
+    }
+    
+    // ✅ 2. Add existing settlements (excluding dates already shown as pending)
+    const settledDates = settlements.filter(s => {
+      // Only include settlements that aren't already in the unsettled list
+      if (!s.date) return false;
+      return !unsettledDates.some(u => u.date === s.date);
+    });
+    
+    if (settledDates.length > 0) {
+      options += `<optgroup label="📋 SETTLED (${settledDates.length} records)">`;
+      
+      settledDates.forEach(s => {
+        hasAnyRecords = true;
+        const displayDate = new Date(s.date + 'T00:00:00').toLocaleDateString('en-MY', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        const employee = s.employee_name ? ` by ${s.employee_name}` : '';
+        const cashTotal = parseFloat(s.cash_actual) || 0;
+        const cardTotal = parseFloat(s.card_actual) || 0;
+        const qrTotal = parseFloat(s.qr_actual) || 0;
+        const alipayTotal = parseFloat(s.alipay_actual) || 0;
+        const total = cashTotal + cardTotal + qrTotal + alipayTotal;
+        
+        const status = s.collected === true ? '✅ Collected' : '⏳ Recorded';
+        
+        const settlementJson = JSON.stringify(s).replace(/"/g, '&quot;');
+        
+        options += `<option value="${s.id}" data-settlement='${settlementJson}' data-is-pending="false">
+          ${displayDate}${employee} - RM ${total.toFixed(2)} (${status})
+        </option>`;
+      });
+      
+      options += `</optgroup>`;
+    }
+    
+    if (!hasAnyRecords) {
+      select.innerHTML = '<option value="">📭 No settlements or pending transactions found</option>';
       return;
     }
     
     select.innerHTML = options;
-    console.log(`✅ Populated ${select.options.length} settlements`);
+    console.log(`✅ Populated ${select.options.length} options (settlements + pending)`);
     
     // Auto-select the first one
     if (select.options.length > 0) {
@@ -9541,6 +9603,78 @@ async function showReprintSettlementModal() {
     select.innerHTML = '<option value="">❌ Error loading settlements</option>';
     errorDiv.innerText = 'Failed to load settlement history. Please try again.';
     errorDiv.style.display = 'block';
+  }
+}
+
+async function fetchUnsettledTransactionDates(store) {
+  try {
+    console.log(`🔍 Fetching unsettled transaction dates for store: ${store}`);
+    
+    // Get ALL transactions for this store that are NOT settled
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('timestamp, total, payment_method, settled, refunded')
+      .eq('store', store)
+      .eq('settled', false)
+      .eq('refunded', false)
+      .order('timestamp', { ascending: false });
+    
+    if (error) {
+      console.error('❌ fetchUnsettledTransactionDates error:', error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('✅ No unsettled transactions found');
+      return [];
+    }
+    
+    // Group by date (using MYT timezone)
+    const dateGroups = {};
+    
+    data.forEach(tx => {
+      const txDate = new Date(tx.timestamp);
+      // Convert to MYT (UTC+8) date string
+      const mytDate = new Date(txDate.getTime() + (8 * 60 * 60 * 1000));
+      const dateKey = mytDate.toISOString().split('T')[0];
+      
+      if (!dateGroups[dateKey]) {
+        dateGroups[dateKey] = {
+          date: dateKey,
+          transactionCount: 0,
+          cashTotal: 0,
+          cardTotal: 0,
+          qrTotal: 0,
+          alipayTotal: 0,
+          total: 0
+        };
+      }
+      
+      const total = parseFloat(tx.total) || 0;
+      dateGroups[dateKey].transactionCount++;
+      dateGroups[dateKey].total += total;
+      
+      const payment = (tx.payment_method || '').toLowerCase();
+      if (payment === 'cash') {
+        dateGroups[dateKey].cashTotal += total;
+      } else if (payment === 'card') {
+        dateGroups[dateKey].cardTotal += total;
+      } else if (payment === 'qr pay' || payment === 'qr') {
+        dateGroups[dateKey].qrTotal += total;
+      } else if (payment === 'alipay') {
+        dateGroups[dateKey].alipayTotal += total;
+      }
+    });
+    
+    // Convert to array, sorted by date descending
+    const result = Object.values(dateGroups).sort((a, b) => b.date.localeCompare(a.date));
+    
+    console.log(`✅ Found ${result.length} unsettled date(s):`, result.map(r => r.date));
+    return result;
+    
+  } catch (err) {
+    console.error('❌ fetchUnsettledTransactionDates error:', err);
+    return [];
   }
 }
 
@@ -9571,10 +9705,24 @@ async function reprintSelectedSettlement() {
     return;
   }
   
-  console.log('📋 Reprinting settlement:', settlementData);
-  
-  // Determine store
+  const isPending = selectedOption.dataset.isPending === 'true';
   const store = currentStore || initialStore || settlementData.store;
+  
+  console.log('📋 Selected:', { isPending, settlementData });
+  
+  // ✅ If it's a PENDING date (no settlement record yet), open settlement modal for that date
+  if (isPending) {
+    console.log(`📝 Opening settlement for pending date: ${settlementData.date}`);
+    
+    // Close the reprint modal
+    document.getElementById('reprintSettlementModal').style.display = 'none';
+    
+    // Open the settlement modal for this specific date
+    await openSettlementForDate(store, settlementData.date);
+    return;
+  }
+  
+  // ✅ Otherwise, reprint the existing settlement
   const date = settlementData.date;
   
   // Build totals object for printing
@@ -9634,6 +9782,153 @@ async function reprintSelectedSettlement() {
   }
 }
 
+async function openSettlementForDate(store, date) {
+  console.log(`📝 Opening settlement modal for store: ${store}, date: ${date}`);
+  
+  const modal = document.getElementById('settlementModal');
+  modal.style.display = 'flex';
+  
+  // Set the store dropdown
+  const storeSelect = document.getElementById('settlementStoreSelect');
+  if (storeSelect) {
+    storeSelect.value = store;
+    // Disable for non-admin
+    if (!currentEmployee?.isAdmin) {
+      storeSelect.disabled = true;
+    }
+  }
+  
+  // Reset buttons
+  document.getElementById('recordSettlementBtn').style.display = 'none';
+  document.getElementById('checkSettlementBtn').style.display = 'block';
+  document.getElementById('settlementError').style.display = 'none';
+  document.getElementById('settlementError').innerHTML = '';
+  
+  // Clear input fields
+  document.getElementById('actualCash').value = '';
+  document.getElementById('actualCard').value = '';
+  document.getElementById('actualQR').value = '';
+  document.getElementById('actualAlipay').value = '';
+  document.getElementById('pettyCashFloat').value = '0.00';
+  
+  // Show loading
+  let loadingMsg = document.getElementById('settlementLoadingMsg');
+  if (!loadingMsg) {
+    loadingMsg = document.createElement('div');
+    loadingMsg.id = 'settlementLoadingMsg';
+    loadingMsg.style.textAlign = 'center';
+    loadingMsg.style.padding = '20px';
+    loadingMsg.style.background = '#f8fafc';
+    loadingMsg.style.borderRadius = '12px';
+    loadingMsg.style.margin = '10px 0';
+    const totalsContainer = document.getElementById('systemTotalsDisplay');
+    if (totalsContainer) totalsContainer.insertAdjacentElement('afterend', loadingMsg);
+  }
+  loadingMsg.innerHTML = `
+    <div class="settlement-loading-spinner"></div>
+    <span style="vertical-align: middle;">Loading settlement for ${date}...</span>
+  `;
+  loadingMsg.style.display = 'block';
+  
+  try {
+    // Fetch totals for this specific date
+    const startDate = new Date(date + 'T00:00:00+08:00');
+    const endDate = new Date(date + 'T23:59:59+08:00');
+    
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('store', store)
+      .eq('settled', false)
+      .eq('refunded', false)
+      .gt('total', 0)
+      .gte('timestamp', startDate.toISOString())
+      .lte('timestamp', endDate.toISOString());
+    
+    if (error) throw error;
+    
+    let cashTotal = 0;
+    let cardTotal = 0;
+    let qrTotal = 0;
+    let alipayTotal = 0;
+    let totalItems = 0;
+    
+    (data || []).forEach(tx => {
+      const total = parseFloat(tx.total) || 0;
+      const payment = (tx.payment_method || '').toLowerCase();
+      
+      if (payment === 'cash') cashTotal += total;
+      else if (payment === 'card') cardTotal += total;
+      else if (payment === 'qr pay' || payment === 'qr') qrTotal += total;
+      else if (payment === 'alipay') alipayTotal += total;
+      
+      if (tx.items && Array.isArray(tx.items)) {
+        tx.items.forEach(item => {
+          totalItems += parseInt(item.quantity) || 0;
+        });
+      }
+    });
+    
+    const netTotal = cashTotal + cardTotal + qrTotal + alipayTotal;
+    
+    // Update the UI with system totals
+    document.getElementById('sysCash').innerText = `RM ${cashTotal.toFixed(2)}`;
+    document.getElementById('sysCard').innerText = `RM ${cardTotal.toFixed(2)}`;
+    document.getElementById('sysQR').innerText = `RM ${qrTotal.toFixed(2)}`;
+    document.getElementById('sysAlipay').innerText = `RM ${alipayTotal.toFixed(2)}`;
+    document.getElementById('sysRefund').innerText = `RM 0.00`;
+    document.getElementById('sysNetTotal').innerText = `RM ${netTotal.toFixed(2)}`;
+    
+    // Pre-fill actual values with system values
+    document.getElementById('actualCash').value = cashTotal.toFixed(2);
+    document.getElementById('actualCard').value = cardTotal.toFixed(2);
+    document.getElementById('actualQR').value = qrTotal.toFixed(2);
+    document.getElementById('actualAlipay').value = alipayTotal.toFixed(2);
+    
+    // Enable fields
+    ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'].forEach(id => {
+      document.getElementById(id).disabled = false;
+    });
+    document.getElementById('checkSettlementBtn').disabled = false;
+    document.getElementById('recordSettlementBtn').style.display = 'block';
+    document.getElementById('checkSettlementBtn').style.display = 'none';
+    
+    // Store data for recording
+    window._settlementData = {
+      store: store,
+      date: date,
+      pettyCashFloat: 0,
+      cashSystem: cashTotal,
+      cardSystem: cardTotal,
+      qrSystem: qrTotal,
+      alipaySystem: alipayTotal,
+      refundSystem: 0,
+      cashActual: cashTotal,
+      cardActual: cardTotal,
+      qrActual: qrTotal,
+      alipayActual: alipayTotal
+    };
+    
+    loadingMsg.style.display = 'none';
+    
+    // Show info message
+    const errorDiv = document.getElementById('settlementError');
+    errorDiv.innerHTML = `
+      ⚠️ <strong>Settling for ${date}</strong><br>
+      <span style="font-size: 0.85rem;">${data.length} unsettled transaction(s) found. Please verify the amounts and click "Record Settlement".</span>
+    `;
+    errorDiv.style.display = 'block';
+    errorDiv.style.color = '#f59e0b';
+    errorDiv.style.background = '#fffbeb';
+    errorDiv.style.padding = '12px';
+    errorDiv.style.borderRadius = '12px';
+    
+  } catch (err) {
+    console.error('Error loading settlement for date:', err);
+    loadingMsg.style.display = 'none';
+    await showAlertModal('Error', 'Failed to load settlement data for this date: ' + err.message);
+  }
+}
 // ==================== EVENT LISTENERS ====================
 
 // Reprint Settlement button
@@ -15884,14 +16179,13 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
     return;
   }
 
-  // ✅ No errors - Check if settlement already exists and is collected
+  // ✅ Get the date from window._settlementData if it exists (for past date settlement)
   const store = document.getElementById('settlementStoreSelect').value;
-  const date = getLocalDateString(new Date());
+  const date = window._settlementData?.date || getLocalDateString(new Date());
   
   const status = await checkSettlementStatus(store, date);
   
   if (status.exists && status.isCollected) {
-    // ✅ Settlement already collected - show error
     document.getElementById('settlementError').innerHTML = `
       ❌ This settlement has already been collected and cannot be settled again.<br>
       <span style="font-size: 0.85rem; color: #64748b;">
@@ -15910,8 +16204,9 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   document.getElementById('checkSettlementBtn').style.display = 'none';
   document.getElementById('recordSettlementBtn').style.display = 'block';
   
-  // Store the settlement data
+  // Update the settlement data with the checked values
   window._settlementData = {
+    ...(window._settlementData || {}),
     store: store,
     date: date,
     pettyCashFloat: parseFloat(document.getElementById('pettyCashFloat').value) || 0,
@@ -15928,8 +16223,7 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   
   console.log('✅ Settlement check passed. Ready to record:', window._settlementData);
 });
- // Record Settlement button - UPDATED with auto-print
-document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
+ document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
   if (!window._settlementData) {
     await showAlertModal('Error', 'No settlement data found. Please check again.');
     return;
