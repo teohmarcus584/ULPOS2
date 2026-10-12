@@ -2408,10 +2408,19 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 </div>
 
 <!-- Login Modal -->
+<!-- Login Modal -->
 <div id="loginModal" class="modal-overlay" style="display: none;">
   <div class="modal-container" style="max-width: 400px;">
     <span class="close-modal" id="closeLoginModal">×</span>
     <div class="modal-title">🔐 Enter PIN</div>
+
+    <!-- ✅ NEW: Fingerprint status -->
+    <div id="fingerprintStatus"
+         style="text-align:center; font-size:0.95rem; color:#2c7a4b; padding:10px;
+                background:#f0fdf4; border-radius:12px; margin-bottom:12px;">
+      👆 Place finger to log in
+    </div>
+
     <div class="login-form">
       <input type="password" id="pinInput" class="pin-input" placeholder="****" maxlength="4" inputmode="numeric" autofocus readonly>
       <div class="pin-keypad">
@@ -2842,22 +2851,38 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   <div class="modal-container" style="max-width: 800px;">
     <span class="close-modal" id="closeEmployeeManagementModal">×</span>
     <div class="modal-title">👥 Employee Management</div>
-    
+
     <!-- Add Employee Button -->
     <div style="margin-bottom: 20px;">
       <button id="openAddEmployeeBtn" class="modal-btn modal-btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem; background: linear-gradient(135deg, #059669 0%, #047857 100%); display: flex; align-items: center; justify-content: center; gap: 10px;">
         <span style="font-size: 1.5rem;">➕</span> Add New Employee
       </button>
     </div>
-    
+
     <!-- Employee List -->
-    <div style="max-height: 500px; overflow-y: auto;">
+    <div style="max-height: 400px; overflow-y: auto;">
       <h4 style="margin-bottom: 12px;">📋 Current Employees</h4>
       <div id="employeeListContainer">
         <div style="text-align:center; padding:20px; color:#94a3b8;">Loading employees...</div>
       </div>
     </div>
-    
+
+    <!-- ✅ NEW: Fingerprint Mappings Section -->
+    <div style="margin-top: 24px; border-top: 2px solid #e2e8f0; padding-top: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h4 style="margin:0;">🖐️ Fingerprint Mappings</h4>
+        <button id="addFingerprintBtn"
+                class="modal-btn modal-btn-primary"
+                style="padding:8px 16px; font-size:0.85rem; background:#8b5cf6;">
+          ➕ Add Mapping
+        </button>
+      </div>
+      <div id="fingerprintListContainer"
+           style="max-height:300px; overflow-y:auto; background:#f8fafc; border-radius:12px; padding:12px;">
+        <div style="text-align:center; color:#94a3b8;">Loading mappings...</div>
+      </div>
+    </div>
+
     <div class="modal-buttons">
       <button id="closeEmployeeManagementBtn" class="modal-btn modal-btn-secondary">Close</button>
     </div>
@@ -2888,7 +2913,45 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   </div>
   <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Enter a 4-digit numeric PIN</div>
 </div>
-      
+      <!-- ✅ NEW: Fingerprint Add Modal -->
+<div id="fingerprintAddModal" class="modal-overlay">
+  <div class="modal-container" style="max-width: 500px;">
+    <span class="close-modal" id="closeFingerprintAddModal">×</span>
+    <div class="modal-title">🖐️ Add Fingerprint Mapping</div>
+
+    <div class="filter-group" style="margin-bottom:16px;">
+      <label>AS608 Finger ID (0–299) <span style="color:#ef4444;">*</span></label>
+      <input type="number" id="fpFingerId" class="modal-input"
+             min="0" max="299" placeholder="e.g., 1"
+             style="width:100%; padding:12px; border-radius:12px; border:2px solid #e2e8f0;">
+      <div style="font-size:0.8rem; color:#64748b; margin-top:4px;">
+        This is the ID you assigned when enrolling the finger on the sensor.
+      </div>
+    </div>
+
+    <div class="filter-group" style="margin-bottom:16px;">
+      <label>Employee <span style="color:#ef4444;">*</span></label>
+      <select id="fpEmployeeSelect" class="modal-input"
+              style="width:100%; padding:12px; border-radius:12px; border:2px solid #e2e8f0;">
+        <option value="">-- Select employee --</option>
+      </select>
+    </div>
+
+    <div class="filter-group" style="margin-bottom:16px;">
+      <label>Label (optional)</label>
+      <input type="text" id="fpLabel" class="modal-input"
+             placeholder="e.g., Right thumb"
+             style="width:100%; padding:12px; border-radius:12px; border:2px solid #e2e8f0;">
+    </div>
+
+    <div id="fpError" style="color:#ef4444; margin-top:12px; display:none;"></div>
+
+    <div class="modal-buttons">
+      <button id="cancelFpAdd" class="modal-btn modal-btn-secondary">Cancel</button>
+      <button id="saveFpAdd" class="modal-btn modal-btn-primary" style="background:#8b5cf6;">💾 Save Mapping</button>
+    </div>
+  </div>
+</div>
       <!-- Store Assignment -->
       <div class="filter-group" style="margin-bottom: 16px;">
         <label style="font-weight: 600; color: #1e293b; font-size: 0.95rem;">Assign to Store</label>
@@ -3152,7 +3215,15 @@ const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 console.log('✅ Supabase client created');
+// ==================== FINGERPRINT LOGIN CONFIG ====================
+const ESP32_FINGERPRINT_URL = "http://192.168.1.42";  // ← Replace with YOUR ESP32 IP
 
+let fingerprintPollingInterval = null;
+
+// Cache for fingerprint mappings so we don't hit Supabase every poll
+let fingerprintMappingsCache = null;
+let fingerprintMappingsCacheTime = 0;
+const FINGERPRINT_CACHE_TTL = 60 * 1000; // 1 minute
 // ==================== GLOBAL VARIABLES ====================
 let products = [];
 let cart = [];
@@ -3316,7 +3387,44 @@ async function loadAndCacheEmployees(force = false) {
   }
   return [];
 }
+// ==================== FINGERPRINT MAPPINGS (Supabase) ====================
 
+async function loadFingerprintMappings(force = false) {
+  const now = Date.now();
+  if (!force && fingerprintMappingsCache &&
+      (now - fingerprintMappingsCacheTime) < FINGERPRINT_CACHE_TTL) {
+    return fingerprintMappingsCache;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('fingerprint_mappings')
+      .select('finger_id, employee_id, label');
+
+    if (error) throw error;
+
+    // Build fast lookup: finger_id → { employee_id, label }
+    const map = {};
+    (data || []).forEach(row => {
+      map[row.finger_id] = {
+        employee_id: row.employee_id,
+        label: row.label
+      };
+    });
+
+    fingerprintMappingsCache = map;
+    fingerprintMappingsCacheTime = now;
+    return map;
+  } catch (err) {
+    console.error('Failed to load fingerprint mappings:', err);
+    return fingerprintMappingsCache || {};
+  }
+}
+
+function invalidateFingerprintCache() {
+  fingerprintMappingsCache = null;
+  fingerprintMappingsCacheTime = 0;
+}
 function findEmployeeByPin(pin) {
   if (!cachedEmployees || cachedEmployees.length === 0) return null;
   return cachedEmployees.find(emp => String(emp.pin) === String(pin));
@@ -3345,6 +3453,9 @@ async function verifyEmployeeByPin(pin) {
     document.getElementById('employeeNameHeader').innerText = `👤 ${currentEmployee.name}`;
     document.getElementById('loginModal').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+
+    // ✅ STOP fingerprint polling once logged in
+    stopFingerprintListener();
     
     await finishLoginAfterVerification();
     return true;
@@ -3354,7 +3465,85 @@ async function verifyEmployeeByPin(pin) {
     return false;
   }
 }
+// ==================== FINGERPRINT LOGIN ====================
 
+async function startFingerprintListener() {
+  stopFingerprintListener(); // clear any old loop
+
+  const hint = document.getElementById('fingerprintStatus');
+  if (hint) hint.innerText = '👆 Place finger to log in';
+
+  // Preload mappings once at start
+  await loadFingerprintMappings();
+
+  fingerprintPollingInterval = setInterval(async () => {
+    const loginModal = document.getElementById('loginModal');
+    if (!loginModal || loginModal.style.display !== 'flex') {
+      stopFingerprintListener();
+      return;
+    }
+    if (loginInProgress) return;
+
+    try {
+      const res = await fetch(`${ESP32_FINGERPRINT_URL}/scan`, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      const data = await res.json();
+
+      if (!data.match || data.id < 0) {
+        if (hint) hint.innerText = '👆 Place finger to log in';
+        return;
+      }
+
+      // Look up the finger ID in Supabase
+      const mappings = await loadFingerprintMappings();
+      const mapping = mappings[data.id];
+
+      if (!mapping) {
+        console.warn(`⚠️ Finger ID ${data.id} has no mapping`);
+        if (hint) hint.innerText = `⚠️ Finger #${data.id} not assigned`;
+        return;
+      }
+
+      // Fetch the employee by ID
+      const { data: employee, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', mapping.employee_id)
+        .single();
+
+      if (error || !employee) {
+        console.error('Employee lookup failed:', error);
+        if (hint) hint.innerText = '⚠️ Employee not found';
+        return;
+      }
+
+      if (hint) hint.innerText = `✅ Welcome, ${employee.name}!`;
+
+      // Auto-fill PIN for visual feedback
+      const pinInput = document.getElementById('pinInput');
+      if (pinInput) pinInput.value = employee.pin || '';
+
+      // Reuse your existing login path
+      loginInProgress = true;
+      await verifyEmployeeByPin(employee.pin);
+      loginInProgress = false;
+
+      stopFingerprintListener();
+
+    } catch (err) {
+      if (hint) hint.innerText = '⚠️ Fingerprint device offline';
+    }
+  }, 1500); // poll every 1.5s
+}
+
+function stopFingerprintListener() {
+  if (fingerprintPollingInterval) {
+    clearInterval(fingerprintPollingInterval);
+    fingerprintPollingInterval = null;
+  }
+}
 async function switchToEmployee(newEmployee) {
   if (currentEmployee && currentEmployee.id === newEmployee.id) {
     await showAlertModal('Already logged in', `Already logged in as ${newEmployee.name}.`);
@@ -3871,8 +4060,9 @@ window._selectedCustomer = null;
     storeSelect.value = storeId;
     document.getElementById('storeSelectModal').style.display = 'none';
 
-    document.getElementById('loginModal').style.display = 'flex';
-    document.getElementById('pinInput').focus();
+   document.getElementById('loginModal').style.display = 'flex';
+document.getElementById('pinInput').focus();
+startFingerprintListener();  // ✅ START POLLING
 
     loadAndCacheEmployees().catch(console.warn);
 
@@ -8917,6 +9107,93 @@ function setSettlementFieldsEnabled(enabled) {
 function openEmployeeManagementModal() {
   document.getElementById('employeeManagementModal').style.display = 'flex';
   renderEmployeeList();
+  renderFingerprintList();  // ✅ Load mappings
+}
+
+// ==================== FINGERPRINT MANAGEMENT UI ====================
+
+async function renderFingerprintList() {
+  const container = document.getElementById('fingerprintListContainer');
+  if (!container) return;
+
+  container.innerHTML = '<div style="text-align:center; color:#94a3b8;">Loading...</div>';
+
+  try {
+    const { data, error } = await supabase
+      .from('fingerprint_mappings')
+      .select('id, finger_id, employee_id, label, created_at')
+      .order('finger_id');
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:#94a3b8;">No fingerprints mapped yet. Click "Add Mapping" to start.</div>';
+      return;
+    }
+
+    // Get employee names
+    const empIds = [...new Set(data.map(r => r.employee_id))];
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('id, name')
+      .in('id', empIds);
+
+    const empMap = {};
+    (emps || []).forEach(e => { empMap[e.id] = e.name; });
+
+    let html = '';
+    data.forEach(row => {
+      const empName = empMap[row.employee_id] || `(deleted #${row.employee_id})`;
+      html += `
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:10px 14px; background:white; border-radius:10px;
+                    margin-bottom:8px; border:1px solid #e2e8f0;">
+          <div>
+            <div style="font-weight:600;">
+              🖐️ Finger #${row.finger_id}
+              ${row.label ? `<span style="color:#64748b; font-weight:400;">— ${escapeHtml(row.label)}</span>` : ''}
+            </div>
+            <div style="font-size:0.85rem; color:#64748b;">👤 ${escapeHtml(empName)}</div>
+          </div>
+          <button class="delete-fingerprint-btn"
+                  data-id="${row.id}"
+                  style="background:#fee2e2; color:#dc2626; border:none;
+                         border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer;">
+            🗑️ Delete
+          </button>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+
+    // Attach delete handlers
+    container.querySelectorAll('.delete-fingerprint-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const confirmed = await showConfirmModal(
+          'Delete Mapping',
+          'Remove this fingerprint mapping? The finger template on the sensor is NOT deleted — only the link to an employee.'
+        );
+        if (!confirmed) return;
+
+        showLoading('Deleting...');
+        const { error } = await supabase.from('fingerprint_mappings').delete().eq('id', id);
+        hideLoading();
+
+        if (error) {
+          await showAlertModal('Error', 'Failed to delete: ' + error.message);
+        } else {
+          invalidateFingerprintCache();
+          renderFingerprintList();
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error('renderFingerprintList error:', err);
+    container.innerHTML = '<div style="text-align:center; color:#ef4444;">Failed to load mappings.</div>';
+  }
 }
 
 // Close Employee Management Modal
@@ -16149,7 +16426,86 @@ document.addEventListener('DOMContentLoaded', function() {
   
   await showAlertModal('✅ Synced', 'Products and pending sales synced successfully.');
 });
+// ==================== FINGERPRINT MAPPING EVENT LISTENERS ====================
 
+// Open the add-mapping modal
+document.getElementById('addFingerprintBtn')?.addEventListener('click', async () => {
+  const modal = document.getElementById('fingerprintAddModal');
+  document.getElementById('fpFingerId').value = '';
+  document.getElementById('fpLabel').value = '';
+  document.getElementById('fpError').style.display = 'none';
+
+  // Populate employee dropdown
+  const sel = document.getElementById('fpEmployeeSelect');
+  sel.innerHTML = '<option value="">-- Select employee --</option>';
+  const employees = await loadAndCacheEmployees(true);
+  employees.forEach(emp => {
+    const opt = document.createElement('option');
+    opt.value = emp.id;
+    opt.textContent = `${emp.name} (ID: ${emp.id})`;
+    sel.appendChild(opt);
+  });
+
+  modal.style.display = 'flex';
+});
+
+// Close handlers
+document.getElementById('closeFingerprintAddModal')?.addEventListener('click', () => {
+  document.getElementById('fingerprintAddModal').style.display = 'none';
+});
+document.getElementById('cancelFpAdd')?.addEventListener('click', () => {
+  document.getElementById('fingerprintAddModal').style.display = 'none';
+});
+
+// Save new mapping
+document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
+  const fingerId = parseInt(document.getElementById('fpFingerId').value);
+  const employeeId = parseInt(document.getElementById('fpEmployeeSelect').value);
+  const label = document.getElementById('fpLabel').value.trim();
+  const errDiv = document.getElementById('fpError');
+
+  errDiv.style.display = 'none';
+
+  if (isNaN(fingerId) || fingerId < 0 || fingerId > 299) {
+    errDiv.innerText = '❌ Finger ID must be a number between 0 and 299.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!employeeId) {
+    errDiv.innerText = '❌ Please select an employee.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  showLoading('Saving mapping...');
+  try {
+    const { error } = await supabase
+      .from('fingerprint_mappings')
+      .insert([{
+        finger_id: fingerId,
+        employee_id: employeeId,
+        label: label || null
+      }]);
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`Finger ID ${fingerId} is already assigned. Delete the existing mapping first.`);
+      }
+      throw error;
+    }
+
+    invalidateFingerprintCache();
+    document.getElementById('fingerprintAddModal').style.display = 'none';
+    await showAlertModal('✅ Mapping Saved', `Finger #${fingerId} is now linked to the selected employee.`);
+    renderFingerprintList();
+
+  } catch (err) {
+    errDiv.innerText = '❌ ' + err.message;
+    errDiv.style.display = 'block';
+  } finally {
+    hideLoading();
+  }
+});
   // Low stock toggle
   document.getElementById('lowStockToggleBtn').addEventListener('click', toggleLowStockFilter);
 
@@ -16836,6 +17192,10 @@ document.getElementById('collectSelectedBtn').addEventListener('click', async ()
     if (syncInterval) clearInterval(syncInterval);
     document.getElementById('mainContent').style.display = 'none';
     document.getElementById('loginModal').style.display = 'flex';
+	document.getElementById('loginModal').style.display = 'flex';
+document.getElementById('pinInput').value = '';
+document.getElementById('loginError').innerText = '';
+startFingerprintListener();  // ✅ RESTART POLLING
     document.getElementById('pinInput').value = '';
     document.getElementById('loginError').innerText = '';
     cart = [];
