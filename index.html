@@ -3216,7 +3216,7 @@ var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 console.log('✅ Supabase client created');
 // ==================== FINGERPRINT LOGIN CONFIG ====================
-const ESP32_FINGERPRINT_URL = "http://192.168.0.107";  // ← Replace with YOUR ESP32 IP
+const ESP32_FINGERPRINT_URL = "http://192.168.1.42";  // ← Replace with YOUR ESP32 IP
 
 let fingerprintPollingInterval = null;
 
@@ -3468,21 +3468,30 @@ async function verifyEmployeeByPin(pin) {
 // ==================== FINGERPRINT LOGIN ====================
 
 async function startFingerprintListener() {
-  stopFingerprintListener(); // clear any old loop
+  stopFingerprintListener();
+  
+  console.log('🟢 startFingerprintListener: starting');
+  
+  // Reset any stuck flag
+  loginInProgress = false;
 
   const hint = document.getElementById('fingerprintStatus');
   if (hint) hint.innerText = '👆 Place finger to log in';
 
-  // Preload mappings once at start
   await loadFingerprintMappings();
+  console.log('🟢 Mappings loaded:', Object.keys(fingerprintMappingsCache || {}).length, 'entries');
 
   fingerprintPollingInterval = setInterval(async () => {
     const loginModal = document.getElementById('loginModal');
     if (!loginModal || loginModal.style.display !== 'flex') {
+      console.log('🟢 Modal closed — stopping poller');
       stopFingerprintListener();
       return;
     }
-    if (loginInProgress) return;
+    if (loginInProgress) {
+      console.log('🟢 loginInProgress=true — skipping this cycle');
+      return;
+    }
 
     try {
       const res = await fetch(`${ESP32_FINGERPRINT_URL}/scan`, {
@@ -3496,50 +3505,58 @@ async function startFingerprintListener() {
         return;
       }
 
-      // Look up the finger ID in Supabase
+      console.log('🟢 MATCH DETECTED, id =', data.id);
+
       const mappings = await loadFingerprintMappings();
       const mapping = mappings[data.id];
+      console.log('🟢 Mapping for id', data.id, '=', mapping);
 
       if (!mapping) {
-        console.warn(`⚠️ Finger ID ${data.id} has no mapping`);
+        console.warn('🟢 No mapping found — showing hint');
         if (hint) hint.innerText = `⚠️ Finger #${data.id} not assigned`;
         return;
       }
 
-      // Fetch the employee by ID
       const { data: employee, error } = await supabase
         .from('employees')
         .select('*')
         .eq('id', mapping.employee_id)
         .single();
 
+      console.log('🟢 Employee lookup:', employee?.name, 'Error:', error);
+
       if (error || !employee) {
-        console.error('Employee lookup failed:', error);
         if (hint) hint.innerText = '⚠️ Employee not found';
         return;
       }
 
-      if (hint) hint.innerText = `✅ Welcome, ${employee.name}!`;
+      console.log('🟢 Setting loginInProgress = true');
+      loginInProgress = true;
 
-      // Auto-fill PIN for visual feedback
+      if (hint) hint.innerText = `✅ Welcome, ${employee.name}!`;
       const pinInput = document.getElementById('pinInput');
       if (pinInput) pinInput.value = employee.pin || '';
 
-      // Reuse your existing login path
-      loginInProgress = true;
-      await verifyEmployeeByPin(employee.pin);
-      loginInProgress = false;
+      console.log('🟢 Calling verifyEmployeeByPin with PIN', employee.pin);
+      const result = await verifyEmployeeByPin(employee.pin);
+      console.log('🟢 verifyEmployeeByPin returned:', result);
 
+      loginInProgress = false;
       stopFingerprintListener();
 
     } catch (err) {
+      console.error('❌ Poller exception:', err);
+      loginInProgress = false;
       if (hint) hint.innerText = '⚠️ Fingerprint device offline';
     }
-  }, 1500); // poll every 1.5s
+  }, 1500);
+
+  console.log('🟢 Poller started, interval id =', fingerprintPollingInterval);
 }
 
 function stopFingerprintListener() {
   if (fingerprintPollingInterval) {
+    console.log('🔴 Stopping poller, interval id =', fingerprintPollingInterval);
     clearInterval(fingerprintPollingInterval);
     fingerprintPollingInterval = null;
   }
