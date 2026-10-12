@@ -2943,7 +2943,6 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   </div>
 </div>
 
-<!-- ✅ FINGERPRINT ADD MODAL — TRUE TOP-LEVEL SIBLING -->
 <div id="fingerprintAddModal" class="modal-overlay">
   <div class="modal-container" style="max-width: 500px;">
     <span class="close-modal" id="closeFingerprintAddModal">×</span>
@@ -16520,18 +16519,19 @@ document.addEventListener('DOMContentLoaded', function() {
 // Open the add-mapping modal
 // ==================== FINGERPRINT ENROLLMENT FLOW ====================
 
+l// ==================== FINGERPRINT ENROLLMENT & MANAGEMENT ====================
+
 let enrollPollTimer = null;
 
+// --- Open Add modal ---
 document.getElementById('addFingerprintBtn')?.addEventListener('click', async () => {
   const modal = document.getElementById('fingerprintAddModal');
-  document.getElementById('fpFingerId')?.setAttribute('style', 'display:none');
   document.getElementById('fpLabel').value = '';
   document.getElementById('fpError').style.display = 'none';
   document.getElementById('fpEnrollPanel').style.display = 'none';
   document.getElementById('saveFpAdd').disabled = false;
   document.getElementById('saveFpAdd').innerHTML = '🖐️ Start Enrollment';
 
-  // Populate employee dropdown
   const sel = document.getElementById('fpEmployeeSelect');
   sel.innerHTML = '<option value="">-- Select employee --</option>';
   const employees = await loadAndCacheEmployees(true);
@@ -16545,10 +16545,7 @@ document.getElementById('addFingerprintBtn')?.addEventListener('click', async ()
   modal.style.display = 'flex';
 });
 
-// Cancel
-document.getElementById('closeFingerprintAddModal')?.addEventListener('click', cancelEnrollment);
-document.getElementById('cancelFpAdd')?.addEventListener('click', cancelEnrollment);
-
+// --- Cancel enrollment ---
 async function cancelEnrollment() {
   stopEnrollPoll();
   try {
@@ -16556,8 +16553,10 @@ async function cancelEnrollment() {
   } catch(e) {}
   document.getElementById('fingerprintAddModal').style.display = 'none';
 }
+document.getElementById('closeFingerprintAddModal')?.addEventListener('click', cancelEnrollment);
+document.getElementById('cancelFpAdd')?.addEventListener('click', cancelEnrollment);
 
-// Start enrollment
+// --- Start enrollment ---
 document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
   const employeeId = parseInt(document.getElementById('fpEmployeeSelect').value);
   const label = document.getElementById('fpLabel').value.trim();
@@ -16570,7 +16569,6 @@ document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
     return;
   }
 
-  // Tell ESP32 to start enrollment
   let assignedId;
   try {
     const r = await fetch(`${ESP32_FINGERPRINT_URL}/enroll/start`);
@@ -16583,7 +16581,6 @@ document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
     return;
   }
 
-  // Show the enrollment panel
   document.getElementById('fpEnrollPanel').style.display = 'block';
   document.getElementById('fpEnrollIcon').innerText = '👆';
   document.getElementById('fpEnrollMessage').innerText = 'Place finger on sensor...';
@@ -16591,7 +16588,6 @@ document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
   document.getElementById('saveFpAdd').disabled = true;
   document.getElementById('saveFpAdd').innerHTML = '⏳ Enrolling...';
 
-  // Poll enrollment status every 1s
   enrollPollTimer = setInterval(async () => {
     try {
       const r = await fetch(`${ESP32_FINGERPRINT_URL}/enroll/status`);
@@ -16613,7 +16609,6 @@ document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
         msg.innerText = 'Fingerprint enrolled!';
         hint.innerText = `Saved as ID #${d.id} — saving mapping...`;
 
-        // Save mapping to Supabase
         try {
           const { error } = await supabase
             .from('fingerprint_mappings')
@@ -16633,15 +16628,24 @@ document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
           invalidateFingerprintCache();
           hint.innerText = `✅ Done! Finger #${d.id} linked to employee.`;
 
+          // ✅ Reset button so it's ready next time
+          document.getElementById('saveFpAdd').disabled = false;
+          document.getElementById('saveFpAdd').innerHTML = '🖐️ Start Enrollment';
+          document.getElementById('fpEnrollPanel').style.display = 'none';
+
           setTimeout(async () => {
             document.getElementById('fingerprintAddModal').style.display = 'none';
-            await showAlertModal('✅ Success', `Fingerprint enrolled and mapped successfully.`);
+            await showAlertModal('✅ Success', `Fingerprint enrolled and mapped.`);
             renderFingerprintList();
           }, 1200);
 
         } catch (dbErr) {
           errDiv.innerText = '⚠️ Finger enrolled but mapping failed: ' + dbErr.message;
           errDiv.style.display = 'block';
+
+          // Reset button
+          document.getElementById('saveFpAdd').disabled = false;
+          document.getElementById('saveFpAdd').innerHTML = '🖐️ Try Again';
         }
 
       } else if (d.state === 'error') {
@@ -16663,6 +16667,159 @@ function stopEnrollPoll() {
   if (enrollPollTimer) {
     clearInterval(enrollPollTimer);
     enrollPollTimer = null;
+  }
+}
+
+// ==================== RENDER FINGERPRINT LIST ====================
+
+async function renderFingerprintList() {
+  const container = document.getElementById('fingerprintListContainer');
+  if (!container) return;
+
+  container.innerHTML = '<div style="text-align:center; color:#94a3b8;">Loading...</div>';
+
+  try {
+    const { data, error } = await supabase
+      .from('fingerprint_mappings')
+      .select('id, finger_id, employee_id, label, created_at')
+      .order('finger_id');
+
+    if (error) throw error;
+
+    // Get sensor's actual fingerprint list
+    let sensorFingerIds = [];
+    try {
+      const sr = await fetch(`${ESP32_FINGERPRINT_URL}/list-prints`);
+      const sd = await sr.json();
+      sensorFingerIds = sd.fingerprints || [];
+    } catch (e) {
+      console.warn('Could not reach sensor for list:', e);
+    }
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="text-align:center; color:#94a3b8;">No fingerprints mapped yet. Click "Add Mapping" to start.</div>';
+      return;
+    }
+
+    const empIds = [...new Set(data.map(r => r.employee_id))];
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('id, name')
+      .in('id', empIds);
+
+    const empMap = {};
+    (emps || []).forEach(e => { empMap[e.id] = e.name; });
+
+    let html = '';
+    data.forEach(row => {
+      const empName = empMap[row.employee_id] || `(deleted #${row.employee_id})`;
+      const onSensor = sensorFingerIds.includes(row.finger_id);
+      const sensorBadge = onSensor
+        ? ''
+        : ' <span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:0.7rem;">⚠️ Not on sensor</span>';
+
+      html += `
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:10px 14px; background:white; border-radius:10px;
+                    margin-bottom:8px; border:1px solid #e2e8f0;">
+          <div>
+            <div style="font-weight:600;">
+              🖐️ Finger #${row.finger_id}
+              ${row.label ? `<span style="color:#64748b; font-weight:400;">— ${escapeHtml(row.label)}</span>` : ''}
+              ${sensorBadge}
+            </div>
+            <div style="font-size:0.85rem; color:#64748b;">👤 ${escapeHtml(empName)}</div>
+          </div>
+          <button class="delete-fingerprint-btn"
+                  data-id="${row.id}"
+                  data-finger-id="${row.finger_id}"
+                  style="background:#fee2e2; color:#dc2626; border:none;
+                         border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer;">
+            🗑️ Delete
+          </button>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+
+    // Attach delete handlers
+    container.querySelectorAll('.delete-fingerprint-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const dbId = btn.dataset.id;
+        const fingerId = parseInt(btn.dataset.fingerId);
+
+        const confirmed = await showConfirmModal(
+          'Delete Fingerprint',
+          `<div style="text-align:left;">
+            <p>Delete fingerprint <strong>#${fingerId}</strong>?</p>
+            <p style="margin-top:8px; font-size:0.9rem; color:#64748b;">
+              This will:<br>
+              • Remove the mapping from the database<br>
+              • Delete the template from the sensor
+            </p>
+          </div>`
+        );
+        if (!confirmed) return;
+
+        showLoading('Deleting fingerprint...');
+
+        let sensorOk = false;
+        let sensorMsg = '';
+
+        // 1️⃣ Delete from sensor
+        try {
+          const r = await fetch(`${ESP32_FINGERPRINT_URL}/finger/delete?id=${fingerId}`);
+          const d = await r.json();
+          if (d.ok) {
+            sensorOk = true;
+          } else {
+            sensorMsg = d.error || 'Unknown sensor error';
+          }
+        } catch (e) {
+          sensorMsg = e.message;
+        }
+
+        // 2️⃣ Delete from Supabase
+        const { error: dbErr } = await supabase
+          .from('fingerprint_mappings')
+          .delete()
+          .eq('id', dbId);
+
+        hideLoading();
+
+        if (dbErr) {
+          await showAlertModal('Error', 'Failed to delete from database: ' + dbErr.message);
+          return;
+        }
+
+        invalidateFingerprintCache();
+        await renderFingerprintList();
+
+        if (sensorOk) {
+          await showAlertModal('✅ Deleted',
+            `Fingerprint #${fingerId} was removed from both the database and the sensor.`
+          );
+        } else {
+          await showAlertModal('⚠️ Partial Delete',
+            `<div style="text-align:left;">
+              <p>The mapping was removed from the database.</p>
+              <p style="margin-top:8px; color:#dc2626; font-size:0.9rem;">
+                ⚠️ The sensor could not be updated:<br>
+                <code>${escapeHtml(sensorMsg)}</code>
+              </p>
+              <p style="margin-top:8px; font-size:0.85rem; color:#64748b;">
+                The finger may still match at login. Please re-enroll or delete via the sensor manually.
+              </p>
+            </div>`
+          );
+        }
+      });
+    });
+
+  } catch (err) {
+    console.error('renderFingerprintList error:', err);
+    container.innerHTML = '<div style="text-align:center; color:#ef4444;">Failed to load mappings.</div>';
   }
 }
   // Low stock toggle
