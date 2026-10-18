@@ -5494,18 +5494,18 @@ function updateCartUI() {
     let regularPrice = item.product.price;
     let effectivePrice = regularPrice;
     let itemTotal = 0;
-
+    
     // ✅ Check if this is a 3-state item (CAR AROMATIC or 15ML PERFUME EDP)
     const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-
-    // ✅ Check if this is a 2-state item (100ML or 50ML PERFUME EDP) - normal ↔ half price only
+    
+    // ✅ Check if this is a 2-state item (100ML or 50ML PERFUME EDP) - normal ↔ free only
     const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
-
+    
     if (isThreeStateItem) {
       // 3-state cycling: normal → special → free → normal
       if (item.offerState === 1) {
         // Special price state
-        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+        specialCount = Math.min(item.specialQuantity || 1, item.quantity);AC
         regularCount = item.quantity - specialCount;
         const regularTotal = regularCount * regularPrice;
         const specialTotal = specialCount * specialPrice;
@@ -5516,7 +5516,7 @@ function updateCartUI() {
         freeCount = Math.min(1, item.quantity);
         const paidCount = item.quantity - freeCount;
         itemTotal = paidCount * regularPrice;
-        effectivePrice = 0;
+        effectivePrice = 0; // Free
       } else {
         // Normal state
         itemTotal = item.quantity * regularPrice;
@@ -5524,21 +5524,13 @@ function updateCartUI() {
         freeCount = 0;
       }
     } else if (isTwoStateItem) {
-      // ✅ 2-state: normal ↔ half price
-      if (item.offerState === 1) {
-        // Half price state - one unit at half price
-        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-        regularCount = item.quantity - specialCount;
-        const regularTotal = regularCount * regularPrice;
-        const specialTotal = specialCount * (regularPrice / 2);
-        itemTotal = regularTotal + specialTotal;
-        effectivePrice = regularPrice / 2;
-      } else {
-        // Normal state
-        itemTotal = item.quantity * regularPrice;
-        effectivePrice = regularPrice;
-      }
-      freeCount = 0;
+      // ✅ 2-state: normal ↔ free only (no special price)
+      // freeCount can be 0, 1, 2, etc. up to quantity
+      const maxFree = item.quantity;
+      freeCount = Math.min(item.freeQuantity || 0, maxFree);
+      const paidCount = item.quantity - freeCount;
+      itemTotal = paidCount * regularPrice;
+      effectivePrice = regularPrice;
     } else if (item.isSpecialOffer && item.specialPriceActive) {
       // 2-state items with special price (for other items)
       specialCount = Math.min(item.specialQuantity || 1, item.quantity);
@@ -5554,42 +5546,39 @@ function updateCartUI() {
       itemTotal = paidUnits * regularPrice;
       effectivePrice = regularPrice;
     }
-
+    
     subtotal += itemTotal;
-
+    
     const categoryDisplay = item.product.category
       ? `<div class="cart-item-category">${escapeHtml(item.product.category)}</div>`
       : '';
-
+    
     // ✅ Determine which button to show based on item type
     let buttonHtml = '';
-
+    
     if (isTwoStateItem) {
-      // ✅ 2-state button: Normal ↔ Half Price
-      if (item.offerState === 1) {
-        const halfPrice = (item.product.price / 2).toFixed(2);
+      // ✅ 2-state button with free count shown ON the button
+      const freeCountDisplay = item.freeQuantity || 0;
+      const maxFree = item.quantity;
+      
+      if (freeCountDisplay > 0) {
+        // Show "Remove Free" on the button
         buttonHtml = `
           <div class="cart-item-special">
-            <button class="special-price-btn active" data-index="${idx}"
-                    style="background: #dc2626; border-color: #dc2626; color: white; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4); padding: 6px 16px; font-size: 0.9rem;">
-              🔄 Half Price ✓ (RM ${halfPrice})
+            <button class="special-price-btn active" data-index="${idx}" 
+                    style="background: #f59e0b; border-color: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); padding: 6px 16px; font-size: 0.9rem;">
+              🎁 Remove Free (${freeCountDisplay}/${maxFree} Free)
             </button>
-            <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-              1 unit at RM ${halfPrice} (Click to remove)
-            </span>
           </div>
         `;
       } else {
-        const halfPrice = (item.product.price / 2).toFixed(2);
+        // ✅ FIXED: Show "Activate Free Gift" when no free items
         buttonHtml = `
           <div class="cart-item-special">
-            <button class="special-price-btn" data-index="${idx}"
+            <button class="special-price-btn" data-index="${idx}" 
                     style="background: #f1f5f9; border-color: #e2e8f0; color: #1e293b; padding: 6px 16px; font-size: 0.9rem;">
-              ✂️ Half Price (RM ${halfPrice})
+              🎁 Activate Free Gift
             </button>
-            <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-              Click for 50% off 1 unit
-            </span>
           </div>
         `;
       }
@@ -5598,7 +5587,7 @@ function updateCartUI() {
       let stateText = '';
       let stateColor = '';
       let bgColor = '';
-
+      
       if (item.offerState === 0) {
         stateText = `🏷️ ${item.specialLabel}`;
         stateColor = '#1e293b';
@@ -5612,16 +5601,16 @@ function updateCartUI() {
         stateColor = 'white';
         bgColor = '#f59e0b';
       }
-
+      
       buttonHtml = `
         <div class="cart-item-special">
-          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}"
+          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}" 
                   style="${item.offerState > 0 ? `background: ${bgColor}; border-color: ${bgColor}; color: ${stateColor};` : ''}">
             ${stateText}
           </button>
           <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-            ${item.offerState === 0 ? 'Click for special price' :
-              item.offerState === 1 ? `${item.specialLabel} on 1 unit` :
+            ${item.offerState === 0 ? 'Click for special price' : 
+              item.offerState === 1 ? `${item.specialLabel} on 1 unit` : 
               '1 unit FREE'}
             (Click to cycle)
           </span>
@@ -5633,10 +5622,10 @@ function updateCartUI() {
       const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
       const label = item.specialLabel || `RM ${item.specialPrice}`;
       const bgColor = getSpecialPriceColor(item.specialPrice);
-
+      
       buttonHtml = `
         <div class="cart-item-special">
-          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}"
+          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}" 
                   style="${isActive ? `background: ${bgColor}; border-color: ${bgColor}; color: white;` : ''}">
             ${isActive ? `🔄 ${label} ✓ (${specialCountDisplay} unit)` : `🏷️ AT ${label}`}
           </button>
@@ -5648,8 +5637,8 @@ function updateCartUI() {
     } else {
       // Regular free gift button
       const freeClass = item.freeQuantity > 0 ? 'active' : '';
-      const buttonText = item.freeQuantity > 0
-        ? `🎁 ${item.freeQuantity} Free`
+      const buttonText = item.freeQuantity > 0 
+        ? `🎁 ${item.freeQuantity} Free` 
         : '🎁 Activate Free Gift';
       buttonHtml = `
         <div class="cart-item-free">
@@ -5657,19 +5646,18 @@ function updateCartUI() {
         </div>
       `;
     }
-
+    
     // Build price display
     let priceDisplay = '';
     let priceColor = '';
     let specialBadge = '';
-
+    
     if (isTwoStateItem) {
-      // ✅ 2-state: normal or half price
-      if (item.offerState === 1) {
-        priceColor = '#dc2626';
-        const halfPrice = (regularPrice / 2).toFixed(2);
-        priceDisplay = `${specialCount} x RM ${halfPrice} (Half) + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
-        specialBadge = ` <span style="font-size:0.7rem; color:#dc2626; background:#dc262622; padding:2px 8px; border-radius:10px;">✂️ HALF PRICE</span>`;
+      // ✅ 2-state: normal or free
+      if (freeCount > 0) {
+        priceColor = '#f59e0b';
+        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 ${freeCount} FREE</span>`;
       } else {
         priceDisplay = `RM ${regularPrice.toFixed(2)}`;
       }
@@ -5692,9 +5680,9 @@ function updateCartUI() {
     } else {
       priceDisplay = `RM ${regularPrice.toFixed(2)}`;
     }
-
+    
     const totalDisplay = itemTotal.toFixed(2);
-
+    
     html += `
       <div class="cart-item" data-index="${idx}">
         <div class="cart-item-info">
@@ -5719,16 +5707,19 @@ function updateCartUI() {
 
   subtotalSpan.innerText = `RM ${subtotal.toFixed(2)}`;
 
-  // Calculate staff discount
+  // ✅ FIXED: Calculate staff discount on the amount AFTER other discounts
+  // Step 1: Calculate subtotal after ALL other discounts (except staff)
+  const amountAfterOtherDiscounts = Math.max(0, subtotal - discountAmount - buy2Free1Discount - buy3Free1Discount - customDiscount);
+  
+  // Step 2: Staff discount is 10% of that remaining amount
   if (staffDiscountActive) {
-    staffDiscount = subtotal * 0.10;
+    staffDiscount = amountAfterOtherDiscounts * 0.10;
   } else {
     staffDiscount = 0;
   }
 
-  // Calculate total with all discounts
-  const totalPromoDiscount = buy2Free1Discount + buy3Free1Discount + customDiscount + staffDiscount;
-  const total = subtotal - discountAmount - totalPromoDiscount;
+  // Step 3: Calculate final total
+  const total = Math.max(0, amountAfterOtherDiscounts - staffDiscount);
 
   // Update discount rows
   if (discountAmount > 0) {
@@ -5775,17 +5766,17 @@ function updateCartUI() {
     btn.removeEventListener('click', handleQtyClick);
     btn.addEventListener('click', handleQtyClick);
   });
-
+  
   document.querySelectorAll('.remove-item').forEach(btn => {
     btn.removeEventListener('click', handleRemoveClick);
     btn.addEventListener('click', handleRemoveClick);
   });
-
+  
   document.querySelectorAll('.free-toggle-btn').forEach(btn => {
     btn.removeEventListener('click', handleFreeToggle);
     btn.addEventListener('click', handleFreeToggle);
   });
-
+  
   document.querySelectorAll('.special-price-btn').forEach(btn => {
     btn.removeEventListener('click', handleSpecialPriceClick);
     btn.addEventListener('click', handleSpecialPriceClick);
@@ -5828,35 +5819,37 @@ function getSpecialPriceColor(specialPrice) {
 function toggleSpecialPrice(index) {
   const item = cart[index];
   if (!item) return;
-
-  // ✅ For 100ML and 50ML PERFUME EDP - toggle half price
+  
+  // ✅ For 100ML and 50ML PERFUME EDP - cycle free items one by one
+  // Cycle: 0 free → 1 free → 2 free → ... → quantity free → 0 free (reset)
   if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
-    // Toggle between normal (0) and half price (1)
-    item.offerState = item.offerState === 1 ? 0 : 1;
-
-    if (item.offerState === 1) {
-      // Activate half price - 1 unit at half price
-      item.specialPriceActive = true;
-      item.specialQuantity = 1;
-      item.specialPrice = item.product.price / 2;
-      item.specialLabel = "HALF PRICE";
+    const currentFree = item.freeQuantity || 0;
+    const maxFree = item.quantity;
+    
+    if (currentFree >= maxFree) {
+      // All items are free → reset to 0 free
       item.freeQuantity = 0;
+      item.offerState = 0;
     } else {
-      // Deactivate
-      item.specialPriceActive = false;
-      item.specialQuantity = 0;
-      item.freeQuantity = 0;
+      // Add one more free item
+      item.freeQuantity = currentFree + 1;
+      item.offerState = 2;
     }
-
+    
+    // Ensure freeQuantity doesn't exceed quantity
+    if (item.freeQuantity > item.quantity) {
+      item.freeQuantity = item.quantity;
+    }
+    
     updateCartUI();
     return;
   }
-
+  
   // ✅ For CAR AROMATIC and 15ML PERFUME EDP - 3-state cycling
   if (item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP") {
     // Cycle states: 0=normal → 1=special → 2=free → 0=normal
     item.offerState = (item.offerState + 1) % 3;
-
+    
     if (item.offerState === 0) {
       // Normal state
       item.specialPriceActive = false;
@@ -5873,11 +5866,11 @@ function toggleSpecialPrice(index) {
       item.specialQuantity = 0;
       item.freeQuantity = 1; // One free unit
     }
-
+    
     updateCartUI();
     return;
   }
-
+  
   // ✅ Default toggle for other items
   item.specialPriceActive = !item.specialPriceActive;
   if (item.specialPriceActive) {
@@ -5952,7 +5945,7 @@ async function startCheckout() {
     await showAlertModal('Processing', 'A checkout is already in progress. Please wait.');
     return;
   }
-
+  
   if (cart.length === 0) {
     await showAlertModal('Empty Cart', 'No items to checkout.');
     return;
@@ -5961,16 +5954,7 @@ async function startCheckout() {
   // ✅ Calculate subtotal with special pricing (mixed pricing)
   let subtotal = 0;
   for (let item of cart) {
-    const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
-
-    if (isTwoStateItem && item.offerState === 1) {
-      // ✅ Half price: 1 unit at half, rest at regular
-      const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
-      const regularCount = item.quantity - specialCount;
-      const regularTotal = regularCount * item.product.price;
-      const specialTotal = specialCount * (item.product.price / 2);
-      subtotal += regularTotal + specialTotal;
-    } else if (item.isSpecialOffer && item.specialPriceActive) {
+    if (item.isSpecialOffer && item.specialPriceActive) {
       // ✅ Only ONE unit gets special price, the rest at regular price
       const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
       const regularCount = item.quantity - specialCount;
@@ -5985,24 +5969,33 @@ async function startCheckout() {
 
   console.log('💰 Cart Subtotal (with special pricing):', subtotal);
 
-  // Calculate discounts
+  // ✅ FIXED: Calculate staff discount on the amount AFTER other discounts
+  // Step 1: Calculate subtotal after ALL other discounts (except staff)
+  const amountAfterOtherDiscounts = Math.max(0, subtotal - discountAmount - buy2Free1Discount - buy3Free1Discount - customDiscount);
+  
+  // Step 2: Staff discount is 10% of that remaining amount
   let effectiveStaffDiscount = 0;
   if (staffDiscountActive) {
-    effectiveStaffDiscount = subtotal * 0.10;
+    effectiveStaffDiscount = amountAfterOtherDiscounts * 0.10;
   }
-
-  const totalAmount = subtotal - discountAmount - (buy2Free1Discount + buy3Free1Discount + customDiscount + effectiveStaffDiscount);
-
+  
+  // Step 3: Calculate final total
+  const totalAmount = Math.max(0, amountAfterOtherDiscounts - effectiveStaffDiscount);
+  
   console.log('💰 Checkout total:', {
     subtotal,
     discountAmount,
     buy2Free1Discount,
     buy3Free1Discount,
     customDiscount,
+    amountAfterOtherDiscounts,
     staffDiscount: effectiveStaffDiscount,
     totalAmount
   });
-
+  
+  // Update the global staffDiscount for consistency
+  staffDiscount = effectiveStaffDiscount;
+  
   pendingTransaction = { totalAmount };
   showPaymentModal(totalAmount);
 }
@@ -6334,6 +6327,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
     });
 
     // ✅ Build transaction with BOTH customer_id AND customer_phone
+      // ✅ Build transaction with BOTH customer_id AND customer_phone
     const transaction = {
       transaction_id: transactionId,
       items: saleItems,
@@ -6345,7 +6339,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
       buy2_free1_discount: buy2Free1Discount || 0,
       buy3_free1_discount: buy3Free1Discount || 0,
       custom_discount: customDiscount || 0,
-      staff_discount: staffDiscount || 0,
+      staff_discount: staffDiscount || 0,  // ✅ This is now correctly calculated
       prize_claimed: claimedReceiptInfo || null,
       customer_id: customerId,
       customer_phone: customerPhone,
