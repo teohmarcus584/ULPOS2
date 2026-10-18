@@ -2408,19 +2408,10 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
 </div>
 
 <!-- Login Modal -->
-<!-- Login Modal -->
 <div id="loginModal" class="modal-overlay" style="display: none;">
   <div class="modal-container" style="max-width: 400px;">
     <span class="close-modal" id="closeLoginModal">×</span>
     <div class="modal-title">🔐 Enter PIN</div>
-
-    <!-- ✅ NEW: Fingerprint status -->
-    <div id="fingerprintStatus"
-         style="text-align:center; font-size:0.95rem; color:#2c7a4b; padding:10px;
-                background:#f0fdf4; border-radius:12px; margin-bottom:12px;">
-      👆 Place finger to log in
-    </div>
-
     <div class="login-form">
       <input type="password" id="pinInput" class="pin-input" placeholder="****" maxlength="4" inputmode="numeric" autofocus readonly>
       <div class="pin-keypad">
@@ -2851,38 +2842,22 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   <div class="modal-container" style="max-width: 800px;">
     <span class="close-modal" id="closeEmployeeManagementModal">×</span>
     <div class="modal-title">👥 Employee Management</div>
-
+    
     <!-- Add Employee Button -->
     <div style="margin-bottom: 20px;">
       <button id="openAddEmployeeBtn" class="modal-btn modal-btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem; background: linear-gradient(135deg, #059669 0%, #047857 100%); display: flex; align-items: center; justify-content: center; gap: 10px;">
         <span style="font-size: 1.5rem;">➕</span> Add New Employee
       </button>
     </div>
-
+    
     <!-- Employee List -->
-    <div style="max-height: 400px; overflow-y: auto;">
+    <div style="max-height: 500px; overflow-y: auto;">
       <h4 style="margin-bottom: 12px;">📋 Current Employees</h4>
       <div id="employeeListContainer">
         <div style="text-align:center; padding:20px; color:#94a3b8;">Loading employees...</div>
       </div>
     </div>
-
-    <!-- ✅ NEW: Fingerprint Mappings Section -->
-    <div style="margin-top: 24px; border-top: 2px solid #e2e8f0; padding-top: 16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <h4 style="margin:0;">🖐️ Fingerprint Mappings</h4>
-        <button id="addFingerprintBtn"
-                class="modal-btn modal-btn-primary"
-                style="padding:8px 16px; font-size:0.85rem; background:#8b5cf6;">
-          ➕ Add Mapping
-        </button>
-      </div>
-      <div id="fingerprintListContainer"
-           style="max-height:300px; overflow-y:auto; background:#f8fafc; border-radius:12px; padding:12px;">
-        <div style="text-align:center; color:#94a3b8;">Loading mappings...</div>
-      </div>
-    </div>
-
+    
     <div class="modal-buttons">
       <button id="closeEmployeeManagementBtn" class="modal-btn modal-btn-secondary">Close</button>
     </div>
@@ -2913,8 +2888,7 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
   </div>
   <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Enter a 4-digit numeric PIN</div>
 </div>
-     
-
+      
       <!-- Store Assignment -->
       <div class="filter-group" style="margin-bottom: 16px;">
         <label style="font-weight: 600; color: #1e293b; font-size: 0.95rem;">Assign to Store</label>
@@ -2939,48 +2913,6 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     <div class="modal-buttons">
       <button id="cancelEmployeeFormBtn" class="modal-btn modal-btn-secondary">Cancel</button>
       <button id="saveEmployeeBtn" class="modal-btn modal-btn-primary" style="background: linear-gradient(135deg, #059669 0%, #047857 100%);">💾 Save Employee</button>
-    </div>
-  </div>
-</div>
-
-<div id="fingerprintAddModal" class="modal-overlay">
-  <div class="modal-container" style="max-width: 500px;">
-    <span class="close-modal" id="closeFingerprintAddModal">×</span>
-    <div class="modal-title">🖐️ Add Fingerprint</div>
-
-    <div class="filter-group" style="margin-bottom:16px;">
-      <label>Employee <span style="color:#ef4444;">*</span></label>
-      <select id="fpEmployeeSelect" class="modal-input"
-              style="width:100%; padding:12px; border-radius:12px; border:2px solid #e2e8f0;">
-        <option value="">-- Select employee --</option>
-      </select>
-    </div>
-
-    <div class="filter-group" style="margin-bottom:16px;">
-      <label>Label (optional)</label>
-      <input type="text" id="fpLabel" class="modal-input"
-             placeholder="e.g., Right thumb"
-             style="width:100%; padding:12px; border-radius:12px; border:2px solid #e2e8f0;">
-    </div>
-
-    <div id="fpEnrollPanel" style="display:none; padding:20px; border-radius:16px;
-         background:#f0fdf4; border:2px dashed #10b981; text-align:center; margin:16px 0;">
-      <div id="fpEnrollIcon" style="font-size:3rem; margin-bottom:8px;">👆</div>
-      <div id="fpEnrollMessage" style="font-weight:600; font-size:1.1rem; color:#065f46;">
-        Place finger on sensor...
-      </div>
-      <div id="fpEnrollHint" style="font-size:0.85rem; color:#64748b; margin-top:8px;">
-        Waiting for device to respond
-      </div>
-    </div>
-
-    <div id="fpError" style="color:#ef4444; margin-top:12px; display:none;"></div>
-
-    <div class="modal-buttons">
-      <button id="cancelFpAdd" class="modal-btn modal-btn-secondary">Cancel</button>
-      <button id="saveFpAdd" class="modal-btn modal-btn-primary" style="background:#8b5cf6;">
-        🖐️ Start Enrollment
-      </button>
     </div>
   </div>
 </div>
@@ -3010,8 +2942,6 @@ body:not(.admin-mode) #adminReportModal .stat-item.breakdown {
     </div>
   </div>
 </div>
-
-
 <div id="collectionModal" class="modal-overlay">
   <div class="modal-container" style="max-width: 800px;">
     <span class="close-modal" id="closeCollectionModal">×</span>
@@ -3222,15 +3152,7 @@ const SUPABASE_ANON_KEY = "sb_publishable__pnqMq2EqdelKoPdT4ELqw_Ds2u8HkI";
 var supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 console.log('✅ Supabase client created');
-// ==================== FINGERPRINT LOGIN CONFIG ====================
-const ESP32_FINGERPRINT_URL = "http://192.168.0.107";  // ← Replace with YOUR ESP32 IP
 
-let fingerprintPollingInterval = null;
-
-// Cache for fingerprint mappings so we don't hit Supabase every poll
-let fingerprintMappingsCache = null;
-let fingerprintMappingsCacheTime = 0;
-const FINGERPRINT_CACHE_TTL = 60 * 1000; // 1 minute
 // ==================== GLOBAL VARIABLES ====================
 let products = [];
 let cart = [];
@@ -3272,6 +3194,9 @@ let notificationsEnabled = false;
 let alertedOutOfStockProducts = new Set();
 let alertedLowStockProducts = new Set();
 let preloadedReportCache = null;
+// ✅ ADD THESE LINES - For back-date settlement tracking
+let pendingSettlementDate = null;
+let pendingSettlementStore = null;
 // ✅ ADD THIS LINE HERE - Declare stores BEFORE fetchStores
 let stores = [];
 let storeIdToName = {};
@@ -3394,44 +3319,7 @@ async function loadAndCacheEmployees(force = false) {
   }
   return [];
 }
-// ==================== FINGERPRINT MAPPINGS (Supabase) ====================
 
-async function loadFingerprintMappings(force = false) {
-  const now = Date.now();
-  if (!force && fingerprintMappingsCache &&
-      (now - fingerprintMappingsCacheTime) < FINGERPRINT_CACHE_TTL) {
-    return fingerprintMappingsCache;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('fingerprint_mappings')
-      .select('finger_id, employee_id, label');
-
-    if (error) throw error;
-
-    // Build fast lookup: finger_id → { employee_id, label }
-    const map = {};
-    (data || []).forEach(row => {
-      map[row.finger_id] = {
-        employee_id: row.employee_id,
-        label: row.label
-      };
-    });
-
-    fingerprintMappingsCache = map;
-    fingerprintMappingsCacheTime = now;
-    return map;
-  } catch (err) {
-    console.error('Failed to load fingerprint mappings:', err);
-    return fingerprintMappingsCache || {};
-  }
-}
-
-function invalidateFingerprintCache() {
-  fingerprintMappingsCache = null;
-  fingerprintMappingsCacheTime = 0;
-}
 function findEmployeeByPin(pin) {
   if (!cachedEmployees || cachedEmployees.length === 0) return null;
   return cachedEmployees.find(emp => String(emp.pin) === String(pin));
@@ -3460,9 +3348,6 @@ async function verifyEmployeeByPin(pin) {
     document.getElementById('employeeNameHeader').innerText = `👤 ${currentEmployee.name}`;
     document.getElementById('loginModal').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-
-    // ✅ STOP fingerprint polling once logged in
-    stopFingerprintListener();
     
     await finishLoginAfterVerification();
     return true;
@@ -3472,102 +3357,7 @@ async function verifyEmployeeByPin(pin) {
     return false;
   }
 }
-// ==================== FINGERPRINT LOGIN ====================
 
-async function startFingerprintListener() {
-  stopFingerprintListener();
-  
-  console.log('🟢 startFingerprintListener: starting');
-  
-  // Reset any stuck flag
-  loginInProgress = false;
-
-  const hint = document.getElementById('fingerprintStatus');
-  if (hint) hint.innerText = '👆 Place finger to log in';
-
-  await loadFingerprintMappings();
-  console.log('🟢 Mappings loaded:', Object.keys(fingerprintMappingsCache || {}).length, 'entries');
-
-  fingerprintPollingInterval = setInterval(async () => {
-    const loginModal = document.getElementById('loginModal');
-    if (!loginModal || loginModal.style.display !== 'flex') {
-      console.log('🟢 Modal closed — stopping poller');
-      stopFingerprintListener();
-      return;
-    }
-    if (loginInProgress) {
-      console.log('🟢 loginInProgress=true — skipping this cycle');
-      return;
-    }
-
-    try {
-      const res = await fetch(`${ESP32_FINGERPRINT_URL}/scan`, {
-        method: 'GET',
-        cache: 'no-store'
-      });
-      const data = await res.json();
-
-      if (!data.match || data.id < 0) {
-        if (hint) hint.innerText = '👆 Place finger to log in';
-        return;
-      }
-
-      console.log('🟢 MATCH DETECTED, id =', data.id);
-
-      const mappings = await loadFingerprintMappings();
-      const mapping = mappings[data.id];
-      console.log('🟢 Mapping for id', data.id, '=', mapping);
-
-      if (!mapping) {
-        console.warn('🟢 No mapping found — showing hint');
-        if (hint) hint.innerText = `⚠️ Finger #${data.id} not assigned`;
-        return;
-      }
-
-      const { data: employee, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('id', mapping.employee_id)
-        .single();
-
-      console.log('🟢 Employee lookup:', employee?.name, 'Error:', error);
-
-      if (error || !employee) {
-        if (hint) hint.innerText = '⚠️ Employee not found';
-        return;
-      }
-
-      console.log('🟢 Setting loginInProgress = true');
-      loginInProgress = true;
-
-      if (hint) hint.innerText = `✅ Welcome, ${employee.name}!`;
-      const pinInput = document.getElementById('pinInput');
-      if (pinInput) pinInput.value = employee.pin || '';
-
-      console.log('🟢 Calling verifyEmployeeByPin with PIN', employee.pin);
-      const result = await verifyEmployeeByPin(employee.pin);
-      console.log('🟢 verifyEmployeeByPin returned:', result);
-
-      loginInProgress = false;
-      stopFingerprintListener();
-
-    } catch (err) {
-      console.error('❌ Poller exception:', err);
-      loginInProgress = false;
-      if (hint) hint.innerText = '⚠️ Fingerprint device offline';
-    }
-  }, 1500);
-
-  console.log('🟢 Poller started, interval id =', fingerprintPollingInterval);
-}
-
-function stopFingerprintListener() {
-  if (fingerprintPollingInterval) {
-    console.log('🔴 Stopping poller, interval id =', fingerprintPollingInterval);
-    clearInterval(fingerprintPollingInterval);
-    fingerprintPollingInterval = null;
-  }
-}
 async function switchToEmployee(newEmployee) {
   if (currentEmployee && currentEmployee.id === newEmployee.id) {
     await showAlertModal('Already logged in', `Already logged in as ${newEmployee.name}.`);
@@ -4084,9 +3874,8 @@ window._selectedCustomer = null;
     storeSelect.value = storeId;
     document.getElementById('storeSelectModal').style.display = 'none';
 
-   document.getElementById('loginModal').style.display = 'flex';
-document.getElementById('pinInput').focus();
-startFingerprintListener();  // ✅ START POLLING
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('pinInput').focus();
 
     loadAndCacheEmployees().catch(console.warn);
 
@@ -4627,14 +4416,14 @@ function renderProductGrid() {
       additionalClass = 'out-of-stock-card';
     }
     
-    // ✅ Add special badge based on category
+        // ✅ Add special badge based on category
     let specialBadge = '';
     let badgeColor = '';
     let badgeText = '';
     
     if (prod.category === "100ML PERFUME EDP" || prod.category === "50ML PERFUME EDP") {
       badgeColor = '#dc2626';
-      badgeText = 'RM 1 OFFER';
+      badgeText = '✂️ HALF PRICE';
     } else if (prod.category === "15ML PERFUME EDP") {
       badgeColor = '#059669';
       badgeText = 'RM 10 OFFER';
@@ -5590,22 +5379,20 @@ function addToCart(product) {
   const existing = cart.find(item => item.product.id === product.id);
   if (existing) {
     existing.quantity += 1;
-    
-    // ✅ For 2-state items (100ML/50ML PERFUME EDP), keep free count proportional
+
     const isTwoStateItem = existing.product.category === "100ML PERFUME EDP" || existing.product.category === "50ML PERFUME EDP";
     if (isTwoStateItem) {
-      // Keep free count, but don't exceed quantity
-      if (existing.freeQuantity > existing.quantity) {
-        existing.freeQuantity = existing.quantity;
+      // Keep special quantity, but don't exceed quantity
+      if (existing.specialQuantity > existing.quantity) {
+        existing.specialQuantity = existing.quantity;
       }
     } else {
-      // For other items, reset free count if it exceeds quantity
       if (existing.freeQuantity > existing.quantity) {
         existing.freeQuantity = existing.quantity;
       }
     }
-    
-    // ✅ If special price was active, check if we need to adjust specialQuantity
+
+    // If special price was active, check if we need to adjust specialQuantity
     if (existing.isSpecialOffer && existing.specialPriceActive) {
       if (existing.specialQuantity > 1) {
         existing.specialQuantity = 1;
@@ -5615,13 +5402,13 @@ function addToCart(product) {
     // ✅ Check which special offer this product qualifies for
     let specialPrice = null;
     let specialLabel = null;
-    let offerType = 'none'; // 'special', 'free', 'none'
-    
-    // ✅ 100ML and 50ML PERFUME EDP → FREE GIFT only (no RM 1 special)
+    let offerType = 'none';
+
+    // ✅ 100ML and 50ML PERFUME EDP → HALF PRICE
     if (product.category === "100ML PERFUME EDP" || product.category === "50ML PERFUME EDP") {
-      specialPrice = 0;  // Free
-      specialLabel = "FREE GIFT";
-      offerType = 'free';
+      specialPrice = product.price / 2;
+      specialLabel = "HALF PRICE";
+      offerType = 'special';
     } else if (product.category === "15ML PERFUME EDP") {
       specialPrice = 10;
       specialLabel = "RM 10";
@@ -5631,12 +5418,12 @@ function addToCart(product) {
       specialLabel = "RM 5";
       offerType = 'special';
     }
-    
+
     const isSpecialOffer = specialPrice !== null;
-    
-    cart.push({ 
-      product: { ...product }, 
-      quantity: 1, 
+
+    cart.push({
+      product: { ...product },
+      quantity: 1,
       freeQuantity: 0,
       isSpecialOffer: isSpecialOffer,
       specialPriceActive: false,
@@ -5650,7 +5437,6 @@ function addToCart(product) {
   updateCartUI();
   clearPromo();
 }
-
 function clearCart() {
   if (cart.length === 0) return;
   cart = [];
@@ -5708,13 +5494,13 @@ function updateCartUI() {
     let regularPrice = item.product.price;
     let effectivePrice = regularPrice;
     let itemTotal = 0;
-    
+
     // ✅ Check if this is a 3-state item (CAR AROMATIC or 15ML PERFUME EDP)
     const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-    
-    // ✅ Check if this is a 2-state item (100ML or 50ML PERFUME EDP) - normal ↔ free only
+
+    // ✅ Check if this is a 2-state item (100ML or 50ML PERFUME EDP) - normal ↔ half price only
     const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
-    
+
     if (isThreeStateItem) {
       // 3-state cycling: normal → special → free → normal
       if (item.offerState === 1) {
@@ -5730,7 +5516,7 @@ function updateCartUI() {
         freeCount = Math.min(1, item.quantity);
         const paidCount = item.quantity - freeCount;
         itemTotal = paidCount * regularPrice;
-        effectivePrice = 0; // Free
+        effectivePrice = 0;
       } else {
         // Normal state
         itemTotal = item.quantity * regularPrice;
@@ -5738,13 +5524,21 @@ function updateCartUI() {
         freeCount = 0;
       }
     } else if (isTwoStateItem) {
-      // ✅ 2-state: normal ↔ free only (no special price)
-      // freeCount can be 0, 1, 2, etc. up to quantity
-      const maxFree = item.quantity;
-      freeCount = Math.min(item.freeQuantity || 0, maxFree);
-      const paidCount = item.quantity - freeCount;
-      itemTotal = paidCount * regularPrice;
-      effectivePrice = regularPrice;
+      // ✅ 2-state: normal ↔ half price
+      if (item.offerState === 1) {
+        // Half price state - one unit at half price
+        specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+        regularCount = item.quantity - specialCount;
+        const regularTotal = regularCount * regularPrice;
+        const specialTotal = specialCount * (regularPrice / 2);
+        itemTotal = regularTotal + specialTotal;
+        effectivePrice = regularPrice / 2;
+      } else {
+        // Normal state
+        itemTotal = item.quantity * regularPrice;
+        effectivePrice = regularPrice;
+      }
+      freeCount = 0;
     } else if (item.isSpecialOffer && item.specialPriceActive) {
       // 2-state items with special price (for other items)
       specialCount = Math.min(item.specialQuantity || 1, item.quantity);
@@ -5760,40 +5554,42 @@ function updateCartUI() {
       itemTotal = paidUnits * regularPrice;
       effectivePrice = regularPrice;
     }
-    
+
     subtotal += itemTotal;
-    
+
     const categoryDisplay = item.product.category
       ? `<div class="cart-item-category">${escapeHtml(item.product.category)}</div>`
       : '';
-    
+
     // ✅ Determine which button to show based on item type
     let buttonHtml = '';
-    
+
     if (isTwoStateItem) {
-      // ✅ 2-state button with free count shown ON the button (no separate indicator)
-      const freeCountDisplay = item.freeQuantity || 0;
-      const maxFree = item.quantity;
-      
-      if (freeCountDisplay > 0) {
-        // Show "Remove Free (X/Y)" on the button
-        const freeText = freeCountDisplay === maxFree ? `All ${freeCountDisplay} Free` : `${freeCountDisplay}/${maxFree} Free`;
+      // ✅ 2-state button: Normal ↔ Half Price
+      if (item.offerState === 1) {
+        const halfPrice = (item.product.price / 2).toFixed(2);
         buttonHtml = `
           <div class="cart-item-special">
-            <button class="special-price-btn active" data-index="${idx}" 
-                    style="background: #f59e0b; border-color: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); padding: 6px 16px; font-size: 0.9rem;">
-              🎁 Remove Free (${freeText})
+            <button class="special-price-btn active" data-index="${idx}"
+                    style="background: #dc2626; border-color: #dc2626; color: white; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4); padding: 6px 16px; font-size: 0.9rem;">
+              🔄 Half Price ✓ (RM ${halfPrice})
             </button>
+            <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
+              1 unit at RM ${halfPrice} (Click to remove)
+            </span>
           </div>
         `;
       } else {
-        // Show "Mark as Free (X available)" on the button
+        const halfPrice = (item.product.price / 2).toFixed(2);
         buttonHtml = `
           <div class="cart-item-special">
-            <button class="special-price-btn" data-index="${idx}" 
+            <button class="special-price-btn" data-index="${idx}"
                     style="background: #f1f5f9; border-color: #e2e8f0; color: #1e293b; padding: 6px 16px; font-size: 0.9rem;">
-              ✨ Mark as Free (${maxFree} avail)
+              ✂️ Half Price (RM ${halfPrice})
             </button>
+            <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
+              Click for 50% off 1 unit
+            </span>
           </div>
         `;
       }
@@ -5802,7 +5598,7 @@ function updateCartUI() {
       let stateText = '';
       let stateColor = '';
       let bgColor = '';
-      
+
       if (item.offerState === 0) {
         stateText = `🏷️ ${item.specialLabel}`;
         stateColor = '#1e293b';
@@ -5816,16 +5612,16 @@ function updateCartUI() {
         stateColor = 'white';
         bgColor = '#f59e0b';
       }
-      
+
       buttonHtml = `
         <div class="cart-item-special">
-          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}" 
+          <button class="special-price-btn ${item.offerState > 0 ? 'active' : ''}" data-index="${idx}"
                   style="${item.offerState > 0 ? `background: ${bgColor}; border-color: ${bgColor}; color: ${stateColor};` : ''}">
             ${stateText}
           </button>
           <span class="special-price-hint" style="font-size:0.65rem; color:#64748b; display:block; text-align:center;">
-            ${item.offerState === 0 ? 'Click for special price' : 
-              item.offerState === 1 ? `${item.specialLabel} on 1 unit` : 
+            ${item.offerState === 0 ? 'Click for special price' :
+              item.offerState === 1 ? `${item.specialLabel} on 1 unit` :
               '1 unit FREE'}
             (Click to cycle)
           </span>
@@ -5837,10 +5633,10 @@ function updateCartUI() {
       const specialCountDisplay = isActive ? (item.specialQuantity || 1) : 0;
       const label = item.specialLabel || `RM ${item.specialPrice}`;
       const bgColor = getSpecialPriceColor(item.specialPrice);
-      
+
       buttonHtml = `
         <div class="cart-item-special">
-          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}" 
+          <button class="special-price-btn ${isActive ? 'active' : ''}" data-index="${idx}"
                   style="${isActive ? `background: ${bgColor}; border-color: ${bgColor}; color: white;` : ''}">
             ${isActive ? `🔄 ${label} ✓ (${specialCountDisplay} unit)` : `🏷️ AT ${label}`}
           </button>
@@ -5852,8 +5648,8 @@ function updateCartUI() {
     } else {
       // Regular free gift button
       const freeClass = item.freeQuantity > 0 ? 'active' : '';
-      const buttonText = item.freeQuantity > 0 
-        ? `🎁 ${item.freeQuantity} Free` 
+      const buttonText = item.freeQuantity > 0
+        ? `🎁 ${item.freeQuantity} Free`
         : '🎁 Activate Free Gift';
       buttonHtml = `
         <div class="cart-item-free">
@@ -5861,18 +5657,19 @@ function updateCartUI() {
         </div>
       `;
     }
-    
+
     // Build price display
     let priceDisplay = '';
     let priceColor = '';
     let specialBadge = '';
-    
+
     if (isTwoStateItem) {
-      // ✅ 2-state: normal or free
-      if (freeCount > 0) {
-        priceColor = '#f59e0b';
-        priceDisplay = `${freeCount} x FREE + ${item.quantity - freeCount} x RM ${regularPrice.toFixed(2)}`;
-        specialBadge = ` <span style="font-size:0.7rem; color:#f59e0b; background:#f59e0b22; padding:2px 8px; border-radius:10px;">🎁 ${freeCount} FREE</span>`;
+      // ✅ 2-state: normal or half price
+      if (item.offerState === 1) {
+        priceColor = '#dc2626';
+        const halfPrice = (regularPrice / 2).toFixed(2);
+        priceDisplay = `${specialCount} x RM ${halfPrice} (Half) + ${regularCount} x RM ${regularPrice.toFixed(2)}`;
+        specialBadge = ` <span style="font-size:0.7rem; color:#dc2626; background:#dc262622; padding:2px 8px; border-radius:10px;">✂️ HALF PRICE</span>`;
       } else {
         priceDisplay = `RM ${regularPrice.toFixed(2)}`;
       }
@@ -5895,9 +5692,9 @@ function updateCartUI() {
     } else {
       priceDisplay = `RM ${regularPrice.toFixed(2)}`;
     }
-    
+
     const totalDisplay = itemTotal.toFixed(2);
-    
+
     html += `
       <div class="cart-item" data-index="${idx}">
         <div class="cart-item-info">
@@ -5978,17 +5775,17 @@ function updateCartUI() {
     btn.removeEventListener('click', handleQtyClick);
     btn.addEventListener('click', handleQtyClick);
   });
-  
+
   document.querySelectorAll('.remove-item').forEach(btn => {
     btn.removeEventListener('click', handleRemoveClick);
     btn.addEventListener('click', handleRemoveClick);
   });
-  
+
   document.querySelectorAll('.free-toggle-btn').forEach(btn => {
     btn.removeEventListener('click', handleFreeToggle);
     btn.addEventListener('click', handleFreeToggle);
   });
-  
+
   document.querySelectorAll('.special-price-btn').forEach(btn => {
     btn.removeEventListener('click', handleSpecialPriceClick);
     btn.addEventListener('click', handleSpecialPriceClick);
@@ -6031,36 +5828,35 @@ function getSpecialPriceColor(specialPrice) {
 function toggleSpecialPrice(index) {
   const item = cart[index];
   if (!item) return;
-  
-  // ✅ For 100ML and 50ML PERFUME EDP - cycle free items one by one
+
+  // ✅ For 100ML and 50ML PERFUME EDP - toggle half price
   if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
-    const currentFree = item.freeQuantity || 0;
-    const maxFree = item.quantity;
-    
-    if (currentFree >= maxFree) {
-      // All items are free → reset to 0 free
+    // Toggle between normal (0) and half price (1)
+    item.offerState = item.offerState === 1 ? 0 : 1;
+
+    if (item.offerState === 1) {
+      // Activate half price - 1 unit at half price
+      item.specialPriceActive = true;
+      item.specialQuantity = 1;
+      item.specialPrice = item.product.price / 2;
+      item.specialLabel = "HALF PRICE";
       item.freeQuantity = 0;
-      item.offerState = 0;
     } else {
-      // Add one more free item
-      item.freeQuantity = currentFree + 1;
-      item.offerState = 2;
+      // Deactivate
+      item.specialPriceActive = false;
+      item.specialQuantity = 0;
+      item.freeQuantity = 0;
     }
-    
-    // Ensure freeQuantity doesn't exceed quantity
-    if (item.freeQuantity > item.quantity) {
-      item.freeQuantity = item.quantity;
-    }
-    
+
     updateCartUI();
     return;
   }
-  
+
   // ✅ For CAR AROMATIC and 15ML PERFUME EDP - 3-state cycling
   if (item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP") {
     // Cycle states: 0=normal → 1=special → 2=free → 0=normal
     item.offerState = (item.offerState + 1) % 3;
-    
+
     if (item.offerState === 0) {
       // Normal state
       item.specialPriceActive = false;
@@ -6077,11 +5873,11 @@ function toggleSpecialPrice(index) {
       item.specialQuantity = 0;
       item.freeQuantity = 1; // One free unit
     }
-    
+
     updateCartUI();
     return;
   }
-  
+
   // ✅ Default toggle for other items
   item.specialPriceActive = !item.specialPriceActive;
   if (item.specialPriceActive) {
@@ -6101,7 +5897,7 @@ function updateQuantity(index, delta) {
   } else {
     item.quantity = newQty;
     if (item.freeQuantity > newQty) item.freeQuantity = newQty;
-    
+
     // ✅ If special price is active, ensure specialQuantity doesn't exceed total quantity
     if (item.isSpecialOffer && item.specialPriceActive) {
       if (item.specialQuantity > newQty) {
@@ -6111,7 +5907,16 @@ function updateQuantity(index, delta) {
         item.specialQuantity = 1;
       }
     }
-    
+
+    // ✅ 2-state items (100ML/50ML): cap specialQuantity at 1 and quantity
+    const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
+    if (isTwoStateItem) {
+      if (item.offerState === 1) {
+        if (item.specialQuantity > newQty) item.specialQuantity = newQty;
+        if (item.specialQuantity < 1) item.specialQuantity = 1;
+      }
+    }
+
     // ✅ If 3-state item, ensure states are valid
     const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
     if (isThreeStateItem) {
@@ -6147,7 +5952,7 @@ async function startCheckout() {
     await showAlertModal('Processing', 'A checkout is already in progress. Please wait.');
     return;
   }
-  
+
   if (cart.length === 0) {
     await showAlertModal('Empty Cart', 'No items to checkout.');
     return;
@@ -6156,7 +5961,16 @@ async function startCheckout() {
   // ✅ Calculate subtotal with special pricing (mixed pricing)
   let subtotal = 0;
   for (let item of cart) {
-    if (item.isSpecialOffer && item.specialPriceActive) {
+    const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
+
+    if (isTwoStateItem && item.offerState === 1) {
+      // ✅ Half price: 1 unit at half, rest at regular
+      const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+      const regularCount = item.quantity - specialCount;
+      const regularTotal = regularCount * item.product.price;
+      const specialTotal = specialCount * (item.product.price / 2);
+      subtotal += regularTotal + specialTotal;
+    } else if (item.isSpecialOffer && item.specialPriceActive) {
       // ✅ Only ONE unit gets special price, the rest at regular price
       const specialCount = Math.min(item.specialQuantity || 1, item.quantity);
       const regularCount = item.quantity - specialCount;
@@ -6176,9 +5990,9 @@ async function startCheckout() {
   if (staffDiscountActive) {
     effectiveStaffDiscount = subtotal * 0.10;
   }
-  
+
   const totalAmount = subtotal - discountAmount - (buy2Free1Discount + buy3Free1Discount + customDiscount + effectiveStaffDiscount);
-  
+
   console.log('💰 Checkout total:', {
     subtotal,
     discountAmount,
@@ -6188,7 +6002,7 @@ async function startCheckout() {
     staffDiscount: effectiveStaffDiscount,
     totalAmount
   });
-  
+
   pendingTransaction = { totalAmount };
   showPaymentModal(totalAmount);
 }
@@ -6422,13 +6236,14 @@ async function completeCheckout(paymentMethod, cashReceived) {
     const customerId = finalCustomer ? finalCustomer.id : null;
 
     // ✅ Calculate sale items with all special offers
+        // ✅ Calculate sale items with all special offers
     const saleItems = cart.map(item => {
       let specialPrice = null;
       let specialLabel = null;
-      
+
       if (item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP") {
-        specialPrice = 1;
-        specialLabel = "RM 1";
+        specialPrice = item.product.price / 2;
+        specialLabel = "HALF PRICE";
       } else if (item.product.category === "15ML PERFUME EDP") {
         specialPrice = 10;
         specialLabel = "RM 10";
@@ -6436,10 +6251,11 @@ async function completeCheckout(paymentMethod, cashReceived) {
         specialPrice = 5;
         specialLabel = "RM 5";
       }
-      
+
       const isEligibleForSpecial = specialPrice !== null;
       const isThreeStateItem = item.product.category === "CAR AROMATIC" || item.product.category === "15ML PERFUME EDP";
-      
+      const isTwoStateItem = item.product.category === "100ML PERFUME EDP" || item.product.category === "50ML PERFUME EDP";
+
       let specialCount = 0;
       let regularCount = item.quantity;
       let freeCount = item.freeQuantity || 0;
@@ -6447,7 +6263,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
       let isSpecialActive = false;
       let isFreeActive = false;
       let effectivePrice = item.product.price;
-      
+
       if (isThreeStateItem) {
         if (item.offerState === 1) {
           specialCount = Math.min(item.specialQuantity || 1, item.quantity);
@@ -6468,6 +6284,21 @@ async function completeCheckout(paymentMethod, cashReceived) {
           effectivePrice = item.product.price;
           freeCount = 0;
         }
+      } else if (isTwoStateItem) {
+        // ✅ 2-state: normal ↔ half price
+        if (item.offerState === 1) {
+          specialCount = Math.min(item.specialQuantity || 1, item.quantity);
+          regularCount = item.quantity - specialCount;
+          const regularTotal = regularCount * item.product.price;
+          const specialTotal = specialCount * specialPrice;
+          itemTotal = regularTotal + specialTotal;
+          isSpecialActive = true;
+          effectivePrice = specialPrice;
+          freeCount = 0;
+        } else {
+          itemTotal = item.quantity * item.product.price;
+          effectivePrice = item.product.price;
+        }
       } else if (isEligibleForSpecial && item.specialPriceActive) {
         specialCount = Math.min(item.specialQuantity || 1, item.quantity);
         regularCount = item.quantity - specialCount;
@@ -6482,7 +6313,7 @@ async function completeCheckout(paymentMethod, cashReceived) {
         itemTotal = paidQty * item.product.price;
         effectivePrice = item.product.price;
       }
-      
+
       return {
         id: item.product.id,
         category: item.product.category,
@@ -9131,157 +8962,6 @@ function setSettlementFieldsEnabled(enabled) {
 function openEmployeeManagementModal() {
   document.getElementById('employeeManagementModal').style.display = 'flex';
   renderEmployeeList();
-  renderFingerprintList();  // ✅ Load mappings
-}
-
-// ==================== FINGERPRINT MANAGEMENT UI ====================
-
-async function renderFingerprintList() {
-  const container = document.getElementById('fingerprintListContainer');
-  if (!container) return;
-
-  container.innerHTML = '<div style="text-align:center; color:#94a3b8;">Loading...</div>';
-
-  try {
-    const { data, error } = await supabase
-      .from('fingerprint_mappings')
-      .select('id, finger_id, employee_id, label, created_at')
-      .order('finger_id');
-
-    if (error) throw error;
-
-    // Also get the list of fingers actually on the sensor
-    let sensorFingerIds = [];
-    try {
-      const sr = await fetch(`${ESP32_FINGERPRINT_URL}/list-prints`);
-      const sd = await sr.json();
-      sensorFingerIds = sd.fingerprints || [];
-    } catch (e) {
-      console.warn('Could not reach sensor for list:', e);
-    }
-
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div style="text-align:center; color:#94a3b8;">No fingerprints mapped yet. Click "Add Mapping" to start.</div>';
-      return;
-    }
-
-    const empIds = [...new Set(data.map(r => r.employee_id))];
-    const { data: emps } = await supabase
-      .from('employees')
-      .select('id, name')
-      .in('id', empIds);
-
-    const empMap = {};
-    (emps || []).forEach(e => { empMap[e.id] = e.name; });
-
-    let html = '';
-    data.forEach(row => {
-      const empName = empMap[row.employee_id] || `(deleted #${row.employee_id})`;
-      const onSensor = sensorFingerIds.includes(row.finger_id);
-      const sensorBadge = onSensor
-        ? ''
-        : ' <span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:0.7rem;">⚠️ Not on sensor</span>';
-
-      html += `
-        <div style="display:flex; justify-content:space-between; align-items:center;
-                    padding:10px 14px; background:white; border-radius:10px;
-                    margin-bottom:8px; border:1px solid #e2e8f0;">
-          <div>
-            <div style="font-weight:600;">
-              🖐️ Finger #${row.finger_id}
-              ${row.label ? `<span style="color:#64748b; font-weight:400;">— ${escapeHtml(row.label)}</span>` : ''}
-              ${sensorBadge}
-            </div>
-            <div style="font-size:0.85rem; color:#64748b;">👤 ${escapeHtml(empName)}</div>
-          </div>
-          <button class="delete-fingerprint-btn"
-                  data-id="${row.id}"
-                  data-finger-id="${row.finger_id}"
-                  style="background:#fee2e2; color:#dc2626; border:none;
-                         border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer;">
-            🗑️ Delete
-          </button>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-
-    // ✅ Attach the NEW delete handler (deletes from BOTH sensor and Supabase)
-    container.querySelectorAll('.delete-fingerprint-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const dbId = btn.dataset.id;
-        const fingerId = parseInt(btn.dataset.fingerId);
-
-        const confirmed = await showConfirmModal(
-          'Delete Fingerprint',
-          `<div style="text-align:left;">
-            <p>Delete fingerprint <strong>#${fingerId}</strong>?</p>
-            <p style="margin-top:8px; font-size:0.9rem; color:#64748b;">
-              This will:<br>
-              • Remove the mapping from the database<br>
-              • Delete the template from the sensor
-            </p>
-          </div>`
-        );
-        if (!confirmed) return;
-
-        showLoading('Deleting fingerprint...');
-
-        let sensorOk = false;
-        let sensorMsg = '';
-
-        // 1️⃣ Delete from sensor first
-        try {
-          const r = await fetch(`${ESP32_FINGERPRINT_URL}/finger/delete?id=${fingerId}`);
-          const d = await r.json();
-          if (d.ok) {
-            sensorOk = true;
-          } else {
-            sensorMsg = d.error || 'Unknown sensor error';
-          }
-        } catch (e) {
-          sensorMsg = e.message;
-        }
-
-        // 2️⃣ Delete from Supabase (even if sensor delete failed, we clean the DB)
-        const { error: dbErr } = await supabase
-          .from('fingerprint_mappings')
-          .delete()
-          .eq('id', dbId);
-
-        hideLoading();
-
-        if (dbErr) {
-          await showAlertModal('Error', 'Failed to delete from database: ' + dbErr.message);
-          return;
-        }
-
-        invalidateFingerprintCache();
-        await renderFingerprintList();
-
-        if (sensorOk) {
-          await showAlertModal('✅ Deleted',
-            `Fingerprint #${fingerId} was removed from both the database and the sensor.`
-          );
-        } else {
-          await showAlertModal('⚠️ Partial Delete',
-            `<div style="text-align:left;">
-              <p>The mapping was removed from the database.</p>
-              <p style="margin-top:8px; color:#dc2626; font-size:0.9rem;">
-                ⚠️ The sensor could not be updated:<br>
-                <code>${escapeHtml(sensorMsg)}</code>
-              </p>
-            </div>`
-          );
-        }
-      });
-    });
-
-  } catch (err) {
-    console.error('renderFingerprintList error:', err);
-    container.innerHTML = '<div style="text-align:center; color:#ef4444;">Failed to load mappings.</div>';
-  }
 }
 
 // Close Employee Management Modal
@@ -9920,34 +9600,40 @@ async function showReprintSettlementModal() {
           day: 'numeric'
         });
         
-        const existingSettlement = settlementByDate[dateInfo.date];
-        const status = existingSettlement 
-          ? (existingSettlement.collected ? '✅ Collected' : '⏳ Recorded')
-          : '🔴 Not Settled';
+       const existingSettlement = settlementByDate[dateInfo.date];
+
+// ✅ A date is "pending" if it has unsettled transactions AND hasn't been collected
+// Even if a settlement record exists, if it's NOT collected, it's still pending
+const isTrulyPending = !existingSettlement || existingSettlement.collected !== true;
+
+const status = existingSettlement 
+  ? (existingSettlement.collected ? '✅ Collected' : '⏳ Recorded - Not Collected')
+  : '🔴 Not Settled';
         
         const totalAmount = (dateInfo.cashTotal || 0) + (dateInfo.cardTotal || 0) + 
                            (dateInfo.qrTotal || 0) + (dateInfo.alipayTotal || 0);
         
         const pendingData = existingSettlement || {
-          id: null,
-          date: dateInfo.date,
-          store: store,
-          _isPending: true,
-          _unsettledCount: dateInfo.transactionCount,
-          _cashTotal: dateInfo.cashTotal,
-          _cardTotal: dateInfo.cardTotal,
-          _qrTotal: dateInfo.qrTotal,
-          _alipayTotal: dateInfo.alipayTotal
-        };
-        
-        const settlementJson = JSON.stringify(pendingData).replace(/"/g, '&quot;');
-        
-        options += `<option value="${existingSettlement ? existingSettlement.id : 'pending_' + dateInfo.date}" 
-                    data-settlement='${settlementJson}'
-                    data-is-pending="${!existingSettlement}"
-                    style="color: #dc2626; font-weight: 600;">
-          🔴 ${displayDate} - ${dateInfo.transactionCount} txns (RM ${totalAmount.toFixed(2)}) - NOT SETTLED
-        </option>`;
+  id: null,
+  date: dateInfo.date,
+  store: store,
+  _isPending: true,
+  _unsettledCount: dateInfo.transactionCount,
+  _cashTotal: dateInfo.cashTotal,
+  _cardTotal: dateInfo.cardTotal,
+  _qrTotal: dateInfo.qrTotal,
+  _alipayTotal: dateInfo.alipayTotal
+};
+
+const settlementJson = JSON.stringify(pendingData).replace(/"/g, '&quot;');
+
+// ✅ Use isTrulyPending instead of just !existingSettlement
+options += `<option value="${existingSettlement ? existingSettlement.id : 'pending_' + dateInfo.date}" 
+            data-settlement='${settlementJson}'
+            data-is-pending="${isTrulyPending}"
+            style="color: #dc2626; font-weight: 600;">
+  🔴 ${displayDate} - ${dateInfo.transactionCount} txns (RM ${totalAmount.toFixed(2)}) - ${isTrulyPending ? 'NOT SETTLED' : 'PENDING'}
+</option>`;
       });
       
       options += `</optgroup>`;
@@ -10000,18 +9686,23 @@ async function showReprintSettlementModal() {
     console.log(`✅ Populated ${select.options.length} options for ${store}`);
     
     // Auto-select the first one
-    if (select.options.length > 0) {
-      select.selectedIndex = 0;
-    }
-    
-    // ✅ Remove old listener to prevent duplicates
-    select.removeEventListener('change', updateSettlementActionButton);
-    
-    // ✅ Add listener for future changes
-    select.addEventListener('change', updateSettlementActionButton);
-    
-    // ✅ Update button text immediately
-    updateSettlementActionButton();
+    // Auto-select the first one
+if (select.options.length > 0) {
+  select.selectedIndex = 0;
+}
+
+// ✅ Use onclick assignment instead of addEventListener to guarantee single listener
+// This prevents the "multiple listeners" bug and guarantees the update fires
+select.onchange = function() {
+  console.log('🔄 Settlement date selection changed');
+  updateSettlementActionButton();
+};
+
+// ✅ Update button text immediately
+updateSettlementActionButton();
+
+// ✅ Also update after a short delay (in case DOM isn't ready)
+setTimeout(updateSettlementActionButton, 100);
     
   } catch (err) {
     console.error('❌ Error loading settlements:', err);
@@ -10030,6 +9721,12 @@ function updateSettlementActionButton() {
   
   const selectedOption = select.options[select.selectedIndex];
   
+  // ✅ DEBUG LOG
+  console.log('🔍 updateSettlementActionButton called');
+  console.log('   Selected value:', selectedOption?.value);
+  console.log('   data-is-pending:', selectedOption?.dataset?.isPending);
+  console.log('   Full option HTML:', selectedOption?.outerHTML);
+  
   // No valid selection
   if (!selectedOption || !selectedOption.value || selectedOption.value === '') {
     actionBtn.innerHTML = '🖨️ Reprint';
@@ -10039,15 +9736,18 @@ function updateSettlementActionButton() {
     return;
   }
   
-  const isPending = selectedOption.dataset.isPending === 'true';
+  // ✅ FIXED: Better check for pending
+  const isPendingAttr = selectedOption.dataset.isPending;
+  const isPending = isPendingAttr === 'true' || isPendingAttr === true;
+  
+  console.log('   isPending resolved to:', isPending);
   
   if (isPending) {
     // ✅ Pending settlement → show "Settle Now" button
     actionBtn.innerHTML = '✅ Settle Now';
-    actionBtn.style.background = '#2c7a4b';  // Green
+    actionBtn.style.background = '#2c7a4b';
     actionBtn.style.color = 'white';
     
-    // Show hint message
     if (errorDiv) {
       errorDiv.innerHTML = '⚠️ This date has <strong>unsettled transactions</strong>. Click <strong>"Settle Now"</strong> to open the settlement form for this date.';
       errorDiv.style.display = 'block';
@@ -10061,10 +9761,9 @@ function updateSettlementActionButton() {
   } else {
     // ✅ Existing settlement → show "Reprint" button
     actionBtn.innerHTML = '🖨️ Reprint';
-    actionBtn.style.background = '#2c7a4b';  // Green
+    actionBtn.style.background = '#2c7a4b';
     actionBtn.style.color = 'white';
     
-    // Hide hint
     if (errorDiv) {
       errorDiv.style.display = 'none';
     }
@@ -10209,7 +9908,8 @@ async function reprintSelectedSettlement() {
     return;
   }
   
-  const isPending = selectedOption.dataset.isPending === 'true';
+  const isPendingAttr = selectedOption.dataset.isPending;
+const isPending = isPendingAttr === 'true' || isPendingAttr === true;
   const store = currentStore || initialStore || settlementData.store;
   
   console.log('📋 Selected:', { isPending, settlementData });
@@ -10497,6 +10197,10 @@ async function openSettlementForDate(store, date) {
     // ============================================================
     // ✅ STEP 10: STORE DATA FOR RECORDING (system values only)
     // ============================================================
+       // ✅ CRITICAL: Store the pending date separately so it persists
+    pendingSettlementDate = date;
+    pendingSettlementStore = store;
+    
     window._settlementData = {
       store: store,
       date: date,
@@ -10506,13 +10210,13 @@ async function openSettlementForDate(store, date) {
       qrSystem: qrTotal,
       alipaySystem: alipayTotal,
       refundSystem: 0,
-      cashActual: 0,      // ← Will be filled when user enters
-      cardActual: 0,      // ← Will be filled when user enters
-      qrActual: 0,        // ← Will be filled when user enters
-      alipayActual: 0     // ← Will be filled when user enters
+      cashActual: 0,
+      cardActual: 0,
+      qrActual: 0,
+      alipayActual: 0
     };
     
-    console.log('✅ Settlement data prepared (actual values empty):', window._settlementData);
+    console.log('✅ Pending settlement date set to:', pendingSettlementDate);
     
     // ============================================================
     // ✅ STEP 11: HIDE LOADING + SHOW INFO MESSAGE
@@ -16514,314 +16218,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   await showAlertModal('✅ Synced', 'Products and pending sales synced successfully.');
 });
-// ==================== FINGERPRINT MAPPING EVENT LISTENERS ====================
 
-// Open the add-mapping modal
-// ==================== FINGERPRINT ENROLLMENT FLOW ====================
-
-
-
-let enrollPollTimer = null;
-
-// --- Open Add modal ---
-document.getElementById('addFingerprintBtn')?.addEventListener('click', async () => {
-  const modal = document.getElementById('fingerprintAddModal');
-  document.getElementById('fpLabel').value = '';
-  document.getElementById('fpError').style.display = 'none';
-  document.getElementById('fpEnrollPanel').style.display = 'none';
-  document.getElementById('saveFpAdd').disabled = false;
-  document.getElementById('saveFpAdd').innerHTML = '🖐️ Start Enrollment';
-
-  const sel = document.getElementById('fpEmployeeSelect');
-  sel.innerHTML = '<option value="">-- Select employee --</option>';
-  const employees = await loadAndCacheEmployees(true);
-  employees.forEach(emp => {
-    const opt = document.createElement('option');
-    opt.value = emp.id;
-    opt.textContent = `${emp.name} (ID: ${emp.id})`;
-    sel.appendChild(opt);
-  });
-
-  modal.style.display = 'flex';
-});
-
-// --- Cancel enrollment ---
-async function cancelEnrollment() {
-  stopEnrollPoll();
-  try {
-    await fetch(`${ESP32_FINGERPRINT_URL}/enroll/cancel`);
-  } catch(e) {}
-  document.getElementById('fingerprintAddModal').style.display = 'none';
-}
-document.getElementById('closeFingerprintAddModal')?.addEventListener('click', cancelEnrollment);
-document.getElementById('cancelFpAdd')?.addEventListener('click', cancelEnrollment);
-
-// --- Start enrollment ---
-document.getElementById('saveFpAdd')?.addEventListener('click', async () => {
-  const employeeId = parseInt(document.getElementById('fpEmployeeSelect').value);
-  const label = document.getElementById('fpLabel').value.trim();
-  const errDiv = document.getElementById('fpError');
-  errDiv.style.display = 'none';
-
-  if (!employeeId) {
-    errDiv.innerText = '❌ Please select an employee.';
-    errDiv.style.display = 'block';
-    return;
-  }
-
-  let assignedId;
-  try {
-    const r = await fetch(`${ESP32_FINGERPRINT_URL}/enroll/start`);
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error || 'Failed to start');
-    assignedId = d.assigned_id;
-  } catch (e) {
-    errDiv.innerText = '❌ Cannot reach fingerprint device: ' + e.message;
-    errDiv.style.display = 'block';
-    return;
-  }
-
-  document.getElementById('fpEnrollPanel').style.display = 'block';
-  document.getElementById('fpEnrollIcon').innerText = '👆';
-  document.getElementById('fpEnrollMessage').innerText = 'Place finger on sensor...';
-  document.getElementById('fpEnrollHint').innerText = `Assigned slot: #${assignedId}`;
-  document.getElementById('saveFpAdd').disabled = true;
-  document.getElementById('saveFpAdd').innerHTML = '⏳ Enrolling...';
-
-  enrollPollTimer = setInterval(async () => {
-    try {
-      const r = await fetch(`${ESP32_FINGERPRINT_URL}/enroll/status`);
-      const d = await r.json();
-
-      const icon = document.getElementById('fpEnrollIcon');
-      const msg = document.getElementById('fpEnrollMessage');
-      const hint = document.getElementById('fpEnrollHint');
-
-      if (d.state === 'waiting_1st') {
-        icon.innerText = '👆';
-        msg.innerText = 'Place finger on sensor';
-      } else if (d.state === 'waiting_2nd') {
-        icon.innerText = '✋';
-        msg.innerText = 'Remove finger, then place again';
-      } else if (d.state === 'success') {
-        stopEnrollPoll();
-        icon.innerText = '✅';
-        msg.innerText = 'Fingerprint enrolled!';
-        hint.innerText = `Saved as ID #${d.id} — saving mapping...`;
-
-        try {
-          const { error } = await supabase
-            .from('fingerprint_mappings')
-            .insert([{
-              finger_id: d.id,
-              employee_id: employeeId,
-              label: label || null
-            }]);
-
-          if (error) {
-            if (error.code === '23505') {
-              throw new Error(`Finger #${d.id} is already mapped.`);
-            }
-            throw error;
-          }
-
-          invalidateFingerprintCache();
-          hint.innerText = `✅ Done! Finger #${d.id} linked to employee.`;
-
-          // ✅ Reset button so it's ready next time
-          document.getElementById('saveFpAdd').disabled = false;
-          document.getElementById('saveFpAdd').innerHTML = '🖐️ Start Enrollment';
-          document.getElementById('fpEnrollPanel').style.display = 'none';
-
-          setTimeout(async () => {
-            document.getElementById('fingerprintAddModal').style.display = 'none';
-            await showAlertModal('✅ Success', `Fingerprint enrolled and mapped.`);
-            renderFingerprintList();
-          }, 1200);
-
-        } catch (dbErr) {
-          errDiv.innerText = '⚠️ Finger enrolled but mapping failed: ' + dbErr.message;
-          errDiv.style.display = 'block';
-
-          // Reset button
-          document.getElementById('saveFpAdd').disabled = false;
-          document.getElementById('saveFpAdd').innerHTML = '🖐️ Try Again';
-        }
-
-      } else if (d.state === 'error') {
-        stopEnrollPoll();
-        icon.innerText = '❌';
-        msg.innerText = 'Enrollment failed';
-        hint.innerText = d.message || 'Please try again';
-        document.getElementById('saveFpAdd').disabled = false;
-        document.getElementById('saveFpAdd').innerHTML = '🖐️ Try Again';
-      }
-
-    } catch (e) {
-      console.warn('Poll error:', e);
-    }
-  }, 1000);
-});
-
-function stopEnrollPoll() {
-  if (enrollPollTimer) {
-    clearInterval(enrollPollTimer);
-    enrollPollTimer = null;
-  }
-}
-
-// ==================== RENDER FINGERPRINT LIST ====================
-
-async function renderFingerprintList() {
-  const container = document.getElementById('fingerprintListContainer');
-  if (!container) return;
-
-  container.innerHTML = '<div style="text-align:center; color:#94a3b8;">Loading...</div>';
-
-  try {
-    const { data, error } = await supabase
-      .from('fingerprint_mappings')
-      .select('id, finger_id, employee_id, label, created_at')
-      .order('finger_id');
-
-    if (error) throw error;
-
-    // Get sensor's actual fingerprint list
-    let sensorFingerIds = [];
-    try {
-      const sr = await fetch(`${ESP32_FINGERPRINT_URL}/list-prints`);
-      const sd = await sr.json();
-      sensorFingerIds = sd.fingerprints || [];
-    } catch (e) {
-      console.warn('Could not reach sensor for list:', e);
-    }
-
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div style="text-align:center; color:#94a3b8;">No fingerprints mapped yet. Click "Add Mapping" to start.</div>';
-      return;
-    }
-
-    const empIds = [...new Set(data.map(r => r.employee_id))];
-    const { data: emps } = await supabase
-      .from('employees')
-      .select('id, name')
-      .in('id', empIds);
-
-    const empMap = {};
-    (emps || []).forEach(e => { empMap[e.id] = e.name; });
-
-    let html = '';
-    data.forEach(row => {
-      const empName = empMap[row.employee_id] || `(deleted #${row.employee_id})`;
-      const onSensor = sensorFingerIds.includes(row.finger_id);
-      const sensorBadge = onSensor
-        ? ''
-        : ' <span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:0.7rem;">⚠️ Not on sensor</span>';
-
-      html += `
-        <div style="display:flex; justify-content:space-between; align-items:center;
-                    padding:10px 14px; background:white; border-radius:10px;
-                    margin-bottom:8px; border:1px solid #e2e8f0;">
-          <div>
-            <div style="font-weight:600;">
-              🖐️ Finger #${row.finger_id}
-              ${row.label ? `<span style="color:#64748b; font-weight:400;">— ${escapeHtml(row.label)}</span>` : ''}
-              ${sensorBadge}
-            </div>
-            <div style="font-size:0.85rem; color:#64748b;">👤 ${escapeHtml(empName)}</div>
-          </div>
-          <button class="delete-fingerprint-btn"
-                  data-id="${row.id}"
-                  data-finger-id="${row.finger_id}"
-                  style="background:#fee2e2; color:#dc2626; border:none;
-                         border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer;">
-            🗑️ Delete
-          </button>
-        </div>
-      `;
-    });
-
-    container.innerHTML = html;
-
-    // Attach delete handlers
-    container.querySelectorAll('.delete-fingerprint-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const dbId = btn.dataset.id;
-        const fingerId = parseInt(btn.dataset.fingerId);
-
-        const confirmed = await showConfirmModal(
-          'Delete Fingerprint',
-          `<div style="text-align:left;">
-            <p>Delete fingerprint <strong>#${fingerId}</strong>?</p>
-            <p style="margin-top:8px; font-size:0.9rem; color:#64748b;">
-              This will:<br>
-              • Remove the mapping from the database<br>
-              • Delete the template from the sensor
-            </p>
-          </div>`
-        );
-        if (!confirmed) return;
-
-        showLoading('Deleting fingerprint...');
-
-        let sensorOk = false;
-        let sensorMsg = '';
-
-        // 1️⃣ Delete from sensor
-        try {
-          const r = await fetch(`${ESP32_FINGERPRINT_URL}/finger/delete?id=${fingerId}`);
-          const d = await r.json();
-          if (d.ok) {
-            sensorOk = true;
-          } else {
-            sensorMsg = d.error || 'Unknown sensor error';
-          }
-        } catch (e) {
-          sensorMsg = e.message;
-        }
-
-        // 2️⃣ Delete from Supabase
-        const { error: dbErr } = await supabase
-          .from('fingerprint_mappings')
-          .delete()
-          .eq('id', dbId);
-
-        hideLoading();
-
-        if (dbErr) {
-          await showAlertModal('Error', 'Failed to delete from database: ' + dbErr.message);
-          return;
-        }
-
-        invalidateFingerprintCache();
-        await renderFingerprintList();
-
-        if (sensorOk) {
-          await showAlertModal('✅ Deleted',
-            `Fingerprint #${fingerId} was removed from both the database and the sensor.`
-          );
-        } else {
-          await showAlertModal('⚠️ Partial Delete',
-            `<div style="text-align:left;">
-              <p>The mapping was removed from the database.</p>
-              <p style="margin-top:8px; color:#dc2626; font-size:0.9rem;">
-                ⚠️ The sensor could not be updated:<br>
-                <code>${escapeHtml(sensorMsg)}</code>
-              </p>
-              <p style="margin-top:8px; font-size:0.85rem; color:#64748b;">
-                The finger may still match at login. Please re-enroll or delete via the sensor manually.
-              </p>
-            </div>`
-          );
-        }
-      });
-    });
-
-  } catch (err) {
-    console.error('renderFingerprintList error:', err);
-    container.innerHTML = '<div style="text-align:center; color:#ef4444;">Failed to load mappings.</div>';
-  }
-}
   // Low stock toggle
   document.getElementById('lowStockToggleBtn').addEventListener('click', toggleLowStockFilter);
 
@@ -17046,8 +16443,23 @@ document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAct
   document.getElementById('receiptsSearch').addEventListener('input', updateReceipts);
 
   // Settlement modal
-  document.getElementById('closeSettlementModal').addEventListener('click', () => document.getElementById('settlementModal').style.display = 'none');
-  document.getElementById('closeSettlementModalBtn').addEventListener('click', () => document.getElementById('settlementModal').style.display = 'none');
+  document.getElementById('closeSettlementModal').addEventListener('click', () => {
+  document.getElementById('settlementModal').style.display = 'none';
+  // Clear pending settlement date when closing without recording
+  if (!window._settlementData || window._settlementData.cashActual === 0) {
+    pendingSettlementDate = null;
+    pendingSettlementStore = null;
+  }
+});
+
+document.getElementById('closeSettlementModalBtn').addEventListener('click', () => {
+  document.getElementById('settlementModal').style.display = 'none';
+  // Clear pending settlement date when closing without recording
+  if (!window._settlementData || window._settlementData.cashActual === 0) {
+    pendingSettlementDate = null;
+    pendingSettlementStore = null;
+  }
+});
   document.getElementById('settlementStoreSelect').addEventListener('change', async () => {
     if (currentEmployee?.isAdmin) {
       const newStore = document.getElementById('settlementStoreSelect').value;
@@ -17055,6 +16467,9 @@ document.getElementById('sideReceiptsBtn').addEventListener('click', wrapMenuAct
     }
   });
 
+// ============================================================
+// CHECK SETTLEMENT BUTTON HANDLER
+// ============================================================
 document.getElementById('checkSettlementBtn').addEventListener('click', async () => {
   const errorFields = ['actualCash', 'actualCard', 'actualQR', 'actualAlipay'];
   errorFields.forEach(id => {
@@ -17112,9 +16527,12 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
     return;
   }
 
-  // ✅ Get the date from window._settlementData if it exists (for past date settlement)
+  // ✅ Get the date - use pending date for back-date settlement
   const store = document.getElementById('settlementStoreSelect').value;
-  const date = window._settlementData?.date || getLocalDateString(new Date());
+  const date = pendingSettlementDate || window._settlementData?.date || getLocalDateString(new Date());
+  
+  console.log('🔍 Check Settlement - Using date:', date);
+  console.log('🔍 Pending date:', pendingSettlementDate);
   
   const status = await checkSettlementStatus(store, date);
   
@@ -17137,6 +16555,12 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   document.getElementById('checkSettlementBtn').style.display = 'none';
   document.getElementById('recordSettlementBtn').style.display = 'block';
   
+  // ✅ Ensure pending date is set
+  if (!pendingSettlementDate) {
+    pendingSettlementDate = date;
+    pendingSettlementStore = store;
+  }
+  
   // Update the settlement data with the checked values
   window._settlementData = {
     ...(window._settlementData || {}),
@@ -17154,9 +16578,17 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
     alipayActual: actualAlipay
   };
   
-  console.log('✅ Settlement check passed. Ready to record:', window._settlementData);
-});
- document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
+  console.log('✅ Settlement check passed. Ready to record:');
+  console.log('📅 Date being settled:', window._settlementData.date);
+  console.log('🏪 Store being settled:', window._settlementData.store);
+  console.log('💰 Full data:', window._settlementData);
+}); // ← ✅ CLOSE checkSettlementBtn handler HERE
+
+
+// ============================================================
+// RECORD SETTLEMENT BUTTON HANDLER (SEPARATE - NOT NESTED!)
+// ============================================================
+document.getElementById('recordSettlementBtn').addEventListener('click', async () => {
   if (!window._settlementData) {
     await showAlertModal('Error', 'No settlement data found. Please check again.');
     return;
@@ -17166,10 +16598,22 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   
   try {
     const data = window._settlementData;
+    const settlementDate = pendingSettlementDate || data.date;
+    const settlementStore = pendingSettlementStore || data.store;
+    
+    console.log('========================================');
+    console.log('📝 RECORDING SETTLEMENT');
+    console.log('📅 Date:', settlementDate);
+    console.log('🏪 Store:', settlementStore);
+    console.log('💵 Cash:', data.cashActual);
+    console.log('💳 Card:', data.cardActual);
+    console.log('📱 QR:', data.qrActual);
+    console.log('💸 Alipay:', data.alipayActual);
+    console.log('========================================');
     
     const result = await recordSettlement(
-      data.store,
-      data.date,
+      settlementStore,
+      settlementDate,
       data.pettyCashFloat,
       data.cashSystem,
       data.cardSystem,
@@ -17184,15 +16628,14 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
     
     if (result.success) {
       const message = result.updated 
-        ? `Settlement for ${data.store} on ${data.date} has been updated successfully.`
-        : `Settlement for ${data.store} on ${data.date} has been recorded successfully.`;
+        ? `Settlement for ${settlementStore} on ${settlementDate} has been updated successfully.`
+        : `Settlement for ${settlementStore} on ${settlementDate} has been recorded successfully.`;
       
       await showAlertModal('✅ Settlement Complete', message);
       
       // ✅ AUTO-PRINT SETTLEMENT REPORT
       console.log('🖨️ Auto-printing settlement report...');
       
-      // Check if printer is connected
       if (!isPrinterConnected) {
         const connectNow = await showConfirmModal(
           '🖨️ Printer Not Connected',
@@ -17212,11 +16655,10 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
         }
       }
       
-           // Print the settlement report if printer is connected
       if (isPrinterConnected) {
         const printed = await printSettlementReportWithAnimation(
-          data.store,
-          data.date,
+          settlementStore,
+          settlementDate,
           {
             cashSystem: data.cashSystem,
             cardSystem: data.cardSystem,
@@ -17240,7 +16682,7 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
       
       // Close modal and refresh
       document.getElementById('settlementModal').style.display = 'none';
-      await refreshSettlementTotals(data.store);
+      await refreshSettlementTotals(settlementStore);
       
     } else {
       throw new Error(result.error || 'Unknown error');
@@ -17252,6 +16694,8 @@ document.getElementById('checkSettlementBtn').addEventListener('click', async ()
   } finally {
     hideLoading();
     window._settlementData = null;
+    pendingSettlementDate = null;
+    pendingSettlementStore = null;
   }
 });
 
@@ -17501,39 +16945,25 @@ document.getElementById('collectSelectedBtn').addEventListener('click', async ()
 
   // Logout
   document.getElementById('logoutHeaderBtn').addEventListener('click', () => {
-  // 1. Stop any running pollers
-  if (typeof stopReceiptPolling === 'function') stopReceiptPolling();
-  stopFingerprintListener();
-  
-  // 2. Reset session state
-  cachedReceipts = null;
-  currentEmployee = null;
-  disableBarcodeScanner();
-  if (syncInterval) clearInterval(syncInterval);
-  
-  // 3. Show login modal
-  document.getElementById('mainContent').style.display = 'none';
-  document.getElementById('loginModal').style.display = 'flex';
-  document.getElementById('pinInput').value = '';
-  document.getElementById('loginError').innerText = '';
-  
-  // 4. Start fingerprint listener for next login
-  startFingerprintListener();
-  
-  // 5. Clear cart & data
-  cart = [];
-  products = [];
-  selectedCustomer = null;
-  updateCustomerDisplay();
-  renderProductGrid();
-  
-  // 6. Clear caches
-  initialDataPromise = null;
-  preloadedDataMap = {};
-  cachedEmployees = [];
-  employeesLastFetched = 0;
-  invalidateFingerprintCache();
-});
+    if (typeof stopReceiptPolling === 'function') stopReceiptPolling();
+    cachedReceipts = null;
+    currentEmployee = null;
+    disableBarcodeScanner();
+    if (syncInterval) clearInterval(syncInterval);
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('loginModal').style.display = 'flex';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('loginError').innerText = '';
+    cart = [];
+    products = [];
+    selectedCustomer = null;
+    updateCustomerDisplay();
+    renderProductGrid();
+    initialDataPromise = null;
+    preloadedDataMap = {};
+    cachedEmployees = [];
+    employeesLastFetched = 0;
+  });
 
   // Back to categories
   document.getElementById('backToCategoriesBtn').addEventListener('click', () => {
